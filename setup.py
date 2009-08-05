@@ -5,4 +5,3 @@ setup(name="concussion",
 	author="Jamie Turner",
 	packages=["concussion", "concussion.protocols"],
 	)
-

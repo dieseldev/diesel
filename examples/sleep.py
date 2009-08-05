@@ -6,7 +6,7 @@ def hi_server(addr):
 
 	for x in xrange(4):
 		yield sleep(2)
-		yield str(x)
+		yield str(x) + '\r\n'
 	yield "you said %s" % inp
 
 app = Application()
