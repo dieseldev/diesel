@@ -27,8 +27,8 @@ class Connection(object):
 		self.addr = addr
 		self.pipeline = pipeline.Pipeline()
 		self.buffer = buffer.Buffer()
-		self._wev = event.event(self.handle_write, handle=sock, evtype=event.EV_WRITE | event.EV_PERSIST, arg=None)
 		self._rev = event.event(self.handle_read, handle=sock, evtype=event.EV_READ | event.EV_PERSIST, arg=None)
+		self._wev = None
 		self.g = self.cycle_all(connection_handler(addr))
 
 	def cycle_all(self, current):
@@ -57,21 +57,21 @@ class Connection(object):
 					last = (yield item)
 
 	def set_writable(self, val):
-		if val:
+		if val and self._wev is None:
+			self._wev = event.event(self.handle_write, handle=self.sock, evtype=event.EV_WRITE | event.EV_PERSIST, arg=None)
 			self._wev.add()
-		elif self._wev.pending():
+		elif not val and self._wev is not None:
 			self._wev.delete()
+			self._wev = None
 
 	def shutdown(self):
 		if self._rev != None:
 			self._rev.delete()
-			del self._rev
+			self._rev = None
 
-		if self._wev != None:
-			self._wev.delete()
-			del self._wev
+		self.set_writable(False)
 
-		self._rev = self._wev = self.g = None
+		self.g = None
 
 	def handle_write(self, ev, handle, evtype, _):
 		if not self.pipeline.empty:
@@ -94,6 +94,8 @@ class Connection(object):
 
 					if not self.pipeline.empty:
 						return True
+					else:
+						self.set_writable(False)
 
 	def handle_read(self, ev, handle, evtype, _):
 		disconnect_reason = None
