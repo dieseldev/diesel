@@ -5,7 +5,7 @@ import os
 
 from concussion import logmod, log
 from concussion import timers
-from concussion import reactor
+from concussion import Connection
 
 class Application(object):
 	def __init__(self, logger=None):
@@ -92,4 +92,4 @@ class Service(object):
 
 	def accept_new_connection(self, *args):
 		sock, addr = self.sock.accept()
-		reactor.add_connection(sock, addr, self.connection_handler)
+		Connection(sock, addr, self.connection_handler).iterate()
