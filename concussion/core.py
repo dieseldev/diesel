@@ -27,7 +27,7 @@ class Connection(object):
 		self.addr = addr
 		self.pipeline = pipeline.Pipeline()
 		self.buffer = buffer.Buffer()
-		self._wev = event.event(self.handle_write, handle=sock, evtype=event.EV_WRITE, arg=None)
+		self._wev = event.event(self.handle_write, handle=sock, evtype=event.EV_WRITE | event.EV_PERSIST, arg=None)
 		self._rev = event.event(self.handle_read, handle=sock, evtype=event.EV_READ | event.EV_PERSIST, arg=None)
 		self.g = self.cycle_all(connection_handler(addr))
 
@@ -57,14 +57,12 @@ class Connection(object):
 					last = (yield item)
 
 	def set_writable(self, val):
-		print 'set writable called for', id(self)
 		if val:
 			self._wev.add()
 		elif self._wev.pending():
 			self._wev.delete()
 
 	def shutdown(self):
-		print 'shutdown called for', id(self)
 		if self._rev != None:
 			self._rev.delete()
 			del self._rev
@@ -76,28 +74,26 @@ class Connection(object):
 		self._rev = self._wev = self.g = None
 
 	def handle_write(self, ev, handle, evtype, _):
-		if self.pipeline.empty:
-			self.set_writable(False)
-		else:
+		if not self.pipeline.empty:
 			try:
 				data = self.pipeline.read(BUFSIZ)
 			except pipeline.PipelineCloseRequest:
 				self.sock.close()
 				self.shutdown()
-				return False
-			try:
-				bsent = self.sock.send(data)
-			except socket.error, s:
-				self.shutdown()
-				self.g.throw(ConnectionClosed, str(s))
-
-			if bsent != len(data):
-				self.pipeline.backup(data[bsent:])
-
-			if self.pipeline.empty:
-				self.set_writable(False)
 			else:
-				self.set_writable(True)
+				try:
+					bsent = self.sock.send(data)
+				except socket.error, s:
+					g = self.g
+					self.shutdown()
+					g.throw(ConnectionClosed, str(s))
+
+				else:
+					if bsent != len(data):
+						self.pipeline.backup(data[bsent:])
+
+					if not self.pipeline.empty:
+						return True
 
 	def handle_read(self, ev, handle, evtype, _):
 		disconnect_reason = None
@@ -108,8 +104,9 @@ class Connection(object):
 			disconnect_reason = str(e)
 
 		if not data:
+			g = self.g
 			self.shutdown()
-			self.g.throw(ConnectionClosed, disconnect_reason)
+			g.throw(ConnectionClosed, disconnect_reason)
 		else:
 			res = self.buffer.feed(data)
 			if res:
@@ -136,5 +133,3 @@ class Connection(object):
 
 		if not self.pipeline.empty:
 			self.set_writable(True)
-		else:
-			self.set_writable(False)
