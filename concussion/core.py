@@ -4,6 +4,7 @@ from types import GeneratorType
 
 from concussion import pipeline
 from concussion import buffer
+from concussion import call_later
 
 class ConnectionClosed(socket.error): pass
 
@@ -20,6 +21,10 @@ def until_eol():
 class bytes(object):
 	def __init__(self, bytes):
 		self.sentinel = sentinel
+
+class sleep(object):
+	def __init__(self, duration):
+		self.duration = duration
 	
 class Connection(object):
 	def __init__(self, sock, addr, connection_handler):
@@ -114,6 +119,9 @@ class Connection(object):
 			if res:
 				self.iterate(res)
 
+	def wake(self):
+		self.iterate()
+
 	def iterate(self, n_val=None):
 		while True:
 			try:
@@ -132,6 +140,9 @@ class Connection(object):
 				n_val = self.buffer.check()
 				if n_val == None:
 					break
+			elif type(ret) is sleep:
+				call_later(ret.duration, self.wake)
+				break
 
 		if not self.pipeline.empty:
 			self.set_writable(True)
