@@ -195,5 +195,5 @@ def http_response(req, code, heads, body):
 	yield '''HTTP/%s %s\r\n%s\r\n\r\n''' % (req.version, code, heads.format())
 	if body:
 		yield body
-	if req.version < '1.1' or req.headers.get('Connection') == ['close']:
+	if req.version < '1.1' or req.headers.get('Connection') == ['close'] or heads.get('Connection') == ['close']:
 		yield HttpClose
