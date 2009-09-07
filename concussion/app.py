@@ -15,6 +15,7 @@ class Application(object):
 		self.logger = logger
 		self.add_log = self.logger.add_log
 		self._services = []
+		self._loops = []
 
 	def run(self):
 		self._run = True
@@ -24,6 +25,8 @@ class Application(object):
 			s.bind_and_listen()
 			event.event(s.accept_new_connection,
 			handle=s.sock, evtype=event.EV_READ | event.EV_PERSIST, arg=s).add()
+		for l in self._loops:
+			l.iterate()
 
 		def checkpoint():
 			if not self._run:
@@ -52,6 +55,10 @@ class Application(object):
 	def add_service(self, service):
 		service.application = self
 		self._services.append(service)
+
+	def add_loop(self, loop):
+		loop.application = self
+		self._loops.append(loop)
 		
 	def halt(self):	
 		self._run = False
