@@ -228,3 +228,35 @@ def http_response(req, code, heads, body):
 		yield body
 	if close:
 		yield HttpClose
+
+from concussion import Client, call, response
+
+class HttpClient(Client):
+	@call
+	def request(self, method, path, headers, body=None):
+		req = HttpRequest(method, path, '1.1')
+		
+		if body:
+			headers.set('Content-Length', len(body))
+		
+		yield '%s\r\n%s\r\n\r\n' % (req.format(), 
+		headers.format())
+
+		if body:	
+			yield body
+
+		resp_line = yield until_eol()
+		version, code, status = resp_line.split(None, 2)
+		code = int(code)
+
+		header_block = yield until('\r\n\r\n')
+		heads = HttpHeaders()
+		heads.parse(header_block)
+
+		cl = int(heads.get('Content-Length', [0])[0])
+		if cl:
+			body = yield bytes(cl)
+		else:
+			body = None
+
+		yield response((code, heads, body))

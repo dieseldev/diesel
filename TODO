@@ -2,6 +2,4 @@ General
   * defer_to_thread-style behavior
 
 HTTP 
-  * Keep-alive doesn't seem to be working
   * Send chunks
-  * Http Client

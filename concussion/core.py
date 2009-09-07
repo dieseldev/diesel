@@ -21,7 +21,7 @@ def until_eol():
 	return until(CRLF)
 
 class bytes(object):
-	def __init__(self, bytes):
+	def __init__(self, sentinel):
 		self.sentinel = sentinel
 
 class sleep(object):
@@ -141,7 +141,8 @@ class Connection(object):
 				else:
 					ret = self.g.next()
 			except StopIteration:
-				self.pipeline.close_request()
+				if hasattr(self, 'sock'):
+					self.pipeline.close_request()
 				break
 			n_val = None
 			if isinstance(ret, response):
@@ -163,7 +164,7 @@ class Connection(object):
 					call_later(ret.duration, self.wake)
 				break
 
-		if not self.pipeline.empty:
+		if hasattr(self, 'sock') and not self.pipeline.empty:
 			self.set_writable(True)
 
 class Loop(Connection):
@@ -174,4 +175,3 @@ class Loop(Connection):
 	'''
 	def __init__(self, loop_callable):
 		self.g = self.cycle_all(loop_callable())
-		self.pipeline = pipeline.Pipeline()
