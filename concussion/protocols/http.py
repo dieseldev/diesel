@@ -2,17 +2,49 @@ import sys, socket
 import urllib
 from collections import defaultdict
 
-from concussion import until, until_eol, bytes
+from concussion import until, until_eol, bytes, ConnectionClosed
 
-response_codes = {
-	404 : ('404 Not Found', 'The specified resource was not found'),
-	403 : ('403 Permission Denied', 'Access is denied to this resource'),
-	500 : ('500 Application Error', 'The server encountered an error while processing your request'),
-	501 : ('501 Not Implemented', 'The server is not programmed to handle to your request'),
-	200 : ('200 OK', ''),
-	202 : ('201 Created', ''),
-	202 : ('202 Accepted', ''),
-	205 : ('205 Reset Content', ''),
+status_strings = {
+100 : "Continue",
+101 : "Switching Protocols",
+200 : "OK",
+201 : "Created",
+202 : "Accepted",
+203 : "Non-Authoritative Information",
+204 : "No Content",
+205 : "Reset Content",
+206 : "Partial Content",
+300 : "Multiple Choices",
+301 : "Moved Permanently",
+302 : "Found",
+303 : "See Other",
+304 : "Not Modified",
+305 : "Use Proxy",
+307 : "Temporary Redirect",
+400 : "Bad Request",
+401 : "Unauthorized",
+402 : "Payment Required",
+403 : "Forbidden",
+404 : "Not Found",
+405 : "Method Not Allowed",
+406 : "Not Acceptable",
+407 : "Proxy Authentication Required",
+408 : "Request Time-out",
+409 : "Conflict",
+410 : "Gone",
+411 : "Length Required",
+412 : "Precondition Failed",
+413 : "Request Entity Too Large",
+414 : "Request-URI Too Large",
+415 : "Unsupported Media Type",
+416 : "Requested range not satisfiable",
+417 : "Expectation Failed",
+500 : "Internal Server Error",
+501 : "Not Implemented",
+502 : "Bad Gateway",
+503 : "Service Unavailable",
+504 : "Gateway Time-out",
+505 : "HTTP Version not supported",
 }
 
 def parse_request_line(line):
@@ -86,6 +118,9 @@ class HttpHeaders(object):
 	def __iter__(self):
 		return self._headers
 
+	def __str__(self):
+		return self.format()
+
 class HttpRequest(object):
 	def __init__(self, cmd, url, version, id=None):
 		self.cmd = cmd
@@ -118,7 +153,10 @@ class HttpServer(object):
 		req_id = 1
 		while True:
 			chunks = []
-			header_line = yield until_eol()
+			try:
+				header_line = yield until_eol()
+			except ConnectionClosed:
+				break
 
 			cmd, url, version = parse_request_line(header_line)	
 			req = HttpRequest(cmd, url, version, req_id)
@@ -173,27 +211,20 @@ class HttpServer(object):
 					yield i
 			if leave_loop:
 				break
-			
-class HttpResponse:
-	def __init__(self, code, status, version, request=None):
-		self.code = code
-		self.status = status
-		self.version = version
-		self.headers = None
-		self.request = request
-		
-	def __str__(self):	
-		def p():
-			yield "HTTP/%s %s %s\n" % (self.version, self.code, self.status)
-			yield "\nHeaders\n-------------\n"
-			for h, v in self.headers.iteritems():
-				yield "%s: %s\n" % (h, ','.join(v))
-		return ''.join(list(p()))
 
 def http_response(req, code, heads, body):
-	# XXX TODO -- implement chunked responses
-	yield '''HTTP/%s %s\r\n%s\r\n\r\n''' % (req.version, code, heads.format())
+	if req.version <= '1.0' and req.headers.get('Connection') != 'Keep-Alive':
+		close = True
+	elif req.headers.get('Connection') == ['close'] or  \
+		heads.get('Connection') == ['close']:
+		close = True
+	else:
+		close = False
+		heads.set('Connection', 'keep-alive')
+	yield '''HTTP/%s %s %s\r\n%s\r\n\r\n''' % (
+    req.version, code, status_strings.get(code, "Unknown Status"), 
+	heads.format())
 	if body:
 		yield body
-	if req.version < '1.1' or req.headers.get('Connection') == ['close'] or heads.get('Connection') == ['close']:
+	if close:
 		yield HttpClose

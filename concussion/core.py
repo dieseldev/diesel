@@ -40,14 +40,16 @@ class Connection(object):
 		self.g = self.cycle_all(connection_handler(addr))
 		self.callbacks = deque()
 
-	def cycle_all(self, current):
+	def cycle_all(self, current, error=None):
 		'''Effectively flattens all iterators.
 		'''
 		last = None
 		stack = []
 		while True:
 			try:
-				if last != None:
+				if error != None:
+					item = current.throw(*error)
+				elif last != None:
 					item = current.send(last)
 				else:
 					item = current.next()
@@ -55,14 +57,17 @@ class Connection(object):
 				if stack:
 					current = stack.pop()
 				else:
-					break
+					raise
 			else:
 				if type(item) is GeneratorType:
 					stack.append(current)
 					current = item
 					last = None
 				else:
-					last = (yield item)
+					try:
+						last = (yield item)
+					except ConnectionClosed, e:
+						error = (ConnectionClosed, str(e))
 
 	def set_writable(self, val):
 		if val and self._wev is None:
@@ -72,12 +77,18 @@ class Connection(object):
 			self._wev.delete()
 			self._wev = None
 
-	def shutdown(self):
+	def shutdown(self, remote_closed=False):
 		if self._rev != None:
 			self._rev.delete()
 			self._rev = None
 
 		self.set_writable(False)
+
+		if remote_closed:
+			try:
+				self.g.throw(ConnectionClosed)
+			except StopIteration:
+				pass
 
 		self.g = None
 
@@ -93,9 +104,7 @@ class Connection(object):
 					bsent = self.sock.send(data)
 				except socket.error, s:
 					g = self.g
-					self.shutdown()
-					g.throw(ConnectionClosed, str(s))
-
+					self.shutdown(True)
 				else:
 					if bsent != len(data):
 						self.pipeline.backup(data[bsent:])
@@ -115,8 +124,7 @@ class Connection(object):
 
 		if not data:
 			g = self.g
-			self.shutdown()
-			g.throw(ConnectionClosed, disconnect_reason)
+			self.shutdown(True)
 		else:
 			res = self.buffer.feed(data)
 			if res:

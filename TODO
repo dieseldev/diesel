@@ -1,6 +1,4 @@
 General
-  * Client
-  * Nested socket iterators.. clients return a "callout" or something
   * defer_to_thread-style behavior
 
 HTTP 
