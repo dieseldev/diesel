@@ -36,7 +36,7 @@ class Client(object):
 		self.conn.iterate()
 
 	def client_conn_handler(self, addr):
-		from concussion.core import sleep
+		from concussion.core import sleep, ConnectionClosed
 		yield self.on_connect()
 
 		while True:
@@ -45,7 +45,13 @@ class Client(object):
 			if not self.jobs:
 				continue
 			mygen = self.jobs.popleft()
-			yield mygen
+			try:
+				yield mygen
+			except ConnectionClosed:
+				self.on_close()
 
 	def on_connect(self):
 		if 0: yield 0
+
+	def on_close(self):
+		pass

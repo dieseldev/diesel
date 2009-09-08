@@ -64,6 +64,9 @@ class Connection(object):
 					current = item
 					last = None
 				else:
+					if type(item) is response:
+						assert stack, "Cannot return a response from main handler"
+						current = stack.pop()
 					try:
 						last = (yield item)
 					except ConnectionClosed, e:

@@ -6,9 +6,10 @@ import os
 from concussion import logmod, log
 from concussion import timers
 from concussion import Connection
+from concussion import Loop
 
 class Application(object):
-	def __init__(self, logger=None):
+	def __init__(self, logger=None, cluster=None):
 		self._run = False
 		if logger is None:
 			logger = logmod.Logger()
@@ -16,11 +17,17 @@ class Application(object):
 		self.add_log = self.logger.add_log
 		self._services = []
 		self._loops = []
+		self.cluster = cluster
 
 	def run(self):
 		self._run = True
 		logmod.set_current_application(self)
 		log.info('Starting concussion application')
+		if self.cluster:
+			self.add_service(Service(self.cluster.service, self.cluster.port))
+			self.add_loop(Loop(self.cluster.cluster_loop))
+			from concussion import cluster as clustermod
+			clustermod._cluster = self.cluster
 		for s in self._services:
 			s.bind_and_listen()
 			event.event(s.accept_new_connection,
