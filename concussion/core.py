@@ -27,6 +27,10 @@ class bytes(object):
 class sleep(object):
 	def __init__(self, duration=0):
 		self.duration = duration
+
+class up(object):
+	def __init__(self, value):
+		self.value = value
 	
 class Connection(object):
 	def __init__(self, sock, addr, connection_handler):
@@ -39,6 +43,7 @@ class Connection(object):
 		self._wev = None
 		self.g = self.cycle_all(connection_handler(addr))
 		self.callbacks = deque()
+		self._wakeup_timer = None
 
 	def cycle_all(self, current, error=None):
 		'''Effectively flattens all iterators.
@@ -133,13 +138,21 @@ class Connection(object):
 			if res:
 				self.iterate(res)
 
+	def schedule(self):
+		if self._wakeup_timer:
+			self._wakeup_timer.cancel()
+			self._wakeup_timer = call_later(0, self.wake)
+
 	def wake(self):
+		if self._wakeup_timer:
+			self._wakeup_timer.cancel()
 		self.iterate()
 
 	def iterate(self, n_val=None):
+		self._wakeup_timer = None
 		while True:
 			try:
-				if n_val:
+				if n_val is not None:
 					ret = self.g.send(n_val)
 				else:
 					ret = self.g.next()
@@ -157,6 +170,8 @@ class Connection(object):
 				break
 			elif isinstance(ret, basestring) or hasattr(ret, 'seek'):
 				self.pipeline.add(ret)
+			elif type(ret) is up:
+				n_val = ret.value
 			elif type(ret) is until or type(ret) is bytes:
 				self.buffer.set_term(ret.sentinel)
 				n_val = self.buffer.check()
@@ -164,7 +179,7 @@ class Connection(object):
 					break
 			elif type(ret) is sleep:
 				if ret.duration:
-					call_later(ret.duration, self.wake)
+					self._wakeup_timer = call_later(ret.duration, self.wake)
 				break
 
 		if hasattr(self, 'sock') and not self.pipeline.empty:
@@ -178,3 +193,4 @@ class Loop(Connection):
 	'''
 	def __init__(self, loop_callable):
 		self.g = self.cycle_all(loop_callable())
+		self._wakeup_timer = None

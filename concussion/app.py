@@ -20,14 +20,16 @@ class Application(object):
 		self.cluster = cluster
 
 	def run(self):
+		if self.cluster:
+			self.add_service(Service(self.cluster.service, self.cluster.port))
+			self.add_loop(self.cluster.loop, front=True)
+			from concussion import cluster as clustermod
+			clustermod._cluster = self.cluster
+
 		self._run = True
 		logmod.set_current_application(self)
 		log.info('Starting concussion application')
-		if self.cluster:
-			self.add_service(Service(self.cluster.service, self.cluster.port))
-			self.add_loop(Loop(self.cluster.cluster_loop))
-			from concussion import cluster as clustermod
-			clustermod._cluster = self.cluster
+
 		for s in self._services:
 			s.bind_and_listen()
 			event.event(s.accept_new_connection,
@@ -61,11 +63,22 @@ class Application(object):
 
 	def add_service(self, service):
 		service.application = self
-		self._services.append(service)
+		if self._run:
+			s.bind_and_listen()
+			event.event(s.accept_new_connection,
+			handle=s.sock, evtype=event.EV_READ | event.EV_PERSIST, arg=s).add()
+		else:
+			self._services.append(service)
 
-	def add_loop(self, loop):
+	def add_loop(self, loop, front=False):
 		loop.application = self
-		self._loops.append(loop)
+		if self._run:
+			loop.iterate()
+		else:
+			if front:
+				self._loops.insert(0, loop)
+			else:
+				self._loops.append(loop)
 		
 	def halt(self):	
 		self._run = False

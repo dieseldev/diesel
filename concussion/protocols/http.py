@@ -2,7 +2,7 @@ import sys, socket
 import urllib
 from collections import defaultdict
 
-from concussion import until, until_eol, bytes, ConnectionClosed
+from concussion import up, until, until_eol, bytes, ConnectionClosed
 
 status_strings = {
 100 : "Continue",
@@ -69,7 +69,7 @@ class HttpHeaders(object):
 			del self._headers[k.lower()]
 
 	def set(self, k, v):
-		self._headers[k.lower()] = [k]
+		self._headers[k.lower()] = [str(v).strip()]
 
 	def format(self):
 		s = []
@@ -231,6 +231,31 @@ def http_response(req, code, heads, body):
 
 from concussion import Client, call, response
 
+def handle_chunks(headers):
+	chunks = []
+	while True:
+		chunk_head = yield until_eol()
+		if ';' in chunk_head:
+			# we don't support any chunk extensions
+			chunk_head = chunk_head[:chunk_head.find(';')]
+		size = int(chunk_head, 16)
+		if size == 0:
+			break
+		else:
+			chunks.append((yield bytes(size)))
+			_ = yield bytes(2) # ignore trailing CRLF
+
+	while True:
+		trailer = yield until_eol()
+		if trailer.strip():
+			headers.add(*tuple(trailer.split(':', 1)))
+		else:
+			body = ''.join(chunks)
+			headers.set('Content-Length', len(body))
+			headers.remove('Transfer-Encoding')
+			yield up(body)
+			break
+
 class HttpClient(Client):
 	@call
 	def request(self, method, path, headers, body=None):
@@ -253,10 +278,15 @@ class HttpClient(Client):
 		heads = HttpHeaders()
 		heads.parse(header_block)
 
-		cl = int(heads.get('Content-Length', [0])[0])
-		if cl:
-			body = yield bytes(cl)
+		if heads.get('Transfer-Encoding') == ['chunked']:
+			body = yield handle_chunks(heads)
 		else:
-			body = None
+			cl = int(heads.get('Content-Length', [0])[0])
+			if cl:
+				body = yield bytes(cl)
+			else:
+				body = None
 
+		if version < '1.0' or heads.get('Connection', ['keep-alive'])[0] == 'close':
+			self.close()
 		yield response((code, heads, body))

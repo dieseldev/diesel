@@ -26,6 +26,7 @@ class Client(object):
 	def __init__(self, connection_handler=None):
 		self.connection_handler = connection_handler or self.client_conn_handler
 		self.jobs = deque()
+		self.conn = None
 	 
 	def connect(self, addr, port):  
 		remote_addr = (addr, port)
@@ -35,19 +36,27 @@ class Client(object):
 		self.conn = Connection(sock, (addr, port), self.client_conn_handler)
 		self.conn.iterate()
 
+	def close(self):
+		self.conn = None
+
+	@property
+	def is_closed(self):
+		return self.conn is None
+
 	def client_conn_handler(self, addr):
 		from concussion.core import sleep, ConnectionClosed
 		yield self.on_connect()
 
 		while True:
-			if not self.jobs:
-				yield sleep()
-			if not self.jobs:
-				continue
-			mygen = self.jobs.popleft()
 			try:
+				if not self.jobs:
+					yield sleep()
+				if not self.jobs:
+					continue
+				mygen = self.jobs.popleft()
 				yield mygen
 			except ConnectionClosed:
+				self.close()
 				self.on_close()
 
 	def on_connect(self):
