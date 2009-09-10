@@ -84,6 +84,10 @@ class PaxosAgent(object):
 
 	def handle_accept(self, number, key, value):
 		if self.states.get(key) != number:
+			if key in self.db:
+				ostate, ovalue = self.db[key]
+				if type(ovalue) is list:
+					self.refs[tuple(ovalue)].remove(key)
 			self.db[key] = number, value
 			self.states[key] = number
 			if type(value) is list:
@@ -377,8 +381,8 @@ class ClusterClient(Client):
 
 _cluster = None
 
-def register(name):
-	yield _cluster.register(name)
+def register(name, handler):
+	yield _cluster.register(name, handler)
 
 def send(service, message, *args, **kw):
 	yield _cluster.send(service, message, *args, **kw)

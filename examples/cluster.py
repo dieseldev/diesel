@@ -1,5 +1,5 @@
 import sys
-from concussion import Cluster, Application, Loop
+from concussion import Cluster, Application, Loop, register
 from concussion.logmod import Logger, LOGLVL_DEBUG
 
 this_port = {
@@ -14,7 +14,7 @@ cluster=Cluster([('wimpy', 10001), ('wimpy', 10002), ('wimpy', 10003)], port=thi
 
 def reg_loop():
 	for x in xrange(0, 100):
-		yield a.cluster.register("foobar%s" % x, None)
+		yield register("foobar%s" % x, None)
 
 a.add_loop(Loop(reg_loop))
 
