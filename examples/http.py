@@ -1,7 +1,7 @@
 from concussion import Application, Service
 from concussion.protocols import http
 
-content = "H" * 1247
+content = "Hello, World!"
 
 def hello_http(req):
 	headers = http.HttpHeaders()
