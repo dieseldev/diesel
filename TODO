@@ -1,5 +1,6 @@
 General
   * Reactor.until clarification, vs. sleep/up, etc?
+  * Finish multi-event blocks (until, [sleep, wait])
   * Fake raising an exception through the gen stack in cycle_all..
     if no one catches it, raise it back at the top-most level
   * @message support for "schedule this generator but don't block me"
@@ -9,3 +10,5 @@ General
   * Test WSGI stuff
   * Docstrings
   * Setup, and pyevent bundling
+  * object-ify everything
+  * http use common chunk code

@@ -1,9 +1,15 @@
+'''Very simple static web server.
+
+Define environment variables $BASE, $PORT, $DEFAULT_FILE 
+to override the assumptions '.', 8080, and 'index.html', 
+respectively.
+'''
 import os
 import mimetypes
 
-from concussion import Application, Service
-from concussion.protocols import http
-from concussion.logmod import LOGLVL_INFO
+from diesel import Application, Service
+from diesel.protocols import http
+from diesel.logmod import LOGLVL_INFO
 
 BASE = os.environ.get('BASE', '.')
 PORT = int(os.environ.get('PORT', 8080))

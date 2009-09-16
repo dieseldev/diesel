@@ -5,8 +5,8 @@ import os
 import cStringIO
 import traceback
 
-from concussion import Application, Service, log
-from concussion.protocols.http import HttpServer, HttpHeaders, http_response
+from diesel import Application, Service, log
+from diesel.protocols.http import HttpServer, HttpHeaders, http_response
 
 HOSTNAME = os.uname()[1] # win32?
 

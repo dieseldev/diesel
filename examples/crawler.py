@@ -1,3 +1,7 @@
+'''A very simple, flawed web crawler--demonstrates
+Clients + Loops
+'''
+
 import sys, time, re, os
 from urlparse import urlparse, urljoin
 
@@ -11,8 +15,8 @@ if not base_dir.endswith('/'):
 
 assert schema == 'http', 'http only'
 
-from concussion import Application, Loop
-from concussion.protocols.http import HttpClient, HttpHeaders
+from diesel import Application, Loop
+from diesel.protocols.http import HttpClient, HttpHeaders
 
 CONCURRENCY = 10 # go easy on those apache instances!
 count = 0

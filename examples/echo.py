@@ -1,8 +1,9 @@
-from concussion import Application, Service, until_eol
+'''Simple echo server.
+'''
+from diesel import Application, Service, until_eol
 
 def hi_server(addr):
 	while 1:
-		yield "hi"
 		inp = (yield until_eol())
 		yield "you said %s" % inp
 

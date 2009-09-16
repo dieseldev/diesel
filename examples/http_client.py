@@ -1,8 +1,11 @@
-'''Http Client test
+'''Simple http client example.
+
+Check out crawler.py for more advanced behaviors involving 
+many concurrent clients.
 '''
 
-from concussion import Application, Loop
-from concussion.protocols.http import HttpClient, HttpHeaders
+from diesel import Application, Loop
+from diesel.protocols.http import HttpClient, HttpHeaders
 
 def req_loop():
 	client = HttpClient()

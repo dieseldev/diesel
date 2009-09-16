@@ -1,7 +1,14 @@
-from concussion.protocols.wsgi import WSGIApplication
+'''Test the WSGI binding, hook cherrypy up.
+
+Tested on CherryPy 3.0.3
+'''
+from diesel.protocols.wsgi import WSGIApplication
 import cherrypy
 
-class Root:
+print "Note.. on CherryPy 3.0.3, KeyboardInterrupt doesn't work."
+print "You'll need to Ctl-Z and kill the job manually"
+
+class Root(object):
 	@cherrypy.expose
 	def index(self):
 		return "Hello, World!"

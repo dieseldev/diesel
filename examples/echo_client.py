@@ -1,7 +1,8 @@
-'''Echo test.
+'''A Client example connecting to an echo server (echo.py).
+Utilizes sleep as well.
 '''
 
-from concussion import Application, Client, call, Loop, sleep, until_eol, response
+from diesel import Application, Client, call, Loop, sleep, until_eol, response
 
 class EchoClient(Client):
 	@call
