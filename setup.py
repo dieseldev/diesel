@@ -12,24 +12,21 @@ except ImportError:
 
 diesel requires pyevent and libevent >= 1.4.  
 
-libevent can most likely be found in your apt/yum repository (make sure
-it is at least version 1.4):
-
- sudo apt-get install libevent
-
-.. or downloaded and installed from source via the libevent website:
-
- http://www.monkey.org/~provos/libevent/
+As of 2009-09-15, apt/yum have older versions of libevent, so you'll probably
+need to install 1.4.X from source.  The contrib/ directory in the diesel
+package contains a copy of libevent-1.4.12, for your convenience.
 
 If you don't yet have libevent, please cancel this installation
 and install it.  Then try again!
 
 If you _do_ have libevent, we recommend you allow us to install 
-pyevent--it's packaged with diesel.
+pyevent--it's packaged with diesel, and we do the hard work 
+for you.
 
 To install pyevent, you'll need Pyrex:
 
  sudo easy_install -UZ Pyrex
+
 """
 
 	if raw_input('Install pyevent (y/N)? ').strip().lower() == 'y':
@@ -45,6 +42,7 @@ To install pyevent, you'll need Pyrex:
 			import event
 		except ImportError:
 			print "pyevent still not working.. aborting!"
+			print "(if a previous version of pyevent was misconfigured, try one more time)"
 			raise SystemExit(2)
 		else:
 			print "pyevent ... [OK]"
