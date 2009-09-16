@@ -254,11 +254,11 @@ class Cluster(object):
 
 				if self.missing_nodes:
 					yield sleep(1)
-					#print hashlib.md5(str(list(sorted(self.paxos.db.items())))).hexdigest()
+					print hashlib.md5(str(list(sorted(self.paxos.db.items())))).hexdigest()
 				else:
 					yield sleep(3)
 		#			print list(sorted(self.paxos.db.items()))
-					#print hashlib.md5(str(list(sorted(self.paxos.db.items())))).hexdigest()
+					print hashlib.md5(str(list(sorted(self.paxos.db.items())))).hexdigest()
 
 	def node_disconnect(self, id):
 		del self.connected_nodes[id]

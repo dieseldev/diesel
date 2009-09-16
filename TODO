@@ -10,3 +10,13 @@ General
   * Specialize the paxos database more for our purposes
   * Clean up logging and debug statements
   * Handle connection errors much more robustly on the cluster.. Connection object
+    probably would be helped by the whole "raise through the fake stack" point
+
+Clustering...
+
+register()  -- register a mailbox
+send()      -- send a single message to a mailbox
+rpc()      -- block rpc style on a call to a mailbox
+
+listen()    -- listen to a class of broadcast message
+broadcast() -- send out a broadcast message

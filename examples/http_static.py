@@ -3,12 +3,13 @@ import mimetypes
 
 from concussion import Application, Service
 from concussion.protocols import http
+from concussion.logmod import LOGLVL_INFO
 
 BASE = os.environ.get('BASE', '.')
 PORT = int(os.environ.get('PORT', 8080))
 DEFAULT_FILE = os.environ.get('DEFAULT_FILE', 'index.html')
 
-def hello_http(req):
+def static_http(req):
 	ct = 'text/plain'
 	if req.cmd != 'GET':
 		content = 'Method unsupported'
@@ -36,8 +37,11 @@ def hello_http(req):
 		headers.add('Connection', 'close')
 
 	headers.add('Content-Type', ct)
+	
+	log.info('%s %s %s' % (req.cmd, req.url, code))
 	return http.http_response(req, code, headers, content)
 
 app = Application()
-app.add_service(Service(http.HttpServer(hello_http), PORT))
+app.add_service(Service(http.HttpServer(static_http), PORT))
+log = app.logger.get_sublogger('http', LOGLVL_INFO)
 app.run()

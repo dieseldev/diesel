@@ -9,7 +9,6 @@ base_dir = path if path.endswith('/') else os.path.dirname(path)
 if not base_dir.endswith('/'):
 	base_dir += '/'
 
-
 assert schema == 'http', 'http only'
 
 from concussion import Application, Loop

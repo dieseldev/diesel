@@ -1,7 +1,7 @@
 import socket
 import event
 from types import GeneratorType
-from collections import deque
+from collections import deque, defaultdict
 
 from concussion import pipeline
 from concussion import buffer
@@ -31,6 +31,17 @@ class sleep(object):
 class up(object):
 	def __init__(self, value):
 		self.value = value
+
+class wait(object):
+	def __init__(self, event):
+		self.event = event
+
+class fire(object):
+	def __init__(self, event, value):
+		self.event = event
+		self.value = value
+
+global_waits = defaultdict(set)
 	
 class Connection(object):
 	def __init__(self, sock, addr, connection_handler):
@@ -138,48 +149,71 @@ class Connection(object):
 			if res:
 				self.iterate(res)
 
-	def schedule(self):
+	def schedule(self, value=None):
 		if self._wakeup_timer:
 			self._wakeup_timer.cancel()
-			self._wakeup_timer = call_later(0, self.wake)
+			self._wakeup_timer = call_later(0, self.wake, value)
 
-	def wake(self):
+	def wake(self, value=None):
 		if self._wakeup_timer:
 			self._wakeup_timer.cancel()
-		self.iterate()
+		self.iterate(value)
 
 	def iterate(self, n_val=None):
 		self._wakeup_timer = None
 		while True:
 			try:
 				if n_val is not None:
-					ret = self.g.send(n_val)
+					rets = self.g.send(n_val)
 				else:
-					ret = self.g.next()
+					rets = self.g.next()
 			except StopIteration:
 				if hasattr(self, 'sock'):
 					self.pipeline.close_request()
 				break
 			n_val = None
-			if isinstance(ret, response):
-				c = self.callbacks.popleft()
-				c(ret.value)
-				break
-			elif isinstance(ret, call):
-				ret.go(self.iterate)
-				break
-			elif isinstance(ret, basestring) or hasattr(ret, 'seek'):
-				self.pipeline.add(ret)
-			elif type(ret) is up:
-				n_val = ret.value
-			elif type(ret) is until or type(ret) is bytes:
-				self.buffer.set_term(ret.sentinel)
-				n_val = self.buffer.check()
-				if n_val == None:
+			if type(rets) != tuple:
+				rets = (rets,)
+
+			exit = False
+			for ret in rets:
+				
+				if isinstance(ret, response):
+					c = self.callbacks.popleft()
+					c(ret.value)
+					assert len(rets) == 1, "response cannot be paired with any other yield token"
+					exit = True
+				elif isinstance(ret, call):
+					ret.go(self.iterate)
+					assert len(rets) == 1, "call cannot be paired with any other yield token"
+					exit = True
+				elif isinstance(ret, basestring) or hasattr(ret, 'seek'):
+					self.pipeline.add(ret)
+					assert len(rets) == 1, "a string or file cannot be paired with any other yield token"
+				elif type(ret) is up:
+					n_val = ret.value
+					assert len(rets) == 1, "up cannot be paired with any other yield token"
+				elif type(ret) is fire:
+					assert len(rets) == 1, "fire cannot be paired with any other yield token"
+					waiters = global_waits[ret.event]
+					for w in waiters:
+						w(ret)
+					global_waits[fire.event] = set()
+				elif type(ret) is until or type(ret) is bytes:
+					self.buffer.set_term(ret.sentinel)
+					n_val = self.buffer.check()
+					if n_val == None:
+						exit = True
+				elif type(ret) is sleep:
+					if ret.duration:
+						self._wakeup_timer = call_later(ret.duration, self.wake, ret)
+					exit = True
+				elif type(ret) is wait:
+					global_waits[ret.event].add(self.schedule)
+					exit = True
+				if exit: 
 					break
-			elif type(ret) is sleep:
-				if ret.duration:
-					self._wakeup_timer = call_later(ret.duration, self.wake)
+			if exit: 
 				break
 
 		if hasattr(self, 'sock') and not self.pipeline.empty:
