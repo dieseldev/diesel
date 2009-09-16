@@ -8,5 +8,4 @@ General
   * Clean up logging and debug statements
   * Test WSGI stuff
   * Docstrings
-  * object-ify everything
   * http use common chunk code
