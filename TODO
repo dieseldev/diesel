@@ -1,6 +1,8 @@
 0.9b
   * Reactor.until clarification, vs. sleep/up, etc?
-  * Finish multi-event blocks (until, [sleep, wait])
+  * Finish multi-event blocks (until, [sleep, wait]),
+    clear waits, sleeps, etc, anything not triggered..
+	how's the return work?
   * Fake raising an exception through the gen stack in cycle_all..
     if no one catches it, raise it back at the top-most level
   * Clean up logging and debug statements
