@@ -13,7 +13,7 @@ HOSTNAME = os.uname()[1] # win32?
 def cgiish_name(nm):
 	return nm.upper().replace('-', '_')
 
-class FileLikeErrorLogger:
+class FileLikeErrorLogger(object):
 	def __init__(self, logger):
 		self.logger = logger
 

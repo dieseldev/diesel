@@ -19,7 +19,7 @@ _lvl_text = {
 }
 	
 
-class Logger:
+class Logger(object):
 	def __init__(self, fd=sys.stdout, verbosity=LOGLVL_WARN):
 		self.fdlist = [fd]
 		self.level = verbosity
@@ -52,7 +52,7 @@ def set_current_application(app):
 	global _current_application
 	_current_application = app
 
-class _currentLogger:
+class _currentLogger(object):
 	def __getattr__(self, n):
 		return getattr(_current_application.logger, n)
 
