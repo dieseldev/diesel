@@ -1,0 +1,4 @@
+include contrib/event-0.4-diesel.tar.gz
+include contrib/bogus.pyx
+include LICENSE
+recursive-include examples *.py

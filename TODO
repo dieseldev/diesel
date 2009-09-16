@@ -6,9 +6,7 @@ General
   * @message support for "schedule this generator but don't block me"
   * Write tests, somehow--check out twisted.trial
   * Clean up logging and debug statements
-  * Rename to diesel
   * Test WSGI stuff
   * Docstrings
-  * Setup, and pyevent bundling
   * object-ify everything
   * http use common chunk code
