@@ -1,7 +1,7 @@
 from setuptools import setup
 
-setup(name="concussion",
-	version="1.0b",
-	author="Jamie Turner",
-	packages=["concussion", "concussion.protocols"],
+setup(name="diesel",
+	version="0.9.0b",
+	author="Jamie Turner/Boomplex LLC",
+	packages=["diesel", "diesel.protocols"],
 	)

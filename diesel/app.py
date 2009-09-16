@@ -3,13 +3,13 @@ import event
 import traceback
 import os
 
-from concussion import logmod, log
-from concussion import timers
-from concussion import Connection
-from concussion import Loop
+from diesel import logmod, log
+from diesel import timers
+from diesel import Connection
+from diesel import Loop
 
 class Application(object):
-	def __init__(self, logger=None, cluster=None):
+	def __init__(self, logger=None):
 		self._run = False
 		if logger is None:
 			logger = logmod.Logger()
@@ -17,18 +17,11 @@ class Application(object):
 		self.add_log = self.logger.add_log
 		self._services = []
 		self._loops = []
-		self.cluster = cluster
 
 	def run(self):
-		if self.cluster:
-			self.add_service(Service(self.cluster.service, self.cluster.port))
-			self.add_loop(self.cluster.loop, front=True)
-			from concussion import cluster as clustermod
-			clustermod._cluster = self.cluster
-
 		self._run = True
 		logmod.set_current_application(self)
-		log.info('Starting concussion application')
+		log.info('Starting diesel application')
 
 		for s in self._services:
 			s.bind_and_listen()
@@ -42,8 +35,6 @@ class Application(object):
 				raise SystemExit
 
 		timers.call_every(1.0, checkpoint)
-#		import gc, sys # XXX debug
-#		timers.call_every(5.0, lambda: sys.stdout.write(repr(gc.get_objects()) + '\n'))
 		
 		self.setup()
 		while self._run:
@@ -59,7 +50,7 @@ class Application(object):
 				log.error("-- Unhandled Exception in main loop --")
 				log.error(traceback.format_exc())
 
-		log.info('Ending concussion application')
+		log.info('Ending diesel application')
 
 	def add_service(self, service):
 		service.application = self

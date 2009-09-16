@@ -32,7 +32,7 @@ class Client(object):
 		remote_addr = (addr, port)
 		sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		sock.connect(remote_addr)
-		from concussion.core import Connection
+		from diesel.core import Connection
 		self.conn = Connection(sock, (addr, port), self.client_conn_handler)
 		self.conn.iterate()
 
@@ -44,7 +44,7 @@ class Client(object):
 		return self.conn is None
 
 	def client_conn_handler(self, addr):
-		from concussion.core import sleep, ConnectionClosed
+		from diesel.core import sleep, ConnectionClosed
 		yield self.on_connect()
 
 		while True:

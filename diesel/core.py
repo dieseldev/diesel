@@ -3,10 +3,10 @@ import event
 from types import GeneratorType
 from collections import deque, defaultdict
 
-from concussion import pipeline
-from concussion import buffer
-from concussion import call_later
-from concussion.client import call, response
+from diesel import pipeline
+from diesel import buffer
+from diesel import call_later
+from diesel.client import call, response
 
 class ConnectionClosed(socket.error): pass
 

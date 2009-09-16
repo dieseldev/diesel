@@ -2,7 +2,7 @@ import sys, socket
 import urllib
 from collections import defaultdict
 
-from concussion import up, until, until_eol, bytes, ConnectionClosed
+from diesel import up, until, until_eol, bytes, ConnectionClosed
 
 status_strings = {
 100 : "Continue",
@@ -229,7 +229,7 @@ def http_response(req, code, heads, body):
 	if close:
 		yield HttpClose
 
-from concussion import Client, call, response
+from diesel import Client, call, response
 
 def handle_chunks(headers):
 	chunks = []
