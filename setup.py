@@ -1,6 +1,6 @@
 from setuptools import setup
 from pkg_resources import require
-import os, sys
+import os, sys, time
 
 print ""
 try:
@@ -15,7 +15,11 @@ except ImportError:
 	print "source distribution)"
 	print ""
 
-	if not raw_input('Install pyevent (Y/n)? ').strip().lower().startswith('n'):
+	if not raw_input('Install pyevent and install/upgrade Pyrex if necessary (Y/n)? ').strip().lower().startswith('n'):
+		print ""
+		print "OK--restart this installation when the pyevent sub-installation is done."
+		print ""
+		time.sleep(3)
 		try:
 			require('Pyrex>=0.9.8.5')
 		except:
