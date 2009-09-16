@@ -11,7 +11,7 @@ except ImportError:
 	print ""
 	print "If libevent 1.4.X installed, I can install pyevent for you (recommended)"
 	print ""
-	print "(if not, you can use contrib/libevent-1.4.12.tar.gz in the diesel"
+	print "(if not, you can use contrib/libevent-1.4.12-stable.tar.gz in the diesel"
 	print "source distribution)"
 	print ""
 
