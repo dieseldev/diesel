@@ -11,6 +11,9 @@ class EchoClient(Client):
 		back = yield until_eol()
 		yield response(back)
 
+	def on_close(self):
+		print 'ouch!  closed!'
+
 
 def echo_loop(n):
 	def _loop():
@@ -24,6 +27,6 @@ def echo_loop(n):
 
 a = Application()
 
-for x in xrange(500):
+for x in xrange(5):
 	a.add_loop(Loop(echo_loop(x)))
 a.run()

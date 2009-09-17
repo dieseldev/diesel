@@ -20,6 +20,8 @@ class Buffer(object):
 		if type(self._atterm) is int:
 			if self._atmark >= self._atterm:
 				ind = self._atterm
+		elif self._atterm is None:
+			return None
 		else:
 			all = ''.join(self._atinbuf)
 			res = all.find(self._atterm)

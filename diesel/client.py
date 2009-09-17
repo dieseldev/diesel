@@ -58,6 +58,7 @@ class Client(object):
 			except ConnectionClosed:
 				self.close()
 				self.on_close()
+				break
 
 	def on_connect(self):
 		if 0: yield 0

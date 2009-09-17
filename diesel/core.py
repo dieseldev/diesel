@@ -79,6 +79,12 @@ class Loop(object):
 					current = stack.pop()
 				else:
 					raise
+			except Exception, e:
+				if stack:
+					error = e.__class__, str(e)
+					current = stack.pop()
+				else:
+					raise
 			else:
 				if type(item) is GeneratorType:
 					stack.append(current)
@@ -92,6 +98,16 @@ class Loop(object):
 						last = (yield item)
 					except ConnectionClosed, e:
 						error = (ConnectionClosed, str(e))
+
+	def multi_callin(self, pos, tot, real_f=None):
+		real_f = real_f or self.wake
+		if tot == 1:
+			return real_f
+		def f(res):
+			real_arg = [None] * tot
+			real_arg[pos] = res
+			return real_f(tuple(real_arg))
+		return f
 
 	def iterate(self, n_val=None):
 		self._wakeup_timer = None
@@ -110,40 +126,53 @@ class Loop(object):
 				rets = (rets,)
 
 			exit = False
-			for ret in rets:
+			used_term = False
+			nrets = len(rets)
+			for pos, ret in enumerate(rets):
 				
 				if isinstance(ret, response):
+					assert nrets == 1, "response cannot be paired with any other yield token"
 					c = self.callbacks.popleft()
 					c(ret.value)
-					assert len(rets) == 1, "response cannot be paired with any other yield token"
 					exit = True
 				elif isinstance(ret, call):
+					assert nrets == 1, "call cannot be paired with any other yield token"
 					ret.go(self.iterate)
-					assert len(rets) == 1, "call cannot be paired with any other yield token"
 					exit = True
 				elif isinstance(ret, basestring) or hasattr(ret, 'seek'):
+					assert nrets == 1, "a string or file cannot be paired with any other yield token"
 					self.pipeline.add(ret)
-					assert len(rets) == 1, "a string or file cannot be paired with any other yield token"
 				elif type(ret) is up:
+					assert nrets == 1, "up cannot be paired with any other yield token"
 					n_val = ret.value
-					assert len(rets) == 1, "up cannot be paired with any other yield token"
 				elif type(ret) is fire:
-					assert len(rets) == 1, "fire cannot be paired with any other yield token"
+					assert nrets == 1, "fire cannot be paired with any other yield token"
 					waiters = global_waits[ret.event]
 					for w in waiters:
 						w(ret)
 					global_waits[fire.event] = set()
 				elif type(ret) is until or type(ret) is bytes:
+					assert used_term == False, "only one terminal specifier (bytes, until) per yield"
+					used_term = True
 					self.buffer.set_term(ret.sentinel)
 					n_val = self.buffer.check()
 					if n_val == None:
 						exit = True
+						self.new_data = self.multi_callin(pos, nrets)
+					else:
+						self.clear_pending_events()
+						if nrets > 1:
+							t = [None] * nrets
+							t[pos] = n_val
+							n_val = tuple(t)
+
 				elif type(ret) is sleep:
 					if ret.duration:
-						self._wakeup_timer = call_later(ret.duration, self.wake, ret)
+						self._wakeup_timer = call_later(ret.duration, self.multi_callin(pos, nrets), True)
 					exit = True
+
 				elif type(ret) is wait:
-					global_waits[ret.event].add(self.schedule)
+					global_waits[ret.event].add(self.multi_callin(pos, nrets, self.schedule))
 					exit = True
 				if exit: 
 					break
@@ -153,14 +182,16 @@ class Loop(object):
 		if not self.pipeline.empty:
 			self.set_writable(True)
 
-	def schedule(self, value=None):
+	def clear_pending_events(self):
 		if self._wakeup_timer:
 			self._wakeup_timer.cancel()
-			self._wakeup_timer = call_later(0, self.wake, value)
+
+	def schedule(self, value=None):
+		self.clear_pending_events()
+		self._wakeup_timer = call_later(0, self.wake, value)
 
 	def wake(self, value=None):
-		if self._wakeup_timer:
-			self._wakeup_timer.cancel()
+		self.clear_pending_events()
 		self.iterate(value)
 
 class Connection(Loop):
@@ -237,4 +268,4 @@ class Connection(Loop):
 		else:
 			res = self.buffer.feed(data)
 			if res:
-				self.iterate(res)
+				self.new_data(res)
