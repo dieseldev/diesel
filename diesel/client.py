@@ -25,6 +25,8 @@ class response(object):
 class Client(object):
 	def __init__(self, connection_handler=None):
 		self.connection_handler = connection_handler or self.client_conn_handler
+		from diesel.app import running_app
+		self.hub = running_app.hub
 		self.jobs = deque()
 		self.conn = None
 	 
@@ -33,7 +35,8 @@ class Client(object):
 		sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		sock.connect(remote_addr)
 		from diesel.core import Connection
-		self.conn = Connection(sock, (addr, port), self.client_conn_handler)
+		self.conn = Connection(sock, (addr, port), self.client_conn_handler, 
+		self.hub)
 		self.conn.iterate()
 
 	def close(self):

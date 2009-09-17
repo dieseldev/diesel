@@ -1,15 +1,17 @@
 import socket
-import event
 import traceback
 import os
 
+from diesel.hub import EventHub
 from diesel import logmod, log
-from diesel import timers
 from diesel import Connection
 from diesel import Loop
 
+running_app = None
+
 class Application(object):
 	def __init__(self, logger=None):
+		self.hub = EventHub()
 		self._run = False
 		if logger is None:
 			logger = logmod.Logger()
@@ -19,27 +21,22 @@ class Application(object):
 		self._loops = []
 
 	def run(self):
+		global running_app
 		self._run = True
+		running_app = self
 		logmod.set_current_application(self)
 		log.info('Starting diesel application')
 
 		for s in self._services:
 			s.bind_and_listen()
-			event.event(s.accept_new_connection,
-			handle=s.sock, evtype=event.EV_READ | event.EV_PERSIST, arg=s).add()
+			self.hub.register(s.sock, s.accept_new_connection, None)
 		for l in self._loops:
 			l.iterate()
 
-		def checkpoint():
-			if not self._run:
-				raise SystemExit
-
-		timers.call_every(1.0, checkpoint)
-		
 		self.setup()
 		while self._run:
 			try:
-				event.dispatch()
+				self.hub.handle_events()
 			except SystemExit:
 				log.warn("-- SystemExit raised.. exiting main loop --")
 				break
@@ -51,13 +48,13 @@ class Application(object):
 				log.error(traceback.format_exc())
 
 		log.info('Ending diesel application')
+		running_app = None
 
 	def add_service(self, service):
 		service.application = self
 		if self._run:
 			s.bind_and_listen()
-			event.event(s.accept_new_connection,
-			handle=s.sock, evtype=event.EV_READ | event.EV_PERSIST, arg=s).add()
+			self.hub.register(s.sock, s.accept_new_connection, None)
 		else:
 			self._services.append(service)
 
@@ -108,6 +105,7 @@ class Service(object):
 
 	listening = property(_get_listening)
 
-	def accept_new_connection(self, *args):
+	def accept_new_connection(self):
 		sock, addr = self.sock.accept()
-		Connection(sock, addr, self.connection_handler).iterate()
+		Connection(sock, addr, self.connection_handler, 
+		self.application.hub).iterate()

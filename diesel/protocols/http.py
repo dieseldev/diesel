@@ -275,7 +275,6 @@ class HttpClient(Client):
 		code = int(code)
 
 		header_block = yield until('\r\n\r\n')
-		print header_block
 		heads = HttpHeaders()
 		heads.parse(header_block)
 

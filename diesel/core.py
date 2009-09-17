@@ -1,11 +1,9 @@
 import socket
-import event
 from types import GeneratorType
 from collections import deque, defaultdict
 
 from diesel import pipeline
 from diesel import buffer
-from diesel import call_later
 from diesel.client import call, response
 
 class ConnectionClosed(socket.error): pass
@@ -168,7 +166,7 @@ class Loop(object):
 
 				elif type(ret) is sleep:
 					if ret.duration:
-						self._wakeup_timer = call_later(ret.duration, self.multi_callin(pos, nrets), True)
+						self._wakeup_timer = self.hub.call_later(ret.duration, self.multi_callin(pos, nrets), True)
 					exit = True
 
 				elif type(ret) is wait:
@@ -186,7 +184,7 @@ class Loop(object):
 
 	def schedule(self, value=None):
 		self.clear_pending_events()
-		self._wakeup_timer = call_later(0, self.wake, value)
+		self._wakeup_timer = self.hub.call_later(0, self.wake, value)
 
 	def wake(self, value=None):
 		self.clear_pending_events()
@@ -195,34 +193,36 @@ class Loop(object):
 class Connection(Loop):
 	'''A cooperative loop hooked up to a socket.
 	'''
-	def __init__(self, sock, addr, connection_handler):
+	def __init__(self, sock, addr, connection_handler, hub):
 		Loop.__init__(self, connection_handler, addr)
 		self.pipeline = pipeline.Pipeline()
 		self.buffer = buffer.Buffer()
 		self.sock = sock
 		self.addr = addr
-		self._rev = event.event(self.handle_read, handle=sock, evtype=event.EV_READ | event.EV_PERSIST, arg=None)
-		self._rev.add()
-		self._wev = None
+		self.hub = hub
+		self.hub.register(sock, self.handle_read, self.handle_write)
 		self._wakeup_timer = None
+		self._writable = False
 		self.callbacks = deque()
+		self.closed = False
 
 	def set_writable(self, val):
-		if val and self._wev is None:
-			self._wev = event.event(self.handle_write, handle=self.sock, evtype=event.EV_WRITE | event.EV_PERSIST, arg=None)
-			self._wev.add()
-		elif not val and self._wev is not None:
-			self._wev.delete()
-			self._wev = None
+		if self.closed:
+			return
+		if val and not self._writable:
+			self.hub.enable_write(self.sock)
+			self._writable = True
+			return
+		if not val and self._writable:
+			self.hub.disable_write(self.sock)
+			self._writable = False
 
 	def shutdown(self, remote_closed=False):
-		if self._rev != None:
-			self._rev.delete()
-			self._rev = None
-
-		self.set_writable(False)
-
-		if remote_closed:
+		self.hub.unregister(self.sock)
+		self.closed = True
+		if not remote_closed:
+			self.sock.close()
+		else:
 			try:
 				self.g.throw(ConnectionClosed)
 			except StopIteration:
@@ -230,12 +230,11 @@ class Connection(Loop):
 
 		self.g = None
 
-	def handle_write(self, ev, handle, evtype, _):
+	def handle_write(self):
 		if not self.pipeline.empty:
 			try:
 				data = self.pipeline.read(BUFSIZ)
 			except pipeline.PipelineCloseRequest:
-				self.sock.close()
 				self.shutdown()
 			else:
 				try:
@@ -252,7 +251,7 @@ class Connection(Loop):
 					else:
 						self.set_writable(False)
 
-	def handle_read(self, ev, handle, evtype, _):
+	def handle_read(self):
 		disconnect_reason = None
 		try:
 			data = self.sock.recv(BUFSIZ)
