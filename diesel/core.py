@@ -174,8 +174,6 @@ class Loop(object):
 				elif type(ret) is wait:
 					global_waits[ret.event].add(self.multi_callin(pos, nrets, self.schedule))
 					exit = True
-				if exit: 
-					break
 			if exit: 
 				break
 
