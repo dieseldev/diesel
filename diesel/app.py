@@ -7,10 +7,12 @@ from diesel import logmod, log
 from diesel import Connection
 from diesel import Loop
 
-running_app = None
+current_app = None
 
 class Application(object):
 	def __init__(self, logger=None):
+		global current_app
+		current_app = self
 		self.hub = EventHub()
 		self._run = False
 		if logger is None:
@@ -21,9 +23,7 @@ class Application(object):
 		self._loops = []
 
 	def run(self):
-		global running_app
 		self._run = True
-		running_app = self
 		logmod.set_current_application(self)
 		log.info('Starting diesel application')
 
@@ -48,7 +48,6 @@ class Application(object):
 				log.error(traceback.format_exc())
 
 		log.info('Ending diesel application')
-		running_app = None
 
 	def add_service(self, service):
 		service.application = self
@@ -107,5 +106,4 @@ class Service(object):
 
 	def accept_new_connection(self):
 		sock, addr = self.sock.accept()
-		Connection(sock, addr, self.connection_handler, 
-		self.application.hub).iterate()
+		Connection(sock, addr, self.connection_handler).iterate()

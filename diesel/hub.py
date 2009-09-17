@@ -4,7 +4,7 @@ from collections import deque
 from time import time
 
 class Timer(object):
-	ACCURACY = 0.03
+	ALLOWANCE = 0.03
 	def __init__(self, interval, f, *args, **kw):
 		self.trigger_time = time() + interval
 		self.f = f
@@ -21,7 +21,7 @@ class Timer(object):
 
 	@property
 	def due(self):
-		return abs(time() - self.trigger_time) < self.ACCURACY
+		return (self.trigger_time - time()) < self.ALLOWANCE
 
 class EventHub(object):
 	SIZE_HINT = 50000

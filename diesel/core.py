@@ -57,6 +57,8 @@ class Loop(object):
 		self.g = self.cycle_all(loop_callable(*callable_args))
 		self.pipeline = NoPipeline()
 		self.buffer = NoBuffer()
+		from diesel.app import current_app
+		self.hub = current_app.hub
 		self._wakeup_timer = None
 
 	def cycle_all(self, current, error=None):
@@ -193,13 +195,12 @@ class Loop(object):
 class Connection(Loop):
 	'''A cooperative loop hooked up to a socket.
 	'''
-	def __init__(self, sock, addr, connection_handler, hub):
+	def __init__(self, sock, addr, connection_handler):
 		Loop.__init__(self, connection_handler, addr)
 		self.pipeline = pipeline.Pipeline()
 		self.buffer = buffer.Buffer()
 		self.sock = sock
 		self.addr = addr
-		self.hub = hub
 		self.hub.register(sock, self.handle_read, self.handle_write)
 		self._wakeup_timer = None
 		self._writable = False

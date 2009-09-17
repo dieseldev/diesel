@@ -3,6 +3,7 @@ Utilizes sleep as well.
 '''
 
 from diesel import Application, Client, call, Loop, sleep, until_eol, response
+import time
 
 class EchoClient(Client):
 	@call
@@ -21,7 +22,8 @@ def echo_loop(n):
 		client.connect('localhost', 8013)
 		while 1:
 			bar = yield client.echo("foo %s" % n)
-			print "%s: remote service said %r" % (n, bar)
+			tms = time.asctime()
+			print "[%s] %s: remote service said %r" % (tms, n, bar)
 			yield sleep(2)
 	return _loop
 
