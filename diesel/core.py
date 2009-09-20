@@ -35,11 +35,29 @@ class wait(object):
 		self.event = event
 
 class fire(object):
-	def __init__(self, event, value):
+	def __init__(self, event, value=None):
 		self.event = event
 		self.value = value
 
-global_waits = defaultdict(set)
+class WaitPool(object):
+	def __init__(self):
+		self.waits = defaultdict(set)
+		self.loop_refs = defaultdict(set)
+
+	def wait(self, who, what):
+		self.waits[what].add(who)
+		self.loop_refs[who].add(what)
+
+	def fire(self, what, value):
+		for handler in self.waits[what].copy():
+			handler.fire(what, value)
+
+	def clear(self, who):
+		for what in self.loop_refs[who]:
+			self.waits[what].remove(who)
+		del self.loop_refs[who]
+
+waits = WaitPool()
 
 class NoPipeline(object):
 	def __getattr__(self, *args, **kw):
@@ -50,6 +68,13 @@ class NoBuffer(object):
 	def __getattr__(self, *args, **kw):
 		return ValueError("Cannot check incoming buffer on socketless Loops (yield until, bytes, etc)")
 
+def id_gen():
+	x = 1
+	while True:
+		yield x
+		x += 1
+ids = id_gen()
+
 class Loop(object):
 	'''A cooperative generator.
 	'''
@@ -59,7 +84,21 @@ class Loop(object):
 		self.buffer = NoBuffer()
 		from diesel.app import current_app
 		self.hub = current_app.hub
+		self.id = ids.next()
 		self._wakeup_timer = None
+		self.fire_handlers = {}
+
+	def __hash__(self):
+		return self.id
+
+	def __eq__(self, other):
+		return other.id == self.id
+
+	def fire(self, what, value):
+		if what in self.fire_handlers:
+			handler = self.fire_handlers.pop(what)
+			self.fire_handlers = {}
+			handler(value)
 
 	def cycle_all(self, current, error=None):
 		'''Effectively flattens all iterators.
@@ -146,10 +185,7 @@ class Loop(object):
 					n_val = ret.value
 				elif type(ret) is fire:
 					assert nrets == 1, "fire cannot be paired with any other yield token"
-					waiters = global_waits[ret.event]
-					for w in waiters:
-						w(ret)
-					global_waits[fire.event] = set()
+					waits.fire(ret.event, ret.value)
 				elif type(ret) is until or type(ret) is bytes:
 					assert used_term == False, "only one terminal specifier (bytes, until) per yield"
 					used_term = True
@@ -168,12 +204,12 @@ class Loop(object):
 						break
 
 				elif type(ret) is sleep:
-					if ret.duration:
-						self._wakeup_timer = self.hub.call_later(ret.duration, self.multi_callin(pos, nrets), True)
+					self._wakeup_timer = self.hub.call_later(ret.duration, self.multi_callin(pos, nrets), True)
 					exit = True
 
 				elif type(ret) is wait:
-					global_waits[ret.event].add(self.multi_callin(pos, nrets, self.schedule))
+					self.fire_handlers[ret.event] = self.multi_callin(pos, nrets, self.schedule)
+					waits.wait(self, ret.event)
 					exit = True
 			if exit: 
 				break
@@ -184,6 +220,8 @@ class Loop(object):
 	def clear_pending_events(self):
 		if self._wakeup_timer and self._wakeup_timer.pending:
 			self._wakeup_timer.cancel()
+		self.fire_handlers = {}
+		waits.clear(self)
 
 	def schedule(self, value=None):
 		self.clear_pending_events()

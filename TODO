@@ -4,7 +4,6 @@
   * Test/fix WSGI stuff
   * Docstrings
   * http use common chunk code
-  * Finish wait, fire
 
 Future
   * @message support for "schedule this generator but don't block me"?
