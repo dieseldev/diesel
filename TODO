@@ -4,6 +4,7 @@
   * Test/fix WSGI stuff
   * Docstrings
   * http use common chunk code
+  * Investigate avoiding timer code for "schedule now!"
 
 Future
   * @message support for "schedule this generator but don't block me"?
