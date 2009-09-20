@@ -110,7 +110,6 @@ class Loop(object):
 		return f
 
 	def iterate(self, n_val=None):
-		self._wakeup_timer = None
 		while True:
 			try:
 				if n_val is not None:
@@ -160,11 +159,13 @@ class Loop(object):
 						exit = True
 						self.new_data = self.multi_callin(pos, nrets)
 					else:
-						self.clear_pending_events()
 						if nrets > 1:
 							t = [None] * nrets
 							t[pos] = n_val
 							n_val = tuple(t)
+						self.clear_pending_events()
+						exit = False
+						break
 
 				elif type(ret) is sleep:
 					if ret.duration:
@@ -181,7 +182,7 @@ class Loop(object):
 			self.set_writable(True)
 
 	def clear_pending_events(self):
-		if self._wakeup_timer:
+		if self._wakeup_timer and self._wakeup_timer.pending:
 			self._wakeup_timer.cancel()
 
 	def schedule(self, value=None):

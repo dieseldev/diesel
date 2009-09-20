@@ -5,7 +5,6 @@
   * Docstrings
   * http use common chunk code
   * Finish wait, fire
-  * Check for timeouts being fired exactly once, esp on multi-return
 
 Future
   * @message support for "schedule this generator but don't block me"?

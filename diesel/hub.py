@@ -78,6 +78,7 @@ class EventHub(object):
 	def call_later(self, interval, f, *args, **kw):
 		t = Timer(interval, f, *args, **kw)
 		self.new_timers.append((t.trigger_time, t))
+		return t
 
 	def register(self, fd, read_callback, write_callback):
 		assert fd not in self.events
