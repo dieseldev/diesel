@@ -259,7 +259,7 @@ Clients
 aren't managed by the hub the same way `Loops` s and `Service` s are.  Instead, they 
 provide an API to other network resources that `Loop` s and `Service` s can utilize.
 
-Let's take our echo example and expand it out to cover all three actors::
+Let's expand our echo example to cover all three object types::
 
     #!/usr/bin/env python2.6
     import time
@@ -497,7 +497,7 @@ included".  `diesel` includes an HTTP/1.1 implementation in both `Client`
 and `Service` form--both because HTTP is so darn useful, and because we
 wanted a real protocol to serve as a reference and test case.
 
-Let's start with an example of using the `Client`::
+Let's start with an example that uses the `HttpClient`::
 
     #!/usr/bin/env python2.6
     from diesel import Application, Loop
@@ -616,7 +616,7 @@ Now, we'll get those "info" messages::
 Great, that worked.  However, we also got an additional line we weren't
 expecting that diesel itself has logged at the "info" level.  This
 raises a problem often encountered in logging systems: we want to be
-able to modify the behavior of logging as specific parts of the application.
+able to modify the behavior of logging in specific parts of the application.
 
 Fortunately, `diesel` supports the idea of sublogger, which allows you
 to clone the main log and make a context-specific log with modified verbosity.
