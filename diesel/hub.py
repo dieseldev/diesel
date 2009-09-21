@@ -29,6 +29,7 @@ class EventHub(object):
 		self.epoll = select.epoll(self.SIZE_HINT)
 		self.timers = deque()
 		self.new_timers = []
+		self.run = True
 		def two_item_list():
 			return [None, None]
 		self.events = {}
@@ -50,6 +51,8 @@ class EventHub(object):
 				t = self.timers.popleft()[1]
 				if t.pending:
 					t.callback()
+					if not self.run:
+						return
 			else:
 				break
 		
@@ -58,6 +61,8 @@ class EventHub(object):
 				self.events[fd][0]()
 			else:
 				self.events[fd][1]()
+			if not self.run:
+				return
 
 		runs = -1
 		while runs != 0:
@@ -72,6 +77,8 @@ class EventHub(object):
 					if t.pending:
 						t.callback()
 						runs += 1
+						if not self.run:
+							return
 				else:
 					break
 

@@ -18,7 +18,6 @@ class Application(object):
 		if logger is None:
 			logger = logmod.Logger()
 		self.logger = logger
-		self.add_log = self.logger.add_log
 		self._services = []
 		self._loops = []
 
@@ -68,6 +67,7 @@ class Application(object):
 				self._loops.append(loop)
 		
 	def halt(self):	
+		self.hub.run = False
 		self._run = False
 
 	def setup(self):

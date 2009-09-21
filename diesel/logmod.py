@@ -20,13 +20,14 @@ _lvl_text = {
 	
 
 class Logger(object):
-	def __init__(self, fd=sys.stdout, verbosity=LOGLVL_WARN):
-		self.fdlist = [fd]
+	def __init__(self, fd=None, verbosity=LOGLVL_WARN):
+		if fd is None:
+			fd = [sys.stdout]
+		if type(fd) not in (list, tuple):
+			fd = [fd]
+		self.fdlist = list(fd)
 		self.level = verbosity
 		self.component = None
-
-	def add_log(self, fd):
-		self.fdlist.append(fd)
 
 	def _writelogline(self, lvl, message):
 		if lvl >= self.level:
