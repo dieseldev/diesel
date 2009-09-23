@@ -202,7 +202,7 @@ class KqueueEventHub(object):
                 break
         
         # Handle all socket I/O
-        for nr, ev in enumerate(events):
+        for ev in events:
             fd = ev.ident
             if ev.filter == KQ_FILTER_READ:
                 self.events[fd][0]()
