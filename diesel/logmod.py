@@ -1,4 +1,7 @@
 # vim:ts=4:sw=4:expandtab
+'''A simple logging module that supports various verbosity
+levels and component-specific subloggers.
+'''
 import sys
 import time
 
@@ -21,6 +24,13 @@ _lvl_text = {
     
 
 class Logger(object):
+    '''Create a logger, with either a provided file-like object
+    or a list of such objects.  If no argument is provided, sys.stdout
+    will be used.
+
+    Optionally, override the global verbosity to be more or less verbose
+    than LOGLVL_WARN.
+    '''
     def __init__(self, fd=None, verbosity=LOGLVL_WARN):
         if fd is None:
             fd = [sys.stdout]
@@ -30,6 +40,7 @@ class Logger(object):
         self.level = verbosity
         self.component = None
 
+    # The actual message logging functions
     def _writelogline(self, lvl, message):
         if lvl >= self.level:
             for fd in self.fdlist:
@@ -45,6 +56,12 @@ class Logger(object):
     critical = lambda s, m: s._writelogline(LOGLVL_CRITICAL, m)
 
     def get_sublogger(self, component, verbosity=None):
+        '''Clone this logger and create a sublogger within the context
+        of `component`, and with the provided `verbosity`.
+
+        The same file object list will be used as the logging
+        location.
+        '''
         copy = Logger(verbosity=verbosity or self.level)
         copy.fdlist = self.fdlist
         copy.component = component

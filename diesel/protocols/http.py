@@ -1,4 +1,6 @@
 # vim:ts=4:sw=4:expandtab
+'''HTTP/1.1 implementation of client and server.
+'''
 import sys, socket
 import urllib
 from collections import defaultdict
@@ -6,49 +8,52 @@ from collections import defaultdict
 from diesel import up, until, until_eol, bytes, ConnectionClosed
 
 status_strings = {
-100 : "Continue",
-101 : "Switching Protocols",
-200 : "OK",
-201 : "Created",
-202 : "Accepted",
-203 : "Non-Authoritative Information",
-204 : "No Content",
-205 : "Reset Content",
-206 : "Partial Content",
-300 : "Multiple Choices",
-301 : "Moved Permanently",
-302 : "Found",
-303 : "See Other",
-304 : "Not Modified",
-305 : "Use Proxy",
-307 : "Temporary Redirect",
-400 : "Bad Request",
-401 : "Unauthorized",
-402 : "Payment Required",
-403 : "Forbidden",
-404 : "Not Found",
-405 : "Method Not Allowed",
-406 : "Not Acceptable",
-407 : "Proxy Authentication Required",
-408 : "Request Time-out",
-409 : "Conflict",
-410 : "Gone",
-411 : "Length Required",
-412 : "Precondition Failed",
-413 : "Request Entity Too Large",
-414 : "Request-URI Too Large",
-415 : "Unsupported Media Type",
-416 : "Requested range not satisfiable",
-417 : "Expectation Failed",
-500 : "Internal Server Error",
-501 : "Not Implemented",
-502 : "Bad Gateway",
-503 : "Service Unavailable",
-504 : "Gateway Time-out",
-505 : "HTTP Version not supported",
+    100 : "Continue",
+    101 : "Switching Protocols",
+    200 : "OK",
+    201 : "Created",
+    202 : "Accepted",
+    203 : "Non-Authoritative Information",
+    204 : "No Content",
+    205 : "Reset Content",
+    206 : "Partial Content",
+    300 : "Multiple Choices",
+    301 : "Moved Permanently",
+    302 : "Found",
+    303 : "See Other",
+    304 : "Not Modified",
+    305 : "Use Proxy",
+    307 : "Temporary Redirect",
+    400 : "Bad Request",
+    401 : "Unauthorized",
+    402 : "Payment Required",
+    403 : "Forbidden",
+    404 : "Not Found",
+    405 : "Method Not Allowed",
+    406 : "Not Acceptable",
+    407 : "Proxy Authentication Required",
+    408 : "Request Time-out",
+    409 : "Conflict",
+    410 : "Gone",
+    411 : "Length Required",
+    412 : "Precondition Failed",
+    413 : "Request Entity Too Large",
+    414 : "Request-URI Too Large",
+    415 : "Unsupported Media Type",
+    416 : "Requested range not satisfiable",
+    417 : "Expectation Failed",
+    500 : "Internal Server Error",
+    501 : "Not Implemented",
+    502 : "Bad Gateway",
+    503 : "Service Unavailable",
+    504 : "Gateway Time-out",
+    505 : "HTTP Version not supported",
 }
 
 def parse_request_line(line):
+    '''Given a request line, split it into 
+    (method, url, protocol).
+    '''
     items = line.split(' ')
     items[0] = items[0].upper()
     if len(items) == 2:
@@ -58,6 +63,10 @@ def parse_request_line(line):
     return tuple(items)
 
 class HttpHeaders(object):
+    '''Support common operations on HTTP headers.
+
+    Parsing, modifying, formatting, etc.
+    '''
     def __init__(self):
         self._headers = defaultdict(list)
         self.link()
@@ -116,6 +125,9 @@ class HttpHeaders(object):
     def get(self, k, d=None):
         return self._headers.get(k.lower(), d)
 
+    def get_one(self, k, d=None):
+        return self.get(k, [d])[0]
+
     def __iter__(self):
         return self._headers
 
@@ -123,35 +135,51 @@ class HttpHeaders(object):
         return self.format()
 
 class HttpRequest(object):
-    def __init__(self, cmd, url, version, id=None):
-        self.cmd = cmd
+    '''Structure representing an HTTP request.
+    '''
+    def __init__(self, method, url, version):
+        self.method = method
         self.url = url
         self.version = version
         self.headers = None
         self.body = None
-        self.id = id
         
     def format(self):    
-        return '%s %s HTTP/%s' % (self.cmd, self.url, self.version)
+        '''Format the request line for the wire.
+        '''
+        return '%s %s HTTP/%s' % (self.method, self.url, self.version)
         
-class HttpProtocolError(Exception): pass    
 class HttpClose(object): pass    
 
 class HttpServer(object):
+    '''An HTTP/1.1 implementation or a server.
+    '''
     def __init__(self, request_handler):
+        '''`request_handler` is a callable that takes
+        an HttpRequest object and generates a response.
+        '''
         self.request_handler = request_handler
 
     BODY_CHUNKED, BODY_CL, BODY_NONE = range(3)
 
     def check_for_http_body(self, heads):
-        if heads.get('Transfer-Encoding') == ['chunked']:
+        if heads.get_one('Transfer-Encoding') == 'chunked':
             return self.BODY_CHUNKED
         elif 'Content-Length' in heads:
             return self.BODY_CL
         return self.BODY_NONE
 
     def __call__(self, addr):
-        req_id = 1
+        '''Since an instance of HttpServer is passed to the Service
+        class (with appropriate request_handler established during
+        initialization), this __call__ method is what's actually
+        invoked by diesel.
+
+        This is our generator, this is our protocol handler.
+
+        It does protocol work, then calls the request_handler, 
+        looking for HttpClose if necessary.
+        '''
         while True:
             chunks = []
             try:
@@ -159,9 +187,8 @@ class HttpServer(object):
             except ConnectionClosed:
                 break
 
-            cmd, url, version = parse_request_line(header_line)    
-            req = HttpRequest(cmd, url, version, req_id)
-            req_id += 1
+            method, url, version = parse_request_line(header_line)    
+            req = HttpRequest(method, url, version)
 
             header_block = yield until('\r\n\r\n')
 
@@ -169,7 +196,7 @@ class HttpServer(object):
             heads.parse(header_block)
             req.headers = heads
 
-            if req.version >= '1.1' and heads.get('Expect') == ['100-continue']:
+            if req.version >= '1.1' and heads.get_one('Expect') == '100-continue':
                 yield 'HTTP/1.1 100 Continue\r\n\r\n'
 
             more_mode = self.check_for_http_body(heads)
@@ -193,10 +220,15 @@ class HttpServer(object):
                 break
 
 def http_response(req, code, heads, body):
-    if req.version <= '1.0' and req.headers.get('Connection') != 'Keep-Alive':
+    '''A "macro", which can be called by `request_handler` callables
+    that are passed to an HttpServer.  Takes care of the nasty business
+    of formatting a response for you, as well as connection handling
+    on Keep-Alive vs. not.
+    '''
+    if req.version <= '1.0' and req.headers.get_one('Connection', '') != 'keep-alive':
         close = True
-    elif req.headers.get('Connection') == ['close'] or  \
-        heads.get('Connection') == ['close']:
+    elif req.headers.get_one('Connection') == 'close' or  \
+        heads.get_one('Connection') == 'close':
         close = True
     else:
         close = False
@@ -212,6 +244,11 @@ def http_response(req, code, heads, body):
 from diesel import Client, call, response
 
 def handle_chunks(headers):
+    '''Generic chunk handling code, used by both client
+    and server.
+
+    Modifies the passed-in HttpHeaders instance.
+    '''
     chunks = []
     while True:
         chunk_head = yield until_eol()
@@ -237,8 +274,22 @@ def handle_chunks(headers):
             break
 
 class HttpClient(Client):
+    '''An HttpClient instance that issues 1.1 requests,
+    including keep-alive behavior.
+
+    Does not support sending chunks, yet... body must
+    be a string.
+    '''
     @call
     def request(self, method, path, headers, body=None):
+        '''Issues a `method` request to `path` on the
+        connected server.  Sends along `headers`, and
+        body.
+
+        Very low level--you must set "host" yourself,
+        for example.  It will set Content-Length, 
+        however.
+        '''
         req = HttpRequest(method, path, '1.1')
         
         if body:
@@ -258,15 +309,15 @@ class HttpClient(Client):
         heads = HttpHeaders()
         heads.parse(header_block)
 
-        if heads.get('Transfer-Encoding') == ['chunked']:
+        if heads.get_one('Transfer-Encoding') == 'chunked':
             body = yield handle_chunks(heads)
         else:
-            cl = int(heads.get('Content-Length', [0])[0])
+            cl = int(heads.get_one('Content-Length', 0))
             if cl:
                 body = yield bytes(cl)
             else:
                 body = None
 
-        if version < '1.0' or heads.get('Connection', ['keep-alive'])[0] == 'close':
+        if version < '1.0' or heads.get_one('Connection') == 'close':
             self.close()
         yield response((code, heads, body))

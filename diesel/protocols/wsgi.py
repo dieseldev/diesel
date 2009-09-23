@@ -1,5 +1,8 @@
 # vim:ts=4:sw=4:expandtab
-"""A minimal WSGI container.
+"""A minimal WSGI implementation to hook into
+diesel's HTTP module.
+
+Note: not well-tested.  Contributions welcome.
 """
 import urlparse
 import os
@@ -28,11 +31,14 @@ class FileLikeErrorLogger(object):
         pass
 
 def build_wsgi_env(req, port):
+    '''Produce a godawful CGI-ish mess from a sensible
+    API.
+    '''
     url_info = urlparse.urlparse(req.url)
     env = {}
 
     # CGI bits
-    env['REQUEST_METHOD'] = req.cmd
+    env['REQUEST_METHOD'] = req.method
     env['SCRIPT_NAME'] = ''
     env['PATH_INFO'] = url_info[2]
     env['QUERY_STRING'] = url_info[4]
@@ -57,6 +63,10 @@ def build_wsgi_env(req, port):
     return env
 
 class WSGIRequestHandler(object):
+    '''The request_handler for the HttpServer that
+    bootsraps the WSGI environemtn and hands it off to the
+    WSGI callable.  This is the key coupling.
+    '''
     def __init__(self, app):
         self.app = app
 
@@ -84,9 +94,20 @@ class WSGIRequestHandler(object):
         for n, v in self.response_headers:
             heads.add(n, v)
         body = ''.join(self.outbuf)
+        if 'Content-Length' not in heads:
+            heads.set('Content-Length', len(body))
+        
         return http_response(req, code, heads, body)
 
 class WSGIApplication(Application):
+    '''A WSGI application that takes over both `Service`
+    setup, `request_handler` spec for the HTTPServer,
+    and the app startup itself.
+
+
+    Just pass it a wsgi_callable and port information, and
+    it should do the rest.
+    '''
     def __init__(self, wsgi_callable, port=80, iface=''):
         Application.__init__(self)
         self.port = port

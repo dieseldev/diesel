@@ -1,4 +1,7 @@
 # vim:ts=4:sw=4:expandtab
+'''Core implementation/handling of generators, including
+the various yield tokens.
+'''
 import socket
 from types import GeneratorType
 from collections import deque, defaultdict
@@ -7,40 +10,75 @@ from diesel import pipeline
 from diesel import buffer
 from diesel.client import call, response
 
-class ConnectionClosed(socket.error): pass
+class ConnectionClosed(socket.error): 
+    '''Raised if the client closes the connection.
+    '''
+    pass
 
 CRLF = '\r\n'
 BUFSIZ = 2 ** 14
 
 class until(object):
+    '''A yield token that indicates the generator wants
+    a string sent back from the socket stream when a 
+    certain `sentinel` is encountered.
+    '''
     def __init__(self, sentinel):
         self.sentinel = sentinel
 
 def until_eol():
+    '''Macro for `until("\r\n")`.
+    '''
     return until(CRLF)
 
 class bytes(object):
+    '''A yield token that indicates the generator wants
+    a string sent back from the socket stream when a
+    certain number of bytes are available.
+    '''
     def __init__(self, sentinel):
         self.sentinel = sentinel
 
 class sleep(object):
+    '''A yield token that indicates the generator wants
+    a callback in `duration` seconds.
+
+    If no argument is passed, the generator will be called
+    again during the next iteration of the main loop.  It
+    can act as a way to yield control to other loops, with
+    the intention of taking control back as soon as they've
+    had a pass.
+    '''
     def __init__(self, duration=0):
         self.duration = duration
 
 class up(object):
+    '''For nested generators, a yield token that indicates this value is 
+    being passed "up" the stack to the "calling" generator, and isn't intended
+    as a message for diesel itself.
+    '''
     def __init__(self, value):
         self.value = value
 
 class wait(object):
+    '''A yield token that indicates a generators desire to wait until a
+    certain event is `fire`d.
+    '''
     def __init__(self, event):
         self.event = event
 
 class fire(object):
+    '''A yield token that fires an event to any appropriate `wait`ers.
+    '''
     def __init__(self, event, value=None):
         self.event = event
         self.value = value
 
 class WaitPool(object):
+    '''A structure that manages all `wait`ers, makes sure fired events
+    get to the right places, and that all other waits are canceled when
+    a one event is passed back to a generator.
+    '''
     def __init__(self):
         self.waits = defaultdict(set)
         self.loop_refs = defaultdict(set)
@@ -61,11 +99,17 @@ class WaitPool(object):
 waits = WaitPool()
 
 class NoPipeline(object):
+    '''Fake pipeline for Loops that aren't managing a connection and have no
+    I/O stream.
+    '''
     def __getattr__(self, *args, **kw):
         return ValueError("Cannot write to the outgoing pipeline for socketless Loops (yield string, file)")
     empty = True
 
 class NoBuffer(object):
+    '''Fake buffer for loops that aren't managing a connection and have no
+    I/O stream.
+    '''
     def __getattr__(self, *args, **kw):
         return ValueError("Cannot check incoming buffer on socketless Loops (yield until, bytes, etc)")
 
@@ -77,7 +121,8 @@ def id_gen():
 ids = id_gen()
 
 class Loop(object):
-    '''A cooperative generator.
+    '''A cooperative generator that represents an arbitrary piece of
+    logic.
     '''
     def __init__(self, loop_callable, *callable_args):
         self.g = self.cycle_all(loop_callable(*callable_args))
@@ -96,13 +141,16 @@ class Loop(object):
         return other.id == self.id
 
     def fire(self, what, value):
+        '''Fire an event back into this generator.
+        '''
         if what in self.fire_handlers:
             handler = self.fire_handlers.pop(what)
             self.fire_handlers = {}
             handler(value)
 
     def cycle_all(self, current, error=None):
-        '''Effectively flattens all iterators.
+        '''Effectively flattens all iterators, providing the
+        "generator stack" effect.
         '''
         last = None
         stack = []
@@ -140,6 +188,10 @@ class Loop(object):
                         error = (ConnectionClosed, str(e))
 
     def multi_callin(self, pos, tot, real_f=None):
+        '''Provide a callable that will pass `None` in all spots
+        that aren't the event that triggered the rescheduling of the
+        generator.  For yield groups.
+        '''
         real_f = real_f or self.wake
         if tot == 1:
             return real_f
@@ -150,6 +202,12 @@ class Loop(object):
         return f
 
     def iterate(self, n_val=None):
+        '''The algorithm that represents iterating over all items
+        in the nested generator that represents this Loop or
+        Connection.  Run whenever a generator is (re-)scheduled.
+        Handles all the `yield` tokens.
+        '''
+
         while True:
             try:
                 if n_val is not None:
@@ -219,21 +277,29 @@ class Loop(object):
             self.set_writable(True)
 
     def clear_pending_events(self):
+        '''When a loop is rescheduled, cancel any other timers or waits.
+        '''
         if self._wakeup_timer and self._wakeup_timer.pending:
             self._wakeup_timer.cancel()
         self.fire_handlers = {}
         waits.clear(self)
 
     def schedule(self, value=None):
+        '''Called by another Loop--reschedule this loop so the hub will run
+        it.  Used in `response` and `fire` situations.
+        '''
         self.clear_pending_events()
         self._wakeup_timer = self.hub.call_later(0, self.wake, value)
 
     def wake(self, value=None):
+        '''Wake up this loop.  Called by the main hub to resume a loop
+        when it is rescheduled.
+        '''
         self.clear_pending_events()
         self.iterate(value)
 
 class Connection(Loop):
-    '''A cooperative loop hooked up to a socket.
+    '''A `Loop` with an associated socket and I/O stream.
     '''
     def __init__(self, sock, addr, connection_handler):
         Loop.__init__(self, connection_handler, addr)
@@ -248,6 +314,10 @@ class Connection(Loop):
         self.closed = False
 
     def set_writable(self, val):
+        '''Set the associated socket writable.  Called when there is
+        data on the outgoing pipeline ready to be delivered to the 
+        remote host.
+        '''
         if self.closed:
             return
         if val and not self._writable:
@@ -259,6 +329,9 @@ class Connection(Loop):
             self._writable = False
 
     def shutdown(self, remote_closed=False):
+        '''Clean up after a client disconnects or after
+        the connection_handler ends (and we disconnect).
+        '''
         self.hub.unregister(self.sock)
         self.closed = True
         if not remote_closed:
@@ -272,6 +345,9 @@ class Connection(Loop):
         self.g = None
 
     def handle_write(self):
+        '''The low-level handler called by the event hub
+        when the socket is ready for writing.
+        '''
         if not self.pipeline.empty:
             try:
                 data = self.pipeline.read(BUFSIZ)
@@ -293,6 +369,9 @@ class Connection(Loop):
                         self.set_writable(False)
 
     def handle_read(self):
+        '''The low-level handler called by the event hub
+        when the socket is ready for reading.
+        '''
         disconnect_reason = None
         try:
             data = self.sock.recv(BUFSIZ)

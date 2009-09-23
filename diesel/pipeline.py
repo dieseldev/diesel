@@ -1,4 +1,7 @@
 # vim:ts=4:sw=4:expandtab
+'''An outgoing pipeline that can handle
+strings or files.
+'''
 try:
     import cStringIO
 except ImportError:
@@ -19,28 +22,26 @@ def get_file_length(f):
     f.seek(m)
     return r
 
-class PipelineLimitReached(Exception): pass
 class PipelineCloseRequest(Exception): pass
 class PipelineClosed(Exception): pass
     
 class Pipeline(object):
-    def __init__(self, limit=0):
+    '''A pipeline that supports appending strings or
+    files and can read() transparently across object
+    boundaries in the outgoing buffer.
+    '''
+    def __init__(self):
         self.line = []
-        self.limit = limit
-        self.used = 0
-        self.callbacks = []
         self.want_close = False
 
     def add(self, d):
+        '''Add object `d` to the pipeline.
+        '''
         if self.want_close:
             raise PipelineClosed
 
-        if self.limit > 0 and self.used >= self.limit:
-            raise PipelineLimitReached
-
         if type(d) is str:
-            if self.line and type(self.line[-1][0]) is _type_SIO and \
-            (self.limit == 0 or self.line[-1][1] < (self.limit / 2)):
+            if self.line and type(self.line[-1][0]) is _type_SIO:
                 fd, l = self.line[-1]
                 m = fd.tell()
                 fd.seek(0, 2)
@@ -49,14 +50,23 @@ class Pipeline(object):
                 self.line[-1] = [fd, l + len(d)]
             else:
                 self.line.append([make_SIO(d), len(d)])
-            self.used += len(d)
         else:
             self.line.append([d, get_file_length(d)])
 
     def close_request(self):
+        '''Add a close request to the outgoing pipeline.
+
+        No more data will be allowed in the pipeline, and, when
+        it is emptied, PipelineCloseRequest will be raised.
+        '''
         self.want_close = True
 
     def read(self, amt):
+        '''Read up to `amt` bytes off the pipeline.
+
+        May raise PipelineCloseRequest if the pipeline is
+        empty and the connected stream should be closed.
+        '''
         if self.line == [] and self.want_close:
             raise PipelineCloseRequest
 
@@ -65,30 +75,29 @@ class Pipeline(object):
         while self.line and read < amt:
             data = self.line[0][0].read(amt - read)
             if data == '':
-                if type(self.line[0][0]) is _type_SIO:
-                    self.used -= self.line[0][1]
                 del self.line[0]
             else:
                 rbuf.append(data)
                 read += len(data)
 
         while self.line and self.line[0][1] == self.line[0][0].tell():
-            self.used -= self.line[0][1]
             del self.line[0]
-
-        while self.callbacks and self.used < self.limit:
-            self.callbacks.pop(0).callback(self)
 
         return ''.join(rbuf)
     
     def backup(self, d):
+        '''Pop object d back onto the front the pipeline.
+
+        Used in cases where not all data is sent() on the socket,
+        for example--the remainder will be placed back in the pipeline.
+        '''
         self.line.insert(0, [make_SIO(d), len(d)])
-        self.used += len(d)
 
-    def _get_empty(self):
+    @property
+    def empty(self):
+        '''Is the pipeline empty?
+
+        A close request is "data" that needs to be consumed,
+        too.
+        '''
         return self.want_close == False and self.line == []
-    empty = property(_get_empty)
-
-    def _get_full(self):
-        return self.used == 0 or self.used >= self.limit
-    full = property(_get_full)

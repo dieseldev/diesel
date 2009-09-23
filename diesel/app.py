@@ -1,4 +1,6 @@
 # vim:ts=4:sw=4:expandtab
+'''The main Application and Service classes
+'''
 import socket
 import traceback
 import os
@@ -11,6 +13,10 @@ from diesel import Loop
 current_app = None
 
 class Application(object):
+    '''The Application represents diesel's main loop--
+    the coordinating entity that runs all Services, Loops,
+    Client protocol work, etc.
+    '''
     def __init__(self, logger=None):
         global current_app
         current_app = self
@@ -23,6 +29,9 @@ class Application(object):
         self._loops = []
 
     def run(self):
+        '''Start up an Application--blocks until the program ends
+        or .halt() is called.
+        '''
         self._run = True
         logmod.set_current_application(self)
         log.info('Starting diesel application')
@@ -50,6 +59,11 @@ class Application(object):
         log.info('Ending diesel application')
 
     def add_service(self, service):
+        '''Add a Service instance to this Application.
+
+        The service will bind to the appropriate port and start
+        handling connections when the Application is run().
+        '''
         service.application = self
         if self._run:
             s.bind_and_listen()
@@ -58,6 +72,10 @@ class Application(object):
             self._services.append(service)
 
     def add_loop(self, loop, front=False):
+        '''Add a Loop instance to this Application.
+
+        The loop will be started when the Application is run().
+        '''
         loop.application = self
         if self._run:
             loop.iterate()
@@ -68,15 +86,30 @@ class Application(object):
                 self._loops.append(loop)
         
     def halt(self):    
+        '''Stop this application from running--the initial run() call
+        will return.
+        '''
         self.hub.run = False
         self._run = False
 
     def setup(self):
+        '''Do some initialization right before the main loop is entered.
+
+        Called by run().
+        '''
         pass
 
 class Service(object):
+    '''A TCP service listening on a certain port, with a protocol 
+    implemented by a passed connection handler.
+    '''
     LQUEUE_SIZ = 500
     def __init__(self, connection_handler, port, iface=''):
+        '''Given a generator definition `connection_handler`, handle
+        connections on port `port`.
+
+        Interface defaults to all interfaces, but overridable with `iface`.
+        '''
         self.port = port
         self.iface = iface
         self.sock = None
@@ -100,10 +133,9 @@ class Service(object):
         sock.listen(self.LQUEUE_SIZ)
         self.sock = sock
 
-    def _get_listening(self):
+    @property
+    def listening(self):
         return self.sock is not None
-
-    listening = property(_get_listening)
 
     def accept_new_connection(self):
         sock, addr = self.sock.accept()

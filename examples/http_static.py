@@ -18,7 +18,7 @@ DEFAULT_FILE = os.environ.get('DEFAULT_FILE', 'index.html')
 
 def static_http(req):
     ct = 'text/plain'
-    if req.cmd != 'GET':
+    if req.method != 'GET':
         content = 'Method unsupported'
         code = 501
     else:
@@ -45,7 +45,7 @@ def static_http(req):
 
     headers.add('Content-Type', ct)
     
-    log.info('%s %s %s' % (req.cmd, req.url, code))
+    log.info('%s %s %s' % (req.method, req.url, code))
     return http.http_response(req, code, headers, content)
 
 app = Application()

@@ -15,6 +15,7 @@ def req_loop():
     heads.set('Host', 'www.jamwt.com')
     print (yield client.request('GET', '/Py-TOC/', heads))
     print (yield client.request('GET', '/', heads))
+    a.halt()
 
 a = Application()
 a.add_loop(Loop(req_loop))
