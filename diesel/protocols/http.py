@@ -180,28 +180,7 @@ class HttpServer(object):
 				req.body = yield bytes(int(heads['Content-Length']))
 
 			elif more_mode is self.BODY_CHUNKED:
-				
-				chunks = []
-				while True:
-					chunk_head = yield until_eol()
-					if ';' in chunk_head:
-						# we don't support any chunk extensions
-						chunk_head = chunk_head[:chunk_head.find(';')]
-					size = int(chunk_head, 16)
-					if size == 0:
-						break
-					else:
-						chunks.append((yield bytes(size)))
-						_ = yield bytes(2) # ignore trailing CRLF
-
-				while True:
-					trailer = yield until_eol()
-					if trailer.strip():
-						req.headers.add(*tuple(trailer.split(':', 1)))
-					else:
-						req.body = ''.join(chunks)
-						req.headers.set('Content-Length', len(req.body))
-						req.headers.remove('Transfer-Encoding')
+				req.body = handle_chunks(heads)
 
 			leave_loop = False
 			for i in self.request_handler(req): 

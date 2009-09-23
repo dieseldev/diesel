@@ -3,7 +3,6 @@
   * Clean up logging and debug statements
   * Test/fix WSGI stuff
   * Docstrings
-  * http use common chunk code
   * Why no responses on httperf?  Compare output to others on HTTP
 
 Future
