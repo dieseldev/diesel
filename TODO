@@ -1,6 +1,3 @@
-0.9b
-  * Docstrings
-
 Future
   * @message support for "schedule this generator but don't block me"?
   * Write tests, somehow--check out twisted.trial
