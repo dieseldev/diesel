@@ -1,11 +1,8 @@
 0.9b
-  * Reactor.until clarification, vs. sleep/up, etc?
-  * Clean up logging and debug statements
-  * Test/fix WSGI stuff
   * Docstrings
-  * Why no responses on httperf?  Compare output to others on HTTP
 
 Future
   * @message support for "schedule this generator but don't block me"?
   * Write tests, somehow--check out twisted.trial
   * Investigate avoiding timer code for "schedule now!"
+  * Test/fix WSGI stuff
