@@ -110,7 +110,9 @@ Examples and Docs
 We do recommend you get the source, however, which contains lots of useful
 examples and a copy of this documentation.  
 
-XXX src link XXX
+The latest source and docs can always be downloaded from bitbucket:
+
+http://bitbucket.org/boomplex/diesel/
 
 
 Fundamentals
