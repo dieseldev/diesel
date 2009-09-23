@@ -6,6 +6,8 @@ from diesel import Application, Service, until_eol
 def hi_server(addr):
     while 1:
         inp = (yield until_eol())
+        if inp.strip() == "quit":
+            break
         yield "you said %s" % inp
 
 app = Application()
