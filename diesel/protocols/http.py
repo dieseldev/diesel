@@ -137,19 +137,20 @@ class HttpHeaders(object):
 class HttpRequest(object):
     '''Structure representing an HTTP request.
     '''
-    def __init__(self, method, url, version):
+    def __init__(self, method, url, version, remote_addr=None):
         self.method = method
         self.url = url
         self.version = version
         self.headers = None
         self.body = None
+        self.remote_addr = remote_addr
         
     def format(self):    
         '''Format the request line for the wire.
         '''
         return '%s %s HTTP/%s' % (self.method, self.url, self.version)
         
-class HttpClose(object): pass    
+class HttpClose(Exception): pass    
 
 class HttpServer(object):
     '''An HTTP/1.1 implementation or a server.
@@ -188,7 +189,7 @@ class HttpServer(object):
                 break
 
             method, url, version = parse_request_line(header_line)    
-            req = HttpRequest(method, url, version)
+            req = HttpRequest(method, url, version, remote_addr=addr)
 
             header_block = yield until('\r\n\r\n')
 
@@ -211,11 +212,10 @@ class HttpServer(object):
                 req.body = handle_chunks(heads)
 
             leave_loop = False
-            for i in self.request_handler(req): 
-                if i == HttpClose:
-                    leave_loop = True
-                else:
-                    yield i
+            try:
+                yield self.request_handler(req)
+            except HttpClose:
+                leave_loop = True
             if leave_loop:
                 break
 
@@ -239,7 +239,7 @@ def http_response(req, code, heads, body):
     if body:
         yield body
     if close:
-        yield HttpClose
+        raise HttpClose()
 
 from diesel import Client, call, response
 

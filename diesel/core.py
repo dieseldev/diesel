@@ -182,6 +182,9 @@ class Loop(object):
                     if type(item) is response:
                         assert stack, "Cannot return a response from main handler"
                         current = stack.pop()
+                    elif type(item) is up:
+                        assert stack, "Cannot return an up from main handler"
+                        current = stack.pop()
                     try:
                         last = (yield item)
                     except ConnectionClosed, e:

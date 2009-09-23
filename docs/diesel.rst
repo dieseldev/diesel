@@ -166,8 +166,8 @@ that appear to be using easily-read, blocking, threaded behavior--but they're ac
 running within one process!
 
 Hopefully that provides a sense of what `diesel` is doing and how generators
-can turn async into blocking-ish routines.  From here on out, 
-we'll just talk about how to *use* `diesel`, not its internals.
+can turn async into blocking-ish routines.  Now let's put internals aside and
+focus on how to *use* `diesel`.
 
 Boilerplate
 -----------
@@ -258,10 +258,11 @@ Clients
 -------
 
 `diesel` supports writing network protocol clients, too.  `Client` objects, however,
-aren't managed by the hub the same way `Loops` s and `Service` s are.  Instead, they 
-provide an API to other network resources that `Loop` s and `Service` s can utilize.
+aren't managed by the main event hub exactly the same way `Loops` s and `Service` s are.  
+Instead, they provide an API to other network resources that `Loop` s and `Service` s 
+can utilize.
 
-Let's expand our echo example to cover all three object types::
+Let's expand our echo application to cover all three object types::
 
     #!/usr/bin/env python2.6
     import time
@@ -298,7 +299,7 @@ Let's expand our echo example to cover all three object types::
 
 `handle_echo()` is our connection handler for our `Service`, and 
 `do_echos()` is a `Loop` that creates a client and does 5000 echo calls.
-Those should start looking familiar by now.
+Those two patterns are probably looking familiar by now.
 
 `EchoClient` is our protocol client.  Clients are made by creating a class
 that inherits from the `Client` superclass.  They should expose an API
@@ -317,15 +318,16 @@ resume the caller's generator and send them this python object as the result".
 
 If we run the above code, we should see something like this as output::
 
-    5000 loops in 1.54s
+    5000 loops in 1.14s
 
-Of course, your timing may be slightly different than ours.
+Of course, the actual timing will vary from machine to machine.
 
 Token Groups, Timeouts, and Cooperative Events
 ==============================================
 
 Certain `yield` tokens can be grouped together in tuples to accomodate 
-common patterns, and a corresponding set of return values will always be
+common "or" patterns, like "break until either this or that". 
+A corresponding set of return values will always be
 sent back into the generator.  Here's an example::
 
     #!/usr/bin/env python2.6
@@ -346,8 +348,8 @@ sent back into the generator.  Here's an example::
 This service will handle two bytes at a time on input, or timeout after
 three seconds if not enough data is read.  As the example illustrates, 
 if a `sleep` timer is
-ever the token that re-scheduled the generator, the return value will be 
-`True`.
+ever the token that re-scheduled the generator, the return value in
+its respective position will be `True`.
 
 Cooperative Events
 ------------------
@@ -648,8 +650,8 @@ up our application and hit it a few times, our output looks like this::
     [Sun Sep 20 20:07:05 2009] {http:info} GET / Host=localhost:8088
     [Sun Sep 20 20:07:19 2009] {http:info} GET /foo/ Host=localhost:8088
 
-However, we don't get the "info" lines diesel itself is generating.  Our
-verbosity modifications only affected the http sublogger.
+However, we don't get the "info" lines diesel itself is generating, because
+our verbosity modifications only apply to the sublogger.
 
 Log Locations
 -------------
@@ -663,3 +665,10 @@ Reference
 =========
 
 Coming soon!
+
+For More Information
+====================
+
+Hit us up on the diesel-users google group:
+
+http://groups.google.com/group/diesel-users/
