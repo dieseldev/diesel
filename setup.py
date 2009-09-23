@@ -7,7 +7,7 @@ assert hasattr(select, 'EPOLLIN'), \
 
 from setuptools import setup
 
-VERSION = "0.9.0b"
+VERSION = "0.9.1b"
 
 setup(name="diesel",
 	version=VERSION,
