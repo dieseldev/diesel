@@ -1,3 +1,4 @@
+# vim:ts=4:sw=4:expandtab
 '''A Client example connecting to an echo server (echo.py).
 Utilizes sleep as well.
 '''
@@ -6,29 +7,29 @@ from diesel import Application, Client, call, Loop, sleep, until_eol, response
 import time
 
 class EchoClient(Client):
-	@call
-	def echo(self, message):
-		yield "%s!\r\n" % message
-		back = yield until_eol()
-		yield response(back)
+    @call
+    def echo(self, message):
+        yield "%s!\r\n" % message
+        back = yield until_eol()
+        yield response(back)
 
-	def on_close(self):
-		print 'ouch!  closed!'
+    def on_close(self):
+        print 'ouch!  closed!'
 
 
 def echo_loop(n):
-	def _loop():
-		client = EchoClient()
-		client.connect('localhost', 8013)
-		while 1:
-			bar = yield client.echo("foo %s" % n)
-			tms = time.asctime()
-			print "[%s] %s: remote service said %r" % (tms, n, bar)
-			yield sleep(2)
-	return _loop
+    def _loop():
+        client = EchoClient()
+        client.connect('localhost', 8013)
+        while 1:
+            bar = yield client.echo("foo %s" % n)
+            tms = time.asctime()
+            print "[%s] %s: remote service said %r" % (tms, n, bar)
+            yield sleep(2)
+    return _loop
 
 a = Application()
 
 for x in xrange(5):
-	a.add_loop(Loop(echo_loop(x)))
+    a.add_loop(Loop(echo_loop(x)))
 a.run()

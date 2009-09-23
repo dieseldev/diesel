@@ -1,3 +1,4 @@
+# vim:ts=4:sw=4:expandtab
 import sys
 import time
 
@@ -11,50 +12,50 @@ LOGLVL_CRITICAL,
 ) = range(1,6)
 
 _lvl_text = {
-	LOGLVL_DEBUG : 'debug',
-	LOGLVL_INFO : 'info',
-	LOGLVL_WARN : 'warn',
-	LOGLVL_ERR : 'error',
-	LOGLVL_CRITICAL : 'critical',
+    LOGLVL_DEBUG : 'debug',
+    LOGLVL_INFO : 'info',
+    LOGLVL_WARN : 'warn',
+    LOGLVL_ERR : 'error',
+    LOGLVL_CRITICAL : 'critical',
 }
-	
+    
 
 class Logger(object):
-	def __init__(self, fd=None, verbosity=LOGLVL_WARN):
-		if fd is None:
-			fd = [sys.stdout]
-		if type(fd) not in (list, tuple):
-			fd = [fd]
-		self.fdlist = list(fd)
-		self.level = verbosity
-		self.component = None
+    def __init__(self, fd=None, verbosity=LOGLVL_WARN):
+        if fd is None:
+            fd = [sys.stdout]
+        if type(fd) not in (list, tuple):
+            fd = [fd]
+        self.fdlist = list(fd)
+        self.level = verbosity
+        self.component = None
 
-	def _writelogline(self, lvl, message):
-		if lvl >= self.level:
-			for fd in self.fdlist:
-				fd.write('[%s] {%s%s} %s\n' % (time.asctime(), 
-										self.component and ('%s:' % self.component) or '',
-										_lvl_text[lvl],
-										message))
+    def _writelogline(self, lvl, message):
+        if lvl >= self.level:
+            for fd in self.fdlist:
+                fd.write('[%s] {%s%s} %s\n' % (time.asctime(), 
+                                        self.component and ('%s:' % self.component) or '',
+                                        _lvl_text[lvl],
+                                        message))
 
-	debug = lambda s, m: s._writelogline(LOGLVL_DEBUG, m)
-	info = lambda s, m: s._writelogline(LOGLVL_INFO, m)
-	warn = lambda s, m: s._writelogline(LOGLVL_WARN, m)
-	error = lambda s, m: s._writelogline(LOGLVL_ERR, m)
-	critical = lambda s, m: s._writelogline(LOGLVL_CRITICAL, m)
+    debug = lambda s, m: s._writelogline(LOGLVL_DEBUG, m)
+    info = lambda s, m: s._writelogline(LOGLVL_INFO, m)
+    warn = lambda s, m: s._writelogline(LOGLVL_WARN, m)
+    error = lambda s, m: s._writelogline(LOGLVL_ERR, m)
+    critical = lambda s, m: s._writelogline(LOGLVL_CRITICAL, m)
 
-	def get_sublogger(self, component, verbosity=None):
-		copy = Logger(verbosity=verbosity or self.level)
-		copy.fdlist = self.fdlist
-		copy.component = component
-		return copy
+    def get_sublogger(self, component, verbosity=None):
+        copy = Logger(verbosity=verbosity or self.level)
+        copy.fdlist = self.fdlist
+        copy.component = component
+        return copy
 
 def set_current_application(app):
-	global _current_application
-	_current_application = app
+    global _current_application
+    _current_application = app
 
 class _currentLogger(object):
-	def __getattr__(self, n):
-		return getattr(_current_application.logger, n)
+    def __getattr__(self, n):
+        return getattr(_current_application.logger, n)
 
 log = _currentLogger()

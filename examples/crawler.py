@@ -1,3 +1,4 @@
+# vim:ts=4:sw=4:expandtab
 '''A very simple, flawed web crawler--demonstrates
 Clients + Loops
 '''
@@ -11,7 +12,7 @@ schema, host, path, _, _, _ = urlparse(url)
 path = path or '/'
 base_dir = path if path.endswith('/') else os.path.dirname(path)
 if not base_dir.endswith('/'):
-	base_dir += '/'
+    base_dir += '/'
 
 assert schema == 'http', 'http only'
 
@@ -26,72 +27,72 @@ url_exp = re.compile(r'(src|href)="([^"]+)', re.MULTILINE | re.IGNORECASE)
 links = None
 
 def get_links(s):
-	for mo in url_exp.finditer(s):
-		lpath = mo.group(2)
-		if ':' not in lpath and '..' not in lpath:
-			if lpath.startswith('/'):
-				yield lpath
-			else:
-				yield urljoin(base_dir, lpath)
+    for mo in url_exp.finditer(s):
+        lpath = mo.group(2)
+        if ':' not in lpath and '..' not in lpath:
+            if lpath.startswith('/'):
+                yield lpath
+            else:
+                yield urljoin(base_dir, lpath)
 
 def get_client():
-	client = HttpClient()
-	client.connect(host, 80)
-	heads = HttpHeaders()
-	heads.set('Host', host)
-	return client, heads
+    client = HttpClient()
+    client.connect(host, 80)
+    heads = HttpHeaders()
+    heads.set('Host', host)
+    return client, heads
 
 def ensure_dirs(lpath):
-	def g(lpath):
-		while len(lpath) > len(folder):
-			lpath = os.path.dirname(lpath)
-			yield lpath
-	for d in reversed(list(g(lpath))):
-		if not os.path.isdir(d):
-			os.mkdir(d)
+    def g(lpath):
+        while len(lpath) > len(folder):
+            lpath = os.path.dirname(lpath)
+            yield lpath
+    for d in reversed(list(g(lpath))):
+        if not os.path.isdir(d):
+            os.mkdir(d)
 
 def write_file(lpath, body):
-	lpath = (lpath if not lpath.endswith('/') else (lpath + 'index.html')).lstrip('/')
-	lpath = os.path.join(folder, lpath)
-	ensure_dirs(lpath)
-	open(lpath, 'w').write(body)
+    lpath = (lpath if not lpath.endswith('/') else (lpath + 'index.html')).lstrip('/')
+    lpath = os.path.join(folder, lpath)
+    ensure_dirs(lpath)
+    open(lpath, 'w').write(body)
 
 def follow_loop():
-	global count
-	global files
-	count += 1
-	client, heads = get_client()
-	while True:
-		try:
-			lpath = links.next()
-		except StopIteration:
-			count -= 1
-			if not count:
-				stop()
-			break
-		print " -> %s" % lpath
-		if client.is_closed:
-			client, heads = get_client()
-		code, heads, body = yield client.request('GET', lpath, heads)
-		write_file(lpath, body)
-		files +=1
-	
+    global count
+    global files
+    count += 1
+    client, heads = get_client()
+    while True:
+        try:
+            lpath = links.next()
+        except StopIteration:
+            count -= 1
+            if not count:
+                stop()
+            break
+        print " -> %s" % lpath
+        if client.is_closed:
+            client, heads = get_client()
+        code, heads, body = yield client.request('GET', lpath, heads)
+        write_file(lpath, body)
+        files +=1
+    
 def req_loop():
-	global links
-	client, heads = get_client()
-	print path
-	code, heads, body = yield client.request('GET', path, heads)
-	write_file(path, body)
-	links = get_links(body)
-	for x in xrange(CONCURRENCY):
-		a.add_loop(Loop(follow_loop))
+    global links
+    client, heads = get_client()
+    print path
+    code, heads, body = yield client.request('GET', path, heads)
+    write_file(path, body)
+    links = get_links(body)
+    for x in xrange(CONCURRENCY):
+        a.add_loop(Loop(follow_loop))
 
 a = Application()
 a.add_loop(Loop(req_loop))
 
 def stop():
-	print "Fetched %s files in %.3fs with concurrency=%s" % (files, time.time() - t, CONCURRENCY)
-	a.halt() # stop application
+    print "Fetched %s files in %.3fs with concurrency=%s" % (files, time.time() - t, CONCURRENCY)
+    a.halt() # stop application
 
 t = time.time()
 a.run()

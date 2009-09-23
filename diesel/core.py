@@ -1,3 +1,4 @@
+# vim:ts=4:sw=4:expandtab
 import socket
 from types import GeneratorType
 from collections import deque, defaultdict
@@ -12,297 +13,297 @@ CRLF = '\r\n'
 BUFSIZ = 2 ** 14
 
 class until(object):
-	def __init__(self, sentinel):
-		self.sentinel = sentinel
+    def __init__(self, sentinel):
+        self.sentinel = sentinel
 
 def until_eol():
-	return until(CRLF)
+    return until(CRLF)
 
 class bytes(object):
-	def __init__(self, sentinel):
-		self.sentinel = sentinel
+    def __init__(self, sentinel):
+        self.sentinel = sentinel
 
 class sleep(object):
-	def __init__(self, duration=0):
-		self.duration = duration
+    def __init__(self, duration=0):
+        self.duration = duration
 
 class up(object):
-	def __init__(self, value):
-		self.value = value
+    def __init__(self, value):
+        self.value = value
 
 class wait(object):
-	def __init__(self, event):
-		self.event = event
+    def __init__(self, event):
+        self.event = event
 
 class fire(object):
-	def __init__(self, event, value=None):
-		self.event = event
-		self.value = value
+    def __init__(self, event, value=None):
+        self.event = event
+        self.value = value
 
 class WaitPool(object):
-	def __init__(self):
-		self.waits = defaultdict(set)
-		self.loop_refs = defaultdict(set)
+    def __init__(self):
+        self.waits = defaultdict(set)
+        self.loop_refs = defaultdict(set)
 
-	def wait(self, who, what):
-		self.waits[what].add(who)
-		self.loop_refs[who].add(what)
+    def wait(self, who, what):
+        self.waits[what].add(who)
+        self.loop_refs[who].add(what)
 
-	def fire(self, what, value):
-		for handler in self.waits[what].copy():
-			handler.fire(what, value)
+    def fire(self, what, value):
+        for handler in self.waits[what].copy():
+            handler.fire(what, value)
 
-	def clear(self, who):
-		for what in self.loop_refs[who]:
-			self.waits[what].remove(who)
-		del self.loop_refs[who]
+    def clear(self, who):
+        for what in self.loop_refs[who]:
+            self.waits[what].remove(who)
+        del self.loop_refs[who]
 
 waits = WaitPool()
 
 class NoPipeline(object):
-	def __getattr__(self, *args, **kw):
-		return ValueError("Cannot write to the outgoing pipeline for socketless Loops (yield string, file)")
-	empty = True
+    def __getattr__(self, *args, **kw):
+        return ValueError("Cannot write to the outgoing pipeline for socketless Loops (yield string, file)")
+    empty = True
 
 class NoBuffer(object):
-	def __getattr__(self, *args, **kw):
-		return ValueError("Cannot check incoming buffer on socketless Loops (yield until, bytes, etc)")
+    def __getattr__(self, *args, **kw):
+        return ValueError("Cannot check incoming buffer on socketless Loops (yield until, bytes, etc)")
 
 def id_gen():
-	x = 1
-	while True:
-		yield x
-		x += 1
+    x = 1
+    while True:
+        yield x
+        x += 1
 ids = id_gen()
 
 class Loop(object):
-	'''A cooperative generator.
-	'''
-	def __init__(self, loop_callable, *callable_args):
-		self.g = self.cycle_all(loop_callable(*callable_args))
-		self.pipeline = NoPipeline()
-		self.buffer = NoBuffer()
-		from diesel.app import current_app
-		self.hub = current_app.hub
-		self.id = ids.next()
-		self._wakeup_timer = None
-		self.fire_handlers = {}
+    '''A cooperative generator.
+    '''
+    def __init__(self, loop_callable, *callable_args):
+        self.g = self.cycle_all(loop_callable(*callable_args))
+        self.pipeline = NoPipeline()
+        self.buffer = NoBuffer()
+        from diesel.app import current_app
+        self.hub = current_app.hub
+        self.id = ids.next()
+        self._wakeup_timer = None
+        self.fire_handlers = {}
 
-	def __hash__(self):
-		return self.id
+    def __hash__(self):
+        return self.id
 
-	def __eq__(self, other):
-		return other.id == self.id
+    def __eq__(self, other):
+        return other.id == self.id
 
-	def fire(self, what, value):
-		if what in self.fire_handlers:
-			handler = self.fire_handlers.pop(what)
-			self.fire_handlers = {}
-			handler(value)
+    def fire(self, what, value):
+        if what in self.fire_handlers:
+            handler = self.fire_handlers.pop(what)
+            self.fire_handlers = {}
+            handler(value)
 
-	def cycle_all(self, current, error=None):
-		'''Effectively flattens all iterators.
-		'''
-		last = None
-		stack = []
-		while True:
-			try:
-				if error != None:
-					item = current.throw(*error)
-				elif last != None:
-					item = current.send(last)
-				else:
-					item = current.next()
-			except StopIteration:
-				if stack:
-					current = stack.pop()
-				else:
-					raise
-			except Exception, e:
-				if stack:
-					error = e.__class__, str(e)
-					current = stack.pop()
-				else:
-					raise
-			else:
-				if type(item) is GeneratorType:
-					stack.append(current)
-					current = item
-					last = None
-				else:
-					if type(item) is response:
-						assert stack, "Cannot return a response from main handler"
-						current = stack.pop()
-					try:
-						last = (yield item)
-					except ConnectionClosed, e:
-						error = (ConnectionClosed, str(e))
+    def cycle_all(self, current, error=None):
+        '''Effectively flattens all iterators.
+        '''
+        last = None
+        stack = []
+        while True:
+            try:
+                if error != None:
+                    item = current.throw(*error)
+                elif last != None:
+                    item = current.send(last)
+                else:
+                    item = current.next()
+            except StopIteration:
+                if stack:
+                    current = stack.pop()
+                else:
+                    raise
+            except Exception, e:
+                if stack:
+                    error = e.__class__, str(e)
+                    current = stack.pop()
+                else:
+                    raise
+            else:
+                if type(item) is GeneratorType:
+                    stack.append(current)
+                    current = item
+                    last = None
+                else:
+                    if type(item) is response:
+                        assert stack, "Cannot return a response from main handler"
+                        current = stack.pop()
+                    try:
+                        last = (yield item)
+                    except ConnectionClosed, e:
+                        error = (ConnectionClosed, str(e))
 
-	def multi_callin(self, pos, tot, real_f=None):
-		real_f = real_f or self.wake
-		if tot == 1:
-			return real_f
-		def f(res):
-			real_arg = [None] * tot
-			real_arg[pos] = res
-			return real_f(tuple(real_arg))
-		return f
+    def multi_callin(self, pos, tot, real_f=None):
+        real_f = real_f or self.wake
+        if tot == 1:
+            return real_f
+        def f(res):
+            real_arg = [None] * tot
+            real_arg[pos] = res
+            return real_f(tuple(real_arg))
+        return f
 
-	def iterate(self, n_val=None):
-		while True:
-			try:
-				if n_val is not None:
-					rets = self.g.send(n_val)
-				else:
-					rets = self.g.next()
-			except StopIteration:
-				if hasattr(self, 'sock'):
-					self.pipeline.close_request()
-				break
-			n_val = None
-			if type(rets) != tuple:
-				rets = (rets,)
+    def iterate(self, n_val=None):
+        while True:
+            try:
+                if n_val is not None:
+                    rets = self.g.send(n_val)
+                else:
+                    rets = self.g.next()
+            except StopIteration:
+                if hasattr(self, 'sock'):
+                    self.pipeline.close_request()
+                break
+            n_val = None
+            if type(rets) != tuple:
+                rets = (rets,)
 
-			exit = False
-			used_term = False
-			nrets = len(rets)
-			for pos, ret in enumerate(rets):
-				
-				if isinstance(ret, response):
-					assert nrets == 1, "response cannot be paired with any other yield token"
-					c = self.callbacks.popleft()
-					c(ret.value)
-					exit = True
-				elif isinstance(ret, call):
-					assert nrets == 1, "call cannot be paired with any other yield token"
-					ret.go(self.iterate)
-					exit = True
-				elif isinstance(ret, basestring) or hasattr(ret, 'seek'):
-					assert nrets == 1, "a string or file cannot be paired with any other yield token"
-					self.pipeline.add(ret)
-				elif type(ret) is up:
-					assert nrets == 1, "up cannot be paired with any other yield token"
-					n_val = ret.value
-				elif type(ret) is fire:
-					assert nrets == 1, "fire cannot be paired with any other yield token"
-					waits.fire(ret.event, ret.value)
-				elif type(ret) is until or type(ret) is bytes:
-					assert used_term == False, "only one terminal specifier (bytes, until) per yield"
-					used_term = True
-					self.buffer.set_term(ret.sentinel)
-					n_val = self.buffer.check()
-					if n_val == None:
-						exit = True
-						self.new_data = self.multi_callin(pos, nrets)
-					else:
-						if nrets > 1:
-							t = [None] * nrets
-							t[pos] = n_val
-							n_val = tuple(t)
-						self.clear_pending_events()
-						exit = False
-						break
+            exit = False
+            used_term = False
+            nrets = len(rets)
+            for pos, ret in enumerate(rets):
+                
+                if isinstance(ret, response):
+                    assert nrets == 1, "response cannot be paired with any other yield token"
+                    c = self.callbacks.popleft()
+                    c(ret.value)
+                    exit = True
+                elif isinstance(ret, call):
+                    assert nrets == 1, "call cannot be paired with any other yield token"
+                    ret.go(self.iterate)
+                    exit = True
+                elif isinstance(ret, basestring) or hasattr(ret, 'seek'):
+                    assert nrets == 1, "a string or file cannot be paired with any other yield token"
+                    self.pipeline.add(ret)
+                elif type(ret) is up:
+                    assert nrets == 1, "up cannot be paired with any other yield token"
+                    n_val = ret.value
+                elif type(ret) is fire:
+                    assert nrets == 1, "fire cannot be paired with any other yield token"
+                    waits.fire(ret.event, ret.value)
+                elif type(ret) is until or type(ret) is bytes:
+                    assert used_term == False, "only one terminal specifier (bytes, until) per yield"
+                    used_term = True
+                    self.buffer.set_term(ret.sentinel)
+                    n_val = self.buffer.check()
+                    if n_val == None:
+                        exit = True
+                        self.new_data = self.multi_callin(pos, nrets)
+                    else:
+                        if nrets > 1:
+                            t = [None] * nrets
+                            t[pos] = n_val
+                            n_val = tuple(t)
+                        self.clear_pending_events()
+                        exit = False
+                        break
 
-				elif type(ret) is sleep:
-					self._wakeup_timer = self.hub.call_later(ret.duration, self.multi_callin(pos, nrets), True)
-					exit = True
+                elif type(ret) is sleep:
+                    self._wakeup_timer = self.hub.call_later(ret.duration, self.multi_callin(pos, nrets), True)
+                    exit = True
 
-				elif type(ret) is wait:
-					self.fire_handlers[ret.event] = self.multi_callin(pos, nrets, self.schedule)
-					waits.wait(self, ret.event)
-					exit = True
-			if exit: 
-				break
+                elif type(ret) is wait:
+                    self.fire_handlers[ret.event] = self.multi_callin(pos, nrets, self.schedule)
+                    waits.wait(self, ret.event)
+                    exit = True
+            if exit: 
+                break
 
-		if not self.pipeline.empty:
-			self.set_writable(True)
+        if not self.pipeline.empty:
+            self.set_writable(True)
 
-	def clear_pending_events(self):
-		if self._wakeup_timer and self._wakeup_timer.pending:
-			self._wakeup_timer.cancel()
-		self.fire_handlers = {}
-		waits.clear(self)
+    def clear_pending_events(self):
+        if self._wakeup_timer and self._wakeup_timer.pending:
+            self._wakeup_timer.cancel()
+        self.fire_handlers = {}
+        waits.clear(self)
 
-	def schedule(self, value=None):
-		self.clear_pending_events()
-		self._wakeup_timer = self.hub.call_later(0, self.wake, value)
+    def schedule(self, value=None):
+        self.clear_pending_events()
+        self._wakeup_timer = self.hub.call_later(0, self.wake, value)
 
-	def wake(self, value=None):
-		self.clear_pending_events()
-		self.iterate(value)
+    def wake(self, value=None):
+        self.clear_pending_events()
+        self.iterate(value)
 
 class Connection(Loop):
-	'''A cooperative loop hooked up to a socket.
-	'''
-	def __init__(self, sock, addr, connection_handler):
-		Loop.__init__(self, connection_handler, addr)
-		self.pipeline = pipeline.Pipeline()
-		self.buffer = buffer.Buffer()
-		self.sock = sock
-		self.addr = addr
-		self.hub.register(sock, self.handle_read, self.handle_write)
-		self._wakeup_timer = None
-		self._writable = False
-		self.callbacks = deque()
-		self.closed = False
+    '''A cooperative loop hooked up to a socket.
+    '''
+    def __init__(self, sock, addr, connection_handler):
+        Loop.__init__(self, connection_handler, addr)
+        self.pipeline = pipeline.Pipeline()
+        self.buffer = buffer.Buffer()
+        self.sock = sock
+        self.addr = addr
+        self.hub.register(sock, self.handle_read, self.handle_write)
+        self._wakeup_timer = None
+        self._writable = False
+        self.callbacks = deque()
+        self.closed = False
 
-	def set_writable(self, val):
-		if self.closed:
-			return
-		if val and not self._writable:
-			self.hub.enable_write(self.sock)
-			self._writable = True
-			return
-		if not val and self._writable:
-			self.hub.disable_write(self.sock)
-			self._writable = False
+    def set_writable(self, val):
+        if self.closed:
+            return
+        if val and not self._writable:
+            self.hub.enable_write(self.sock)
+            self._writable = True
+            return
+        if not val and self._writable:
+            self.hub.disable_write(self.sock)
+            self._writable = False
 
-	def shutdown(self, remote_closed=False):
-		self.hub.unregister(self.sock)
-		self.closed = True
-		if not remote_closed:
-			self.sock.close()
-		else:
-			try:
-				self.g.throw(ConnectionClosed)
-			except StopIteration:
-				pass
+    def shutdown(self, remote_closed=False):
+        self.hub.unregister(self.sock)
+        self.closed = True
+        if not remote_closed:
+            self.sock.close()
+        else:
+            try:
+                self.g.throw(ConnectionClosed)
+            except StopIteration:
+                pass
 
-		self.g = None
+        self.g = None
 
-	def handle_write(self):
-		if not self.pipeline.empty:
-			try:
-				data = self.pipeline.read(BUFSIZ)
-			except pipeline.PipelineCloseRequest:
-				self.shutdown()
-			else:
-				try:
-					bsent = self.sock.send(data)
-				except socket.error, s:
-					g = self.g
-					self.shutdown(True)
-				else:
-					if bsent != len(data):
-						self.pipeline.backup(data[bsent:])
+    def handle_write(self):
+        if not self.pipeline.empty:
+            try:
+                data = self.pipeline.read(BUFSIZ)
+            except pipeline.PipelineCloseRequest:
+                self.shutdown()
+            else:
+                try:
+                    bsent = self.sock.send(data)
+                except socket.error, s:
+                    g = self.g
+                    self.shutdown(True)
+                else:
+                    if bsent != len(data):
+                        self.pipeline.backup(data[bsent:])
 
-					if not self.pipeline.empty:
-						return True
-					else:
-						self.set_writable(False)
+                    if not self.pipeline.empty:
+                        return True
+                    else:
+                        self.set_writable(False)
 
-	def handle_read(self):
-		disconnect_reason = None
-		try:
-			data = self.sock.recv(BUFSIZ)
-		except socket.error, e:
-			data = ''
-			disconnect_reason = str(e)
+    def handle_read(self):
+        disconnect_reason = None
+        try:
+            data = self.sock.recv(BUFSIZ)
+        except socket.error, e:
+            data = ''
+            disconnect_reason = str(e)
 
-		if not data:
-			g = self.g
-			self.shutdown(True)
-		else:
-			res = self.buffer.feed(data)
-			if res:
-				self.new_data(res)
+        if not data:
+            g = self.g
+            self.shutdown(True)
+        else:
+            res = self.buffer.feed(data)
+            if res:
+                self.new_data(res)

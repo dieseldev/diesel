@@ -1,3 +1,4 @@
+# vim:ts=4:sw=4:expandtab
 import logmod
 log = logmod.log
 from logmod import Logger, LOGLVL_DEBUG, LOGLVL_INFO, LOGLVL_WARN, LOGLVL_ERR, LOGLVL_CRITICAL
