@@ -1,7 +1,7 @@
 Quickstart
 ============
 
-`diesel` lets you write non-blocking network applications in Python.
+Here's what you need to get up and running with `diesel` in a flash.
 
 Requirements
 ------------
