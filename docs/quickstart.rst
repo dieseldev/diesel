@@ -47,5 +47,5 @@ Learn More
 Read the complete documentation_ for the full story on creating high-performance
 network applications with `diesel`.
 
-.. _documentation: http://www.dieselweb.org/lib/docs
+.. _documentation: http://dieselweb.org/lib/docs
 
