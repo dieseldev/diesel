@@ -153,6 +153,7 @@ class Loop(object):
         "generator stack" effect.
         '''
         last = None
+        in_self_call = False
         stack = []
         while True:
             try:
@@ -178,10 +179,18 @@ class Loop(object):
                     stack.append(current)
                     current = item
                     last = None
+                elif type(item) is call and item.client.conn == self:
+                    in_self_call = True
+                    stack.append(current)
+                    current = item.gen
+                    last = None
                 else:
                     if type(item) is response:
                         assert stack, "Cannot return a response from main handler"
                         current = stack.pop()
+                        if in_self_call:
+                            in_self_call = False
+                            item = up(item.value)
                     elif type(item) is up:
                         assert stack, "Cannot return an up from main handler"
                         current = stack.pop()
@@ -273,6 +282,8 @@ class Loop(object):
                     self.fire_handlers[ret.event] = self.multi_callin(pos, nrets, self.schedule)
                     waits.wait(self, ret.event)
                     exit = True
+                else:
+                    raise ValueError("Unknown yield token %s" % ret)
             if exit: 
                 break
 
