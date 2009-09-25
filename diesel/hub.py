@@ -253,12 +253,14 @@ class EPollEventHub(AbstractEventHub):
         self.epoll.unregister(fd)
 
 # Expose a usable EventHub implementation
+import os
 try:
+    if 'DIESEL_NO_EPOLL' in os.environ:
+        raise AttributeError('epoll')
     select.epoll
 except AttributeError:
     EventHub = SelectEventHub
 else:
-    print 'epoll!'
     EventHub = EPollEventHub
 
 if __name__ == '__main__':
