@@ -13,6 +13,11 @@ class EchoClient(Client):
         back = yield until_eol()
         yield response(back)
 
+    @call
+    def echo_whatup(self):
+        resp = yield self.echo('whatup?')
+        yield response(resp)
+
     def on_close(self):
         print 'ouch!  closed!'
 
@@ -28,8 +33,21 @@ def echo_loop(n):
             yield sleep(2)
     return _loop
 
+def echo_self_loop(n):
+    def _loop():
+        client = EchoClient()
+        client.connect('localhost', 8013)
+        while 1:
+            bar = yield client.echo_whatup()
+            tms = time.asctime()
+            print "[%s] %s: (whatup) remote service said %r" % (tms, n, bar)
+            yield sleep(3)
+    return _loop
+
 a = Application()
 
 for x in xrange(5):
     a.add_loop(Loop(echo_loop(x)))
+for x in xrange(5):
+    a.add_loop(Loop(echo_self_loop(x)))
 a.run()
