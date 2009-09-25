@@ -258,7 +258,8 @@ try:
 except AttributeError:
     EventHub = SelectEventHub
 else:
-    EventHub = EpollEventHub
+    print 'epoll!'
+    EventHub = EPollEventHub
 
 if __name__ == '__main__':
     hub = EventHub()
