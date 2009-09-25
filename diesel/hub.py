@@ -3,9 +3,18 @@
 on Python 2.6's epoll support.
 '''
 import select
-from select import EPOLLIN, EPOLLOUT, EPOLLPRI
+try:
+    from select import EPOLLIN, EPOLLOUT, EPOLLPRI
+except ImportError:
+    # Some fallbacks used in non-epoll implementations
+    EPOLLIN = object()
+    EPOLLPRI = object()
+    EPOLLOUT = object()
+
+import errno
 from collections import deque
 from time import time
+import itertools
 
 class Timer(object):
     '''A timer is a promise to call some function at a future date.
@@ -38,17 +47,11 @@ class Timer(object):
         '''
         return (self.trigger_time - time()) < self.ALLOWANCE
 
-class EventHub(object):
-    '''A epoll-based hub.
-    '''
-    SIZE_HINT = 50000
+class AbstractEventHub(object):
     def __init__(self):
-        self.epoll = select.epoll(self.SIZE_HINT)
         self.timers = deque()
         self.new_timers = []
         self.run = True
-        def two_item_list():
-            return [None, None]
         self.events = {}
 
     def handle_events(self):
@@ -67,7 +70,8 @@ class EventHub(object):
         timeout = (self.timers[0][1].trigger_time - tm) if self.timers else 1e6
         if timeout < 0:
             timeout = 0
-        events = self.epoll.poll(timeout)
+
+        events = self._get_events(timeout)
 
         # Run timers first, to try to nail their timings
         while self.timers:
@@ -79,7 +83,7 @@ class EventHub(object):
                         return
             else:
                 break
-        
+
         # Handle all socket I/O
         for (fd, evtype) in events:
             if evtype == EPOLLIN or evtype == EPOLLPRI:
@@ -108,6 +112,11 @@ class EventHub(object):
                 else:
                     break
 
+    def _get_events(self):
+        '''Get all events to process.
+        '''
+        raise NotImplementedError
+
     def call_later(self, interval, f, *args, **kw):
         '''Schedule a timer on the hub.
         '''
@@ -123,8 +132,108 @@ class EventHub(object):
         By default, only the read behavior will be polled and the
         read callback used until enable_write is invoked.
         '''
-        assert fd not in self.events
+        assert fd.fileno() not in self.events
         self.events[fd.fileno()] = (read_callback, write_callback)
+        self._add_fd(fd)
+
+    def _add_fd(self, fd):
+        '''Add this socket to the list of sockets used in the
+        poll call.
+        '''
+        raise NotImplementedError
+
+    def enable_write(self, fd):
+        '''Enable write polling and the write callback.
+        '''
+        raise NotImplementedError
+
+    def disable_write(self, fd):
+        '''Disable write polling and the write callback.
+        '''
+        raise NotImplementedError
+
+    def unregister(self, fd):
+        '''Remove this socket from the list of sockets the
+        hub is polling on.
+        '''
+        fn = fd.fileno()
+        if fn in self.events:
+            del self.events[fn]
+
+            self._remove_fd(fd)
+
+    def _remove_fd(self, fd):
+        '''Remove this socket from the list of sockets the
+        hub is polling on.
+        '''
+        raise NotImplementedError
+
+
+class SelectEventHub(AbstractEventHub):
+    '''A select-based hub.
+    '''
+    def __init__(self):
+        super(SelectEventHub, self).__init__()
+
+        self.in_set, self.out_set = set(), set()
+
+    def _get_events(self, timeout):
+        '''Get all events to process.
+        '''
+        readables, writables, _ = select.select(self.in_set,
+                                                self.out_set,
+                                                set(), timeout)
+
+        # Make our return value look like the return value of epoll
+        return tuple(
+            itertools.chain(
+                ((fd.fileno(), EPOLLIN) for fd in readables),
+                ((fd.fileno(), EPOLLOUT) for fd in writables)
+            )
+        )
+
+    def _add_fd(self, fd):
+        '''Add this socket to the list of sockets used in the
+        poll call.
+        '''
+        self.in_set.add(fd)
+
+    def enable_write(self, fd):
+        '''Enable write polling and the write callback.
+        '''
+        self.out_set.add(fd)
+
+    def disable_write(self, fd):
+        '''Disable write polling and the write callback.
+        '''
+        self.out_set.remove(fd)
+
+    def _remove_fd(self, fd):
+        '''Remove this socket from the list of sockets the
+        hub is polling on.
+        '''
+        self.in_set.remove(fd)
+        if fd in self.out_set:
+            self.out_set.remove(fd)
+
+
+class EPollEventHub(AbstractEventHub):
+    '''A epoll-based hub.
+    '''
+    SIZE_HINT = 50000
+    def __init__(self):
+        super(EPollEventHub, self).__init__()
+        self.epoll = select.epoll(self.SIZE_HINT)
+
+    def _get_events(self, timeout):
+        '''Get all events to process.
+        '''
+        return self.epoll.poll(timeout)
+        
+    def _add_fd(self, fd):
+        '''Add this socket to the list of sockets used in the
+        poll call.
+        '''
         self.epoll.register(fd, EPOLLIN | EPOLLPRI)
 
     def enable_write(self, fd):
@@ -137,14 +246,19 @@ class EventHub(object):
         '''
         self.epoll.modify(fd, EPOLLIN | EPOLLPRI)
 
-    def unregister(self, fd):
+    def _remove_fd(self, fd):
         '''Remove this socket from the list of sockets the
         hub is polling on.
         '''
-        fn = fd.fileno()
-        if fn in self.events:
-            del self.events[fn]
-            self.epoll.unregister(fd)
+        self.epoll.unregister(fd)
+
+# Expose a usable EventHub implementation
+try:
+    select.epoll
+except AttributeError:
+    EventHub = SelectEventHub
+else:
+    EventHub = EpollEventHub
 
 if __name__ == '__main__':
     hub = EventHub()
