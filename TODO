@@ -1,3 +1,6 @@
+  * iterator support on client api
+  * Update examples to use log instead of print
+
 Future
   * @message support for "schedule this generator but don't block me"?
   * Write tests, somehow--check out twisted.trial

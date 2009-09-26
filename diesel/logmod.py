@@ -43,11 +43,12 @@ class Logger(object):
     # The actual message logging functions
     def _writelogline(self, lvl, message):
         if lvl >= self.level:
+            final_out = '[%s] {%s%s} %s\n' % (time.asctime(), 
+            self.component and ('%s:' % self.component) or '',
+            _lvl_text[lvl],
+            message)
             for fd in self.fdlist:
-                fd.write('[%s] {%s%s} %s\n' % (time.asctime(), 
-                                        self.component and ('%s:' % self.component) or '',
-                                        _lvl_text[lvl],
-                                        message))
+                fd.write(final_out)
 
     debug = lambda s, m: s._writelogline(LOGLVL_DEBUG, m)
     info = lambda s, m: s._writelogline(LOGLVL_INFO, m)

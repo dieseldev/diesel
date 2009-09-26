@@ -5,7 +5,8 @@ Just give it a run and off it goes.
 '''
 
 import time
-from diesel import Application, Service, Client, Loop, until, call, response
+from diesel import Application, Service, Client, Loop
+from diesel import until, call, response, log, Logger, LOGLVL_INFO
 
 def handle_echo(remote_addr):
     while True:
@@ -19,7 +20,7 @@ class EchoClient(Client):
         back = yield until("\r\n")
         yield response(back)
 
-app = Application()
+app = Application(logger=Logger(verbosity=LOGLVL_INFO))
 
 def do_echos():
     client = EchoClient()
@@ -29,7 +30,7 @@ def do_echos():
         msg = "hello, world #%s!" % x
         echo_result = yield client.echo(msg)
         assert echo_result.strip() == "you said: %s" % msg
-    print '5000 loops in %.2fs' % (time.time() - t)
+    log.info('5000 loops in %.2fs' % (time.time() - t))
     app.halt()
 
 app.add_service(Service(handle_echo, port=8000))
