@@ -21,7 +21,15 @@ _lvl_text = {
     LOGLVL_ERR : 'error',
     LOGLVL_CRITICAL : 'critical',
 }
-    
+
+def log_method_to_level(m):
+    return {
+        'debug' :  LOGLVL_DEBUG,
+        'info' :  LOGLVL_INFO,
+        'warn' :  LOGLVL_WARN,
+        'error' :  LOGLVL_ERR,
+        'critical' :  LOGLVL_CRITICAL,
+    }[m.__name__]
 
 class Logger(object):
     '''Create a logger, with either a provided file-like object
@@ -37,6 +45,8 @@ class Logger(object):
         if type(fd) not in (list, tuple):
             fd = [fd]
         self.fdlist = list(fd)
+        if callable(verbosity):
+            verbosity = log_method_to_level(verbosity)
         self.level = verbosity
         self.component = None
 
@@ -50,13 +60,22 @@ class Logger(object):
             for fd in self.fdlist:
                 fd.write(final_out)
 
-    debug = lambda s, m: s._writelogline(LOGLVL_DEBUG, m)
-    info = lambda s, m: s._writelogline(LOGLVL_INFO, m)
-    warn = lambda s, m: s._writelogline(LOGLVL_WARN, m)
-    error = lambda s, m: s._writelogline(LOGLVL_ERR, m)
-    critical = lambda s, m: s._writelogline(LOGLVL_CRITICAL, m)
+    def debug(self, message):
+        return self._writelogline(LOGLVL_DEBUG, message)
 
-    def get_sublogger(self, component, verbosity=None):
+    def info(self, message):
+        return self._writelogline(LOGLVL_INFO, message)
+
+    def warn(self, message):
+        return self._writelogline(LOGLVL_WARN, message)
+
+    def error(self, message):
+        return self._writelogline(LOGLVL_ERR, message)
+
+    def critical(self, message):
+        return self._writelogline(LOGLVL_CRITICAL, message)
+
+    def sublog(self, component, verbosity=None):
         '''Clone this logger and create a sublogger within the context
         of `component`, and with the provided `verbosity`.
 
@@ -67,6 +86,11 @@ class Logger(object):
         copy.fdlist = self.fdlist
         copy.component = component
         return copy
+
+    def get_sublogger(self, *args, **kw):
+        from warnings import warn
+        warn("get_sublogger() is deprecated; use just .sublog()", DeprecationWarning)
+        return self.sublogger(*args, **kw)
 
 def set_current_application(app):
     global _current_application

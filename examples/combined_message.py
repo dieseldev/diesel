@@ -6,7 +6,7 @@ Just give it a run and off it goes.
 
 import time
 from diesel import Application, Service, Client, Loop
-from diesel import until, message, response, log, Logger, LOGLVL_INFO
+from diesel import until, message, response, log 
 
 def handle_listener(remote_addr):
     for x in xrange(5000):
@@ -19,7 +19,8 @@ class MessageSender(Client):
     def send(self, message):
         yield message + '\r\n'
 
-app = Application(logger=Logger(verbosity=LOGLVL_INFO))
+app = Application()
+log = log.sublog('echo-message-system', log.info)
 
 def do_messages():
     client = MessageSender()

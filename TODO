@@ -1,7 +1,6 @@
   * Update examples to use log instead of print
 
 Future
-  * @message support for "schedule this generator but don't block me"?
   * Write tests, somehow--check out twisted.trial
   * Test/fix WSGI stuff
   * Error handling and callback existence, response/no response conventions, client

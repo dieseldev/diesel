@@ -6,7 +6,7 @@ Just give it a run and off it goes.
 
 import time
 from diesel import Application, Service, Client, Loop
-from diesel import until, call, response, log, Logger, LOGLVL_INFO
+from diesel import until, call, response, log
 
 def handle_echo(remote_addr):
     while True:
@@ -20,7 +20,8 @@ class EchoClient(Client):
         back = yield until("\r\n")
         yield response(back)
 
-app = Application(logger=Logger(verbosity=LOGLVL_INFO))
+app = Application()
+log = log.sublog('echo-system', log.info)
 
 def do_echos():
     client = EchoClient()

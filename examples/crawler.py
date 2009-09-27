@@ -16,7 +16,7 @@ if not base_dir.endswith('/'):
 
 assert schema == 'http', 'http only'
 
-from diesel import Application, Loop
+from diesel import Application, Loop, log
 from diesel.protocols.http import HttpClient, HttpHeaders
 
 CONCURRENCY = 10 # go easy on those apache instances!
@@ -70,7 +70,7 @@ def follow_loop():
             if not count:
                 stop()
             break
-        print " -> %s" % lpath
+        log.info(" -> %s" % lpath )
         if client.is_closed:
             client, heads = get_client()
         code, heads, body = yield client.request('GET', lpath, heads)
@@ -80,7 +80,7 @@ def follow_loop():
 def req_loop():
     global links
     client, heads = get_client()
-    print path
+    log.info(path)
     code, heads, body = yield client.request('GET', path, heads)
     write_file(path, body)
     links = get_links(body)
@@ -90,8 +90,10 @@ def req_loop():
 a = Application()
 a.add_loop(Loop(req_loop))
 
+log = log.sublog('http-crawler', log.info)
+
 def stop():
-    print "Fetched %s files in %.3fs with concurrency=%s" % (files, time.time() - t, CONCURRENCY)
+    log.info("Fetched %s files in %.3fs with concurrency=%s" % (files, time.time() - t, CONCURRENCY))
     a.halt() # stop application
 
 t = time.time()

@@ -19,12 +19,14 @@ class Application(object):
     '''
     def __init__(self, logger=None):
         global current_app
+        assert current_app is None, "Only one Application instance per program allowed"
         current_app = self
         self.hub = EventHub()
         self._run = False
         if logger is None:
             logger = logmod.Logger()
         self.logger = logger
+        logmod.set_current_application(self)
         self._services = []
         self._loops = []
 
@@ -33,7 +35,6 @@ class Application(object):
         or .halt() is called.
         '''
         self._run = True
-        logmod.set_current_application(self)
         log.info('Starting diesel application')
 
         for s in self._services:

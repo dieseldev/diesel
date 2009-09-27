@@ -2,7 +2,7 @@
 '''Example of event firing.
 '''
 import random
-from diesel import Application, Loop, sleep, fire, wait
+from diesel import Application, Loop, sleep, fire, wait, log
 
 def gunner():
     x = 1
@@ -15,11 +15,12 @@ def sieged():
     while True:
         n = yield wait('bam')
         if n % 10000 == 0:
-            print n
+            log.info(n)
             if n == 50000:
                 a.halt()
 
 a = Application()
+log = log.sublog('fire-system', log.info)
 a.add_loop(Loop(gunner))
 a.add_loop(Loop(sieged))
 a.run()

@@ -8,9 +8,8 @@ respectively.
 import os
 import mimetypes
 
-from diesel import Application, Service
+from diesel import Application, Service, log
 from diesel.protocols import http
-from diesel.logmod import LOGLVL_INFO
 
 BASE = os.environ.get('BASE', '.')
 PORT = int(os.environ.get('PORT', 8080))
@@ -50,5 +49,5 @@ def static_http(req):
 
 app = Application()
 app.add_service(Service(http.HttpServer(static_http), PORT))
-log = app.logger.get_sublogger('http', LOGLVL_INFO)
+log = log.sublog('http', log.info)
 app.run()
