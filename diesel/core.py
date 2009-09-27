@@ -302,8 +302,7 @@ class Loop(object):
         '''Called by another Loop--reschedule this loop so the hub will run
         it.  Used in `response` and `fire` situations.
         '''
-        self.clear_pending_events()
-        self._wakeup_timer = self.hub.call_later(0, self.wake, value)
+        self.hub.schedule(lambda: self.wake(value))
 
     def wake(self, value=None):
         '''Wake up this loop.  Called by the main hub to resume a loop

@@ -53,6 +53,7 @@ class AbstractEventHub(object):
         self.new_timers = []
         self.run = True
         self.events = {}
+        self.run_now = deque()
 
     def handle_events(self):
         '''Run one pass of event handling.
@@ -79,6 +80,8 @@ class AbstractEventHub(object):
                 t = self.timers.popleft()[1]
                 if t.pending:
                     t.callback()
+                    while self.run_now and self.run:
+                        self.run_now.popleft()()
                     if not self.run:
                         return
             else:
@@ -90,6 +93,10 @@ class AbstractEventHub(object):
                 self.events[fd][0]()
             else:
                 self.events[fd][1]()
+
+            while self.run_now and self.run:
+                self.run_now.popleft()()
+
             if not self.run:
                 return
 
@@ -104,6 +111,9 @@ class AbstractEventHub(object):
         t = Timer(interval, f, *args, **kw)
         self.new_timers.append((t.trigger_time, t))
         return t
+
+    def schedule(self, c):
+        self.run_now.append(c)
 
     def register(self, fd, read_callback, write_callback):
         '''Register a socket fd with the hub, providing callbacks
