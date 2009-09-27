@@ -16,6 +16,8 @@ def sieged():
         n = yield wait('bam')
         if n % 10000 == 0:
             print n
+            if n == 50000:
+                a.halt()
 
 a = Application()
 a.add_loop(Loop(gunner))

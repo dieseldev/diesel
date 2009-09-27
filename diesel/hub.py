@@ -93,25 +93,6 @@ class AbstractEventHub(object):
             if not self.run:
                 return
 
-        # Run timers one last time, until no more timers are due
-        runs = -1
-        while runs != 0:
-            runs = 0
-            if self.new_timers:
-                self.timers.extend(self.new_timers)
-                self.timers = deque(sorted(self.timers))
-                self.new_timers = []
-            while self.timers:
-                if self.timers[0][1].due:
-                    t = self.timers.popleft()[1]
-                    if t.pending:
-                        t.callback()
-                        runs += 1
-                        if not self.run:
-                            return
-                else:
-                    break
-
     def _get_events(self):
         '''Get all events to process.
         '''
