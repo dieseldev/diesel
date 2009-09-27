@@ -8,7 +8,7 @@ from collections import deque, defaultdict
 
 from diesel import pipeline
 from diesel import buffer
-from diesel.client import call, response
+from diesel.client import call, message, response
 
 class ConnectionClosed(socket.error): 
     '''Raised if the client closes the connection.
@@ -239,24 +239,9 @@ class Loop(object):
             nrets = len(rets)
             for pos, ret in enumerate(rets):
                 
-                if isinstance(ret, response):
-                    assert nrets == 1, "response cannot be paired with any other yield token"
-                    c = self.callbacks.popleft()
-                    c(ret.value)
-                    exit = True
-                elif isinstance(ret, call):
-                    assert nrets == 1, "call cannot be paired with any other yield token"
-                    ret.go(self.iterate)
-                    exit = True
-                elif isinstance(ret, basestring) or hasattr(ret, 'seek'):
+                if type(ret) is str or hasattr(ret, 'seek'):
                     assert nrets == 1, "a string or file cannot be paired with any other yield token"
                     self.pipeline.add(ret)
-                elif type(ret) is up:
-                    assert nrets == 1, "up cannot be paired with any other yield token"
-                    n_val = ret.value
-                elif type(ret) is fire:
-                    assert nrets == 1, "fire cannot be paired with any other yield token"
-                    waits.fire(ret.event, ret.value)
                 elif type(ret) is until or type(ret) is bytes:
                     assert used_term == False, "only one terminal specifier (bytes, until) per yield"
                     used_term = True
@@ -278,10 +263,34 @@ class Loop(object):
                     self._wakeup_timer = self.hub.call_later(ret.duration, self.multi_callin(pos, nrets), True)
                     exit = True
 
+                elif type(ret) is up:
+                    assert nrets == 1, "up cannot be paired with any other yield token"
+                    n_val = ret.value
+
+                elif type(ret) is fire:
+                    assert nrets == 1, "fire cannot be paired with any other yield token"
+                    waits.fire(ret.event, ret.value)
+
                 elif type(ret) is wait:
                     self.fire_handlers[ret.event] = self.multi_callin(pos, nrets, self.schedule)
                     waits.wait(self, ret.event)
                     exit = True
+
+                elif type(ret) is response:
+                    assert nrets == 1, "response cannot be paired with any other yield token"
+                    c = self.callbacks.popleft()
+                    c(ret.value)
+                    exit = True
+
+                elif type(ret) is call:
+                    assert nrets == 1, "call cannot be paired with any other yield token"
+                    ret.go(self.iterate)
+                    exit = True
+
+                elif type(ret) is message:
+                    assert nrets == 1, "message cannot be paired with any other yield token"
+                    ret.go()
+
                 else:
                     raise ValueError("Unknown yield token %s" % ret)
             if exit: 

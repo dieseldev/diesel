@@ -19,9 +19,20 @@ class call(object):
         return call(self.f, inst)
 
     def go(self, callback): # XXX errback-type stuff?
-        self.client.conn.callbacks.append(callback)
+        if callback:
+            self.client.conn.callbacks.append(callback)
         self.client.jobs.append(self.gen)
         self.client.conn.wake()
+
+class message(call):
+    '''An async message on a client connection, without
+    waiting for the response.
+    '''
+    def __get__(self, inst, cls):
+        return message(self.f, inst)
+
+    def go(self):
+        call.go(self, None)
 
 class response(object):
     '''A yield token that indicates a client method has finished
