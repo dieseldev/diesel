@@ -63,6 +63,7 @@ class Client(object):
     def close(self):
         '''Close the socket to the remote host.
         '''
+        self.conn.shutdown()
         self.conn = None
 
     @property
