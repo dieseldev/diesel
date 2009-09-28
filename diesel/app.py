@@ -66,11 +66,12 @@ class Application(object):
         handling connections when the Application is run().
         '''
         service.application = self
+        svc = service
         if self._run:
-            s.bind_and_listen()
-            self.hub.register(s.sock, s.accept_new_connection, None)
+            svc.bind_and_listen()
+            self.hub.register(svc.sock, svc.accept_new_connection, None)
         else:
-            self._services.append(service)
+            self._services.append(svc)
 
     def add_loop(self, loop, front=False):
         '''Add a Loop instance to this Application.
