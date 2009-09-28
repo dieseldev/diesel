@@ -7,7 +7,7 @@ from pymongo.bson import BSON, _make_c_string, _to_dicts
 from pymongo.son import SON
 
 _ZERO = "\x00\x00\x00\x00"
-
+HEADER_SIZE = 16
 
 def _full_name(parent, child):
     return "%s.%s" % (parent, child)
@@ -47,26 +47,16 @@ class MongoClient(Client):
 
     def _put_request_get_response(self, op, data):
         yield self._put_request(op, data)
-        header = yield bytes(16)
+        header = yield bytes(HEADER_SIZE)
         length, id, to, code = struct.unpack('<4i', header)
-        to_read = length - 16
-        complete = 0
-        parts = []
-        while True:
-            # read in chunks so we give other coroutines a chance to run
-            part = yield bytes(512 if (to_read - complete) >= 512 else (to_read - complete))
-            parts.append(part)
-            complete += len(part)
-            if to_read == complete:
-                break
-        message = "".join(parts)
+        message = yield bytes(length - HEADER_SIZE)
         cutoff = struct.calcsize('<iqii')
         flag, cid, start, numret = struct.unpack('<iqii', message[:cutoff])
         body = _to_dicts(message[cutoff:])
         yield up((cid, start, numret, body))
 
     def _put_request(self, op, data):
-        req = struct.pack('<4i', 16 + len(data), self._msg_id, 0, op)
+        req = struct.pack('<4i', HEADER_SIZE + len(data), self._msg_id, 0, op)
         yield "%s%s" % (req, data)
 
     def _handle_response(self, cursor, resp):
@@ -257,9 +247,9 @@ class RawMongoClient(Client):
         if not respond:
             yield response('')
         else:
-            header = yield bytes(16)
+            header = yield bytes(HEADER_SIZE)
             length, id, to, opcode = struct.unpack('<4i', header)
-            body = yield bytes(length - 16)
+            body = yield bytes(length - HEADER_SIZE)
             yield response(header + body)
 
 class MongoProxy(object):
@@ -272,10 +262,10 @@ class MongoProxy(object):
         try:
             backend = None
             while True:
-                header = yield bytes(16)
+                header = yield bytes(HEADER_SIZE)
                 info = struct.unpack('<4i', header)
                 length, id, to, opcode = info
-                body = yield bytes(length - 16)
+                body = yield bytes(length - HEADER_SIZE)
                 resp, info, body = yield self.handle_request(info, body)
                 if resp is not None:
                     # our proxy will respond without talking to the backend
