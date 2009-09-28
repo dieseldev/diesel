@@ -2,7 +2,7 @@
 
 import itertools
 import struct
-from diesel import Client, call, response, bytes, Loop, Application, up
+from diesel import Client, call, response, bytes, Loop, Application, up, ConnectionClosed
 from pymongo.bson import BSON, _make_c_string, _to_dicts
 from pymongo.son import SON
 
@@ -78,7 +78,7 @@ class MongoClient(Client):
         yield response(result)
 
     @call
-    def query(self, cursor): #col, spec=None, fields=None, skip=0, limit=0):
+    def query(self, cursor):
         op = Ops.OP_QUERY
         c = cursor
         msg = Ops.query(c.col, c.spec, c.fields, c.skip, c.limit)
@@ -247,7 +247,64 @@ class MongoCursor(object):
         if self.id and not self.finished:
             raise RuntimeError("need to cleanup cursor!")
 
+class RawMongoClient(Client):
+    "A mongodb client that does the bare minimum to push bits over the wire."
+
+    @call
+    def send(self, data, respond=False):
+        """Send raw mongodb data and optionally yield the server's response."""
+        yield data
+        if not respond:
+            yield response('')
+        else:
+            header = yield bytes(16)
+            length, id, to, opcode = struct.unpack('<4i', header)
+            body = yield bytes(length - 16)
+            yield response(header + body)
+
+class MongoProxy(object):
+    def __init__(self, backend_host, backend_port):
+        self.backend_host = backend_host
+        self.backend_port = backend_port
+
+    def __call__(self, addr):
+        """A persistent client<--proxy-->backend connection handler."""
+        try:
+            backend = None
+            while True:
+                header = yield bytes(16)
+                info = struct.unpack('<4i', header)
+                length, id, to, opcode = info
+                body = yield bytes(length - 16)
+                resp, info, body = yield self.handle_request(info, body)
+                if resp is not None:
+                    # our proxy will respond without talking to the backend
+                    yield resp
+                else:
+                    # pass the (maybe modified) request on to the backend
+                    length, id, to, opcode = info
+                    is_query = opcode in [Ops.OP_QUERY, Ops.OP_GET_MORE]
+                    payload = header + body
+                    (backend, resp) = yield self.from_backend(payload, is_query, backend)
+                    yield resp
+        except ConnectionClosed:
+            if backend:
+                backend.close()
+
+    def handle_request(self, info, body):
+        length, id, to, opcode = info
+        print "saw request with opcode", opcode
+        yield up(None, info, body)
+
+    def from_backend(self, data, respond, backend=None):
+        if not backend:
+            backend = RawMongoClient()
+            backend.connect(self.backend_host, self.backend_port)
+        resp = yield backend.send(data, respond)
+        yield up((backend, resp))
+
 if __name__ == '__main__':
+    import time
     from pprint import pprint
     from diesel import fire, wait
     HOST = 'localhost'
@@ -351,4 +408,7 @@ if __name__ == '__main__':
     a.add_loop(Loop(mgr))
     a.add_loop(Loop(pure_db_action))
     a.add_loop(Loop(query_20_times))
+    start = time.time()
     a.run()
+    print "done. %.2f secs" % (time.time() - start)
+
