@@ -206,7 +206,7 @@ class HttpServer(object):
                 req.body = None
 
             elif more_mode is self.BODY_CL:
-                req.body = yield bytes(int(heads['Content-Length']))
+                req.body = yield bytes(int(heads.get_one('Content-Length')))
 
             elif more_mode is self.BODY_CHUNKED:
                 req.body = handle_chunks(heads)
