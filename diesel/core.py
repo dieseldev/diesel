@@ -3,6 +3,8 @@
 the various yield tokens.
 '''
 import socket
+import traceback
+import sys
 from types import GeneratorType
 from collections import deque, defaultdict
 
@@ -120,6 +122,19 @@ def id_gen():
         x += 1
 ids = id_gen()
 
+def print_errstack(stack, e):
+    print "=== DIESEL ERROR ==="
+    print ""
+    print " Generator stack at time of error:"
+    print ""
+    for g in stack:
+        print g.gi_code
+    print ""
+    print ""
+    print " Standard Traceback:"
+    print ""
+    traceback.print_exception(*e)
+
 class Loop(object):
     '''A cooperative generator that represents an arbitrary piece of
     logic.
@@ -155,6 +170,8 @@ class Loop(object):
         last = None
         in_self_call = False
         stack = []
+        errstack = None
+        save_e = None
         while True:
             try:
                 if error != None:
@@ -169,12 +186,19 @@ class Loop(object):
                 else:
                     raise
             except Exception, e:
+                if not save_e:
+                   save_e = sys.exc_info()
                 if stack:
+                    if not errstack:
+                        errstack = stack[:] + [current]
                     error = e.__class__, str(e)
                     current = stack.pop()
                 else:
-                    raise
+                    print_errstack(errstack, save_e)
+                    raise StopIteration
             else:
+                errstack = None
+                save_e = None
                 if type(item) is GeneratorType:
                     stack.append(current)
                     current = item

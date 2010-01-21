@@ -205,6 +205,24 @@ class MongoCursor(object):
         elif not self.finished:
             yield self.client.get_more(self)
 
+    def all(self):
+        o = []
+        while not self.finished:
+            o.extend( (yield self.more()) )
+
+        yield up(o)
+
+    def one(self):
+        all = yield self.all()
+        la = len(all)
+        if la == 1:
+            res = all[0]
+        elif la == 0:
+            res = None
+        else:
+            raise ValueError("Cursor returned more than 1 record")
+        yield up(res)
+
     def count(self):
         if self.retrieved:
             raise ValueError("can't count an already started cursor")
