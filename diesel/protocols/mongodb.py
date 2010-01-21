@@ -18,7 +18,11 @@ class TraversesCollections(object):
         self.client = client
 
     def __getattr__(self, name):
+        return self[name]
+
+    def __getitem__(self, name):
         return Collection(_full_name(self.name, name), self.client)
+
 
 class Db(TraversesCollections):
     pass
