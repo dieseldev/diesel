@@ -67,8 +67,9 @@ class WSGIRequestHandler(object):
     bootsraps the WSGI environemtn and hands it off to the
     WSGI callable.  This is the key coupling.
     '''
-    def __init__(self, app):
-        self.app = app
+    def __init__(self, wsgi_callable, port=80):
+        self.port = port
+        self.wsgi_callable = wsgi_callable
 
     def _start_response(self, status, response_headers, exc_info=None):
         if exc_info:
@@ -82,9 +83,9 @@ class WSGIRequestHandler(object):
         self.outbuf.append(output)
 
     def __call__(self, req):
-        env = build_wsgi_env(req, self.app.port)
+        env = build_wsgi_env(req, self.port)
         self.outbuf = []
-        for output in self.app.wsgi_callable(env, self._start_response):
+        for output in self.wsgi_callable(env, self._start_response):
             self.write_output(output)
         return self.finalize_request(req)
 
@@ -112,7 +113,7 @@ class WSGIApplication(Application):
         Application.__init__(self)
         self.port = port
         self.wsgi_callable = wsgi_callable
-        http_service = Service(HttpServer(WSGIRequestHandler(self)), port, iface)
+        http_service = Service(HttpServer(WSGIRequestHandler(wsgi_callable, port)), port, iface)
         self.add_service(http_service)
 
 if __name__ == '__main__':
