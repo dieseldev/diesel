@@ -76,6 +76,15 @@ class fire(object):
         self.event = event
         self.value = value
 
+class catch(object):
+    '''A yield token that indicates a "calling" generator's willingness
+    to handle certain types of failures in "called" generators.. must be
+    paired with another generator.
+    '''
+    def __init__(self, call, *exc_types):
+        self.call = call
+        self.exc_types = set(exc_types)
+
 class WaitPool(object):
     '''A structure that manages all `wait`ers, makes sure fired events
     get to the right places, and that all other waits are canceled when
@@ -124,12 +133,17 @@ ids = id_gen()
 
 def print_errstack(stack, e):
     print "=== DIESEL ERROR ==="
-    print ""
-    print " Generator stack at time of error:"
-    print ""
-    for g in stack:
-        print g.gi_code
-    print ""
+    if stack:
+        print ""
+        print " Generator stack at time of error:"
+        print ""
+        for g, c in stack:
+            print g.gi_code,
+            if c:
+                print "catches %r" % c.exc_types
+            else:
+                print ""
+        print ""
     print ""
     print " Standard Traceback:"
     print ""
@@ -170,8 +184,6 @@ class Loop(object):
         last = None
         in_self_call = False
         stack = []
-        errstack = None
-        save_e = None
         while True:
             try:
                 if error != None:
@@ -181,45 +193,47 @@ class Loop(object):
                 else:
                     item = current.next()
             except StopIteration:
-                errstack = None
-                save_e = None
                 if stack:
-                    current = stack.pop()
+                    current, _ = stack.pop()
                 else:
                     raise
             except Exception, e:
-                if not save_e:
-                   save_e = sys.exc_info()
-                if stack:
-                    if not errstack:
-                        errstack = stack[:] + [current]
-                    error = tuple(save_e[:2])
-                    current = stack.pop()
-                else:
-                    print_errstack(errstack, save_e)
+                errstack = stack[:] + [(current, None)]
+                error = None
+                while stack:
+                    current, level_catch = stack.pop()
+                    if level_catch and e.__class__ in level_catch.exc_types:
+                        error = tuple(sys.exc_info()[:2])
+                        break
+                if not error: # no one claims to handle it
+                    print_errstack(errstack, sys.exc_info())
                     raise StopIteration
             else:
-                errstack = None
-                save_e = None
+                level_catch = None
+
+                if type(item) is catch:
+                    level_catch = item
+                    item = item.call
+
                 if type(item) is GeneratorType:
-                    stack.append(current)
+                    stack.append((current, level_catch))
                     current = item
                     last = None
                 elif type(item) is call and item.client.conn == self:
                     in_self_call = True
-                    stack.append(current)
+                    stack.append((current, level_catch))
                     current = item.gen
                     last = None
                 else:
                     if type(item) is response:
                         assert stack, "Cannot return a response from main handler"
-                        current = stack.pop()
+                        current, _ = stack.pop()
                         if in_self_call:
                             in_self_call = False
                             item = up(item.value)
                     elif type(item) is up:
                         assert stack, "Cannot return an up from main handler"
-                        current = stack.pop()
+                        current, _ = stack.pop()
                     try:
                         last = (yield item)
                     except ConnectionClosed, e:
