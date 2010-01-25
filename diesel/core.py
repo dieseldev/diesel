@@ -181,6 +181,8 @@ class Loop(object):
                 else:
                     item = current.next()
             except StopIteration:
+                errstack = None
+                save_e = None
                 if stack:
                     current = stack.pop()
                 else:
@@ -191,7 +193,7 @@ class Loop(object):
                 if stack:
                     if not errstack:
                         errstack = stack[:] + [current]
-                    error = e.__class__, str(e)
+                    error = tuple(save_e[:2])
                     current = stack.pop()
                 else:
                     print_errstack(errstack, save_e)

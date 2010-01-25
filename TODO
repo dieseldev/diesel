@@ -4,3 +4,4 @@ Future
   * Write tests, somehow--check out twisted.trial
   * Test/fix WSGI stuff
   * Error handling and callback existence, response/no response conventions, client
+  * Exception handling in the stack.. doesn't work well!

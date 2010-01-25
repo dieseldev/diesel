@@ -4,7 +4,7 @@ assert sys.version_info >= (2, 6), \
 
 from setuptools import setup
 
-VERSION = "0.9.1b"
+VERSION = "0.9.2b"
 
 setup(name="diesel",
 	version=VERSION,
