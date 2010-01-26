@@ -19,6 +19,6 @@ for building web applications.
 ''',
     url="http://dieselweb.org",
     download_url="http://download.dieselweb.org/diesel-%s.tar.gz" % VERSION, 
-    packages=["diesel", "diesel.protocols"],
+    packages=["diesel", "diesel.protocols", "diesel.util"],
     scripts=["examples/dhttpd"],
     )
