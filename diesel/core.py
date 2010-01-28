@@ -202,14 +202,18 @@ class Loop(object):
                 error = None
                 while stack:
                     current, level_catch = stack.pop()
-                    if level_catch and e.__class__ in level_catch.exc_types:
+                    if level_catch and \
+                    filter(None, map(lambda x: isinstance(e, x), 
+                    level_catch.exc_types)):
+
                         error = tuple(sys.exc_info()[:2])
                         break
                 if not error: # no one claims to handle it
                     print_errstack(errstack, sys.exc_info())
-                    raise StopIteration
+                    raise StopIteration()
             else:
                 level_catch = None
+                error = None
 
                 if type(item) is catch:
                     level_catch = item
@@ -259,6 +263,8 @@ class Loop(object):
         Connection.  Run whenever a generator is (re-)scheduled.
         Handles all the `yield` tokens.
         '''
+        if self.g is None:
+            return 
 
         while True:
             try:
@@ -369,7 +375,7 @@ class Connection(Loop):
         self.buffer = buffer.Buffer()
         self.sock = sock
         self.addr = addr
-        self.hub.register(sock, self.handle_read, self.handle_write)
+        self.hub.register(sock, self.handle_read, self.handle_write, self.handle_error)
         self._wakeup_timer = None
         self._writable = False
         self.callbacks = deque()
@@ -396,15 +402,16 @@ class Connection(Loop):
         '''
         self.hub.unregister(self.sock)
         self.closed = True
-        if not remote_closed:
-            self.sock.close()
-        else:
-            try:
-                self.g.throw(ConnectionClosed)
-            except StopIteration:
-                pass
-
-        self.g = None
+        try:
+            if not remote_closed:
+                self.sock.close()
+            else:
+                try:
+                    self.g.throw(ConnectionClosed)
+                except StopIteration:
+                    pass
+        finally:
+            self.g = None
 
     def handle_write(self):
         '''The low-level handler called by the event hub
@@ -448,3 +455,6 @@ class Connection(Loop):
             res = self.buffer.feed(data)
             if res:
                 self.new_data(res)
+
+    def handle_error(self):
+        self.shutdown(True)

@@ -30,6 +30,12 @@ class Application(object):
         self._services = []
         self._loops = []
 
+    def global_bail(self, msg):
+        def bail():
+            self.logger.critical("ABORTING: %s" % msg)
+            self.halt()
+        return bail
+
     def run(self):
         '''Start up an Application--blocks until the program ends
         or .halt() is called.
@@ -39,7 +45,8 @@ class Application(object):
 
         for s in self._services:
             s.bind_and_listen()
-            self.hub.register(s.sock, s.accept_new_connection, None)
+            self.hub.register(s.sock, s.accept_new_connection, None, 
+            self.global_bail("low-level socket error on bound service"))
         for l in self._loops:
             l.iterate()
 
@@ -69,7 +76,8 @@ class Application(object):
         svc = service
         if self._run:
             svc.bind_and_listen()
-            self.hub.register(svc.sock, svc.accept_new_connection, None)
+            self.hub.register(svc.sock, svc.accept_new_connection, None,
+            self.global_bail("low-level socket error on bound service"))
         else:
             self._services.append(svc)
 
