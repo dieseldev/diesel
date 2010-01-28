@@ -5,7 +5,7 @@ import sys, socket
 import urllib
 from collections import defaultdict
 
-from diesel import up, until, until_eol, bytes, ConnectionClosed
+from diesel import up, until, until_eol, bytes, ConnectionClosed, catch
 
 status_strings = {
     100 : "Continue",
@@ -213,7 +213,7 @@ class HttpServer(object):
 
             leave_loop = False
             try:
-                yield self.request_handler(req)
+                yield catch(self.request_handler(req), HttpClose)
             except HttpClose:
                 leave_loop = True
             if leave_loop:

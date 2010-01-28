@@ -4,7 +4,7 @@ on Python 2.6's epoll support.
 '''
 import select
 try:
-    from select import EPOLLIN, EPOLLOUT, EPOLLPRI
+    from select import EPOLLIN, EPOLLOUT, EPOLLPRI, EPOLLERR, EPOLLHUP
 except ImportError:
     # Some fallbacks used in non-epoll implementations
     EPOLLIN = object()
@@ -89,9 +89,11 @@ class AbstractEventHub(object):
 
         # Handle all socket I/O
         for (fd, evtype) in events:
-            if evtype == EPOLLIN or evtype == EPOLLPRI:
+            if evtype & EPOLLIN or evtype & EPOLLPRI:
                 self.events[fd][0]()
-            else:
+            elif evtype & EPOLLERR or evtype & EPOLLHUP:
+                self.events[fd][2]()
+            if evtype & EPOLLOUT:
                 self.events[fd][1]()
 
             while self.run_now and self.run:
@@ -115,7 +117,7 @@ class AbstractEventHub(object):
     def schedule(self, c):
         self.run_now.append(c)
 
-    def register(self, fd, read_callback, write_callback):
+    def register(self, fd, read_callback, write_callback, error_callback):
         '''Register a socket fd with the hub, providing callbacks
         for read (data is ready to be recv'd) and write (buffers are
         ready for send()).
@@ -124,7 +126,7 @@ class AbstractEventHub(object):
         read callback used until enable_write is invoked.
         '''
         assert fd.fileno() not in self.events
-        self.events[fd.fileno()] = (read_callback, write_callback)
+        self.events[fd.fileno()] = (read_callback, write_callback, error_callback)
         self._add_fd(fd)
 
     def _add_fd(self, fd):
