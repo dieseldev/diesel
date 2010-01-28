@@ -4,7 +4,7 @@ VERSION = "0.9.2b"
 
 setup(name="diesel",
 	version=VERSION,
-	author="Boomplex LLC",
+	author="Boomplex LLC/Bump Technologies, Inc.",
 	author_email="dev@boomplex.com",
 	description="Diesel is a generator-based asynchronous I/O library for Python",
 	long_description='''
