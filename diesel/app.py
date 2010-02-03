@@ -151,5 +151,5 @@ class Service(object):
     def accept_new_connection(self):
         sock, addr = self.sock.accept()
         if self.security:
-            sock = self.security.wrap(sock, server_side=True)
+            sock = self.security.wrap(sock)
         Connection(sock, addr, self.connection_handler).iterate()
