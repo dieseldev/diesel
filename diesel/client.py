@@ -45,16 +45,19 @@ class Client(object):
     '''An agent that connects to an external host and provides an API to
     return data based on a protocol across that host.
     '''
-    def __init__(self, connection_handler=None):
+    def __init__(self, connection_handler=None, security=None):
         self.connection_handler = connection_handler or self.client_conn_handler
         self.jobs = deque()
         self.conn = None
+        self.security = security
      
     def connect(self, addr, port):  
         '''Connect to a remote host.
         '''
         remote_addr = (addr, port)
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        if self.security:
+            sock = self.security.wrap(sock)
         sock.connect(remote_addr)
         from diesel.core import Connection
         self.conn = Connection(sock, (addr, port), self.client_conn_handler)
