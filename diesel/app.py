@@ -3,6 +3,7 @@
 '''
 import socket
 import traceback
+import errno
 import os
 
 from diesel.hub import EventHub
@@ -135,6 +136,7 @@ class Service(object):
     def bind_and_listen(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.setblocking(0)
 
         try:
             sock.bind((self.iface, self.port))
@@ -149,7 +151,14 @@ class Service(object):
         return self.sock is not None
 
     def accept_new_connection(self):
-        sock, addr = self.sock.accept()
+        try:
+            sock, addr = self.sock.accept()
+        except socket.error, e:
+            code, s = e
+            if code in (errno.EAGAIN, errno.EINTR):
+                return
+            raise
+        sock.setblocking(0)
         if self.security:
             sock = self.security.wrap(sock)
         Connection(sock, addr, self.connection_handler).iterate()

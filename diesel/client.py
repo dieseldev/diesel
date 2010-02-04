@@ -1,5 +1,6 @@
 # vim:ts=4:sw=4:expandtab
 import socket
+import errno
 from collections import deque
 
 class call(object):
@@ -41,6 +42,14 @@ class response(object):
     def __init__(self, value):
         self.value = value
 
+class connect(object):
+    '''A yield token that indicates an asynchronous connection 
+    is being established.
+    '''
+    def __init__(self, sock, callback):
+        self.sock = sock
+        self.callback = callback
+
 class Client(object):
     '''An agent that connects to an external host and provides an API to
     return data based on a protocol across that host.
@@ -56,12 +65,23 @@ class Client(object):
         '''
         remote_addr = (addr, port)
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.setblocking(0)
+        def _run():
+            from diesel.core import Connection
+            self.conn = Connection(sock, (addr, port), self.client_conn_handler)
+            self.conn.iterate()
+            return True
+
         if self.security:
             sock = self.security.wrap(sock)
-        sock.connect(remote_addr)
-        from diesel.core import Connection
-        self.conn = Connection(sock, (addr, port), self.client_conn_handler)
-        self.conn.iterate()
+        try:
+            sock.connect(remote_addr) # note--name resolution still blocks!
+        except socket.error, e:
+            if e[0] == errno.EINPROGRESS:
+                print 'right-o!'
+                return connect(sock, _run)
+            else:
+                raise
 
     def close(self):
         '''Close the socket to the remote host.

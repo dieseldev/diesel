@@ -10,7 +10,7 @@ from diesel.protocols.http import HttpClient, HttpHeaders
 
 def req_loop():
     client = HttpClient()
-    client.connect('www.jamwt.com', 80)
+    yield client.connect('www.jamwt.com', 80)
     heads = HttpHeaders()
     heads.set('Host', 'www.jamwt.com')
     log.info( (yield client.request('GET', '/Py-TOC/', heads)) )

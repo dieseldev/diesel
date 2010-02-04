@@ -4,13 +4,14 @@ the various yield tokens.
 '''
 import socket
 import traceback
+import errno
 import sys
 from types import GeneratorType
 from collections import deque, defaultdict
 
 from diesel import pipeline
 from diesel import buffer
-from diesel.client import call, message, response
+from diesel.client import call, message, response, connect
 
 class ConnectionClosed(socket.error): 
     '''Raised if the client closes the connection.
@@ -304,7 +305,17 @@ class Loop(object):
                         self.clear_pending_events()
                         exit = False
                         break
+                elif type(ret) is connect:
+                    def connect_callback():
+                        print 'called back!'
+                        self.hub.unregister(ret.sock)
+                        cont = ret.callback()
+                        if cont:
+                            self.multi_callin(pos, nrets)()
 
+                    self.hub.register(ret.sock, connect_callback, connect_callback, connect_callback)
+                    exit = True
+    
                 elif type(ret) is sleep:
                     self._wakeup_timer = self.hub.call_later(ret.duration, self.multi_callin(pos, nrets), True)
                     exit = True
@@ -426,6 +437,10 @@ class Connection(Loop):
                 try:
                     bsent = self.sock.send(data)
                 except socket.error, s:
+                    code, s = e
+                    if code in (errno.EAGAIN, errno.EINTR):
+                        self.pipeline.backup(data)
+                        return True
                     g = self.g
                     self.shutdown(True)
                 else:
@@ -445,6 +460,9 @@ class Connection(Loop):
         try:
             data = self.sock.recv(BUFSIZ)
         except socket.error, e:
+            code, s = e
+            if code in (errno.EAGAIN, errno.EINTR):
+                return
             data = ''
             disconnect_reason = str(e)
 
