@@ -132,21 +132,22 @@ def id_gen():
 ids = id_gen()
 
 def print_errstack(stack, e):
-    print "=== DIESEL ERROR ==="
+    eout = lambda s: sys.stderr.write(str(s) + "\n")
+    eout("=== DIESEL ERROR ===")
     if stack:
-        print ""
-        print " Generator stack at time of error:"
-        print ""
+        eout("")
+        eout(" Generator stack at time of error:")
+        eout("")
         for g, c in stack:
-            print g.gi_code,
+            eout(g.gi_code,)
             if c:
-                print "catches %r" % c.exc_types
+                eout("catches %r" % c.exc_types)
             else:
-                print ""
-        print ""
-    print ""
-    print " Standard Traceback:"
-    print ""
+                eout("")
+        eout("")
+    eout("")
+    eout(" Standard Traceback:")
+    eout("")
     traceback.print_exception(*e)
 
 class Loop(object):
