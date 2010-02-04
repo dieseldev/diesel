@@ -48,6 +48,7 @@ class Buffer(object):
                 ind = res + len(self._atterm)
         if ind is None:
             return None
+        self._atterm = None # this terminator was used
         if all is None:
             all = ''.join(self._atinbuf)
         use = all[:ind]
