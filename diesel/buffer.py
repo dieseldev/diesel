@@ -7,9 +7,8 @@ class Buffer(object):
     specified by consumers of incoming data.
     '''
     def __init__(self):
-        self._atinbuf = []
+        self._atinbuf = ""
         self._atterm = None
-        self._atmark = 0
         
     def set_term(self, term):
         '''Set the current sentinel.
@@ -26,8 +25,7 @@ class Buffer(object):
         The buffer is appended, and the check() is run in case
         this append causes the sentinel to be satisfied.
         '''
-        self._atinbuf.append(data)
-        self._atmark += len(data)
+        self._atinbuf += data
         return self.check()
 
     def check(self):
@@ -35,25 +33,19 @@ class Buffer(object):
         the current sentinel.
         '''
         ind = None
-        all = None
         if type(self._atterm) is int:
-            if self._atmark >= self._atterm:
+            if len(self._atinbuf) >= self._atterm:
                 ind = self._atterm
         elif self._atterm is None:
             return None
         else:
-            all = ''.join(self._atinbuf)
-            res = all.find(self._atterm)
+            res = self._atinbuf.find(self._atterm)
             if res != -1:
                 ind = res + len(self._atterm)
         if ind is None:
             return None
         self._atterm = None # this terminator was used
-        if all is None:
-            all = ''.join(self._atinbuf)
-        use = all[:ind]
-        new_all = all[ind:]
-        self._atinbuf = [new_all]
-        self._atmark = len(new_all)
+        use = self._atinbuf[:ind]
+        self._atinbuf = self._atinbuf[ind:]
 
         return use
