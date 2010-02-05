@@ -14,7 +14,9 @@ class call(object):
 
     def __call__(self, *args, **kw):
         self.gen = self.f(self.client, *args, **kw)
-        return self
+        if not self.client.connected:
+            yield self.client._real_connect()
+        yield self
 
     def __get__(self, inst, cls):
         return call(self.f, inst)
@@ -22,6 +24,7 @@ class call(object):
     def go(self, callback): # XXX errback-type stuff?
         if callback:
             self.client.conn.callbacks.append(callback)
+
         self.client.jobs.append(self.gen)
         self.client.conn.wake()
 
@@ -60,18 +63,25 @@ class Client(object):
         self.jobs = deque()
         self.conn = None
         self.security = security
+        self.connected = False
      
-    def connect(self, addr, port):  
+    def connect(self, addr, port, lazy=False):  
+        self.addr = addr
+        self.port = port
+        if not lazy:
+            return self._real_connect()
+
+    def _real_connect(self):
         '''Connect to a remote host.
         '''
-        remote_addr = (addr, port)
+        remote_addr = (self.addr, self.port)
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.setblocking(0)
         def _run():
             from diesel.core import Connection
-            self.conn = Connection(cobj.sock, (addr, port), self.client_conn_handler)
+            self.conn = Connection(cobj.sock, remote_addr, self.client_conn_handler)
             self.conn.iterate()
-            return True
+            self.connected = True
 
         try:
             sock.connect(remote_addr)
@@ -87,6 +97,7 @@ class Client(object):
         '''
         self.conn.shutdown()
         self.conn = None
+        self.connected = False
 
     @property
     def is_closed(self):
