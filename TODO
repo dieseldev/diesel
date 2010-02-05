@@ -1,6 +1,4 @@
   * Update examples to use log instead of print
-  * Switch to non-blocking and do things The Right Way
-  * Fix SSL handshaking, etc, for non-blocking
   * Defer to thread
 
 Future

@@ -116,7 +116,7 @@ class Service(object):
     implemented by a passed connection handler.
     '''
     LQUEUE_SIZ = 500
-    def __init__(self, connection_handler, port, iface=''):
+    def __init__(self, connection_handler, port, iface='', security=None):
         '''Given a generator definition `connection_handler`, handle
         connections on port `port`.
 
@@ -127,6 +127,7 @@ class Service(object):
         self.sock = None
         self.connection_handler = connection_handler
         self.application = None
+        self.security = security
 
     def handle_cannot_bind(self, reason):
         log.critical("service at %s:%s cannot bind: %s" % (self.iface or '*', 
