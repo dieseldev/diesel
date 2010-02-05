@@ -212,6 +212,8 @@ class Loop(object):
 
                         error = tuple(sys.exc_info()[:2])
                         break
+                    else:
+                        current.close()
                 if not error: # no one claims to handle it
                     print_errstack(errstack, sys.exc_info())
                     raise StopIteration()
