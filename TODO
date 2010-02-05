@@ -1,5 +1,6 @@
   * Update examples to use log instead of print
   * Defer to thread
+  * Pooling, context managers.. EEK!
 
 Future
   * Write tests, somehow--check out twisted.trial
