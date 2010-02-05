@@ -311,7 +311,7 @@ class MongoProxy(object):
     def from_backend(self, data, respond, backend=None):
         if not backend:
             backend = RawMongoClient()
-            backend.connect(self.backend_host, self.backend_port)
+            yield backend.connect(self.backend_host, self.backend_port)
         resp = yield backend.send(data, respond)
         yield up((backend, resp))
 
@@ -330,7 +330,7 @@ if __name__ == '__main__':
 
     def query_20_times():
         d = MongoClient()
-        d.connect(HOST, PORT)
+        yield d.connect(HOST, PORT)
         counts = []
         for i in range(20):
             with (yield d.diesel.test.find({'type':'test'}, limit=500)) as cursor:
@@ -343,7 +343,7 @@ if __name__ == '__main__':
 
     def pure_db_action():
         d = MongoClient()
-        d.connect(HOST, PORT)
+        yield d.connect(HOST, PORT)
         print (yield d.list_databases())
         print (yield d.drop_database('diesel'))
         yield d.diesel.test.insert({'name':'dowski', 'state':'OH'})

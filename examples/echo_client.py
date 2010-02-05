@@ -25,7 +25,7 @@ class EchoClient(Client):
 def echo_loop(n):
     def _loop():
         client = EchoClient()
-        client.connect('localhost', 8013)
+        yield client.connect('localhost', 8013)
         while 1:
             bar = yield client.echo("foo %s" % n)
             tms = time.asctime()
@@ -36,7 +36,7 @@ def echo_loop(n):
 def echo_self_loop(n):
     def _loop():
         client = EchoClient()
-        client.connect('localhost', 8013)
+        yield client.connect('localhost', 8013)
         while 1:
             bar = yield client.echo_whatup()
             tms = time.asctime()

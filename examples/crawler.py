@@ -37,7 +37,7 @@ def get_links(s):
 
 def get_client():
     client = HttpClient()
-    client.connect(host, 80)
+    yield client.connect(host, 80)
     heads = HttpHeaders()
     heads.set('Host', host)
     return client, heads

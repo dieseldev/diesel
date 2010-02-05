@@ -24,7 +24,7 @@ log = log.sublog('echo-message-system', log.info)
 
 def do_messages():
     client = MessageSender()
-    client.connect('localhost', 8000)
+    yield client.connect('localhost', 8000)
     for x in xrange(5000):
         msg = "hello, world #%s!" % x
         yield client.send(msg)
