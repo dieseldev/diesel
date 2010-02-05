@@ -10,6 +10,7 @@ from diesel.hub import EventHub
 from diesel import logmod, log
 from diesel import Connection
 from diesel import Loop
+from diesel.security import ssl_async_handshake
 
 current_app = None
 
@@ -159,6 +160,10 @@ class Service(object):
                 return
             raise
         sock.setblocking(0)
+        def make_connection():
+            Connection(sock, addr, self.connection_handler).iterate()
         if self.security:
             sock = self.security.wrap(sock)
-        Connection(sock, addr, self.connection_handler).iterate()
+            ssl_async_handshake(sock, self.application.hub, make_connection)
+        else:
+            make_connection()

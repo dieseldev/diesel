@@ -46,9 +46,10 @@ class connect(object):
     '''A yield token that indicates an asynchronous connection 
     is being established.
     '''
-    def __init__(self, sock, callback):
+    def __init__(self, sock, callback, security):
         self.sock = sock
         self.callback = callback
+        self.security = security
 
 class Client(object):
     '''An agent that connects to an external host and provides an API to
@@ -68,18 +69,16 @@ class Client(object):
         sock.setblocking(0)
         def _run():
             from diesel.core import Connection
-            self.conn = Connection(sock, (addr, port), self.client_conn_handler)
+            self.conn = Connection(cobj.sock, (addr, port), self.client_conn_handler)
             self.conn.iterate()
             return True
 
-        if self.security:
-            sock = self.security.wrap(sock)
         try:
-            sock.connect(remote_addr) # note--name resolution still blocks!
+            sock.connect(remote_addr)
         except socket.error, e:
             if e[0] == errno.EINPROGRESS:
-                print 'right-o!'
-                return connect(sock, _run)
+                cobj = connect(sock, _run, self.security)
+                yield cobj
             else:
                 raise
 

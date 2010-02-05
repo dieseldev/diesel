@@ -6,12 +6,14 @@ import socket
 import traceback
 import errno
 import sys
+import ssl
 from types import GeneratorType
 from collections import deque, defaultdict
 
 from diesel import pipeline
 from diesel import buffer
 from diesel.client import call, message, response, connect
+from diesel.security import ssl_async_handshake
 
 class ConnectionClosed(socket.error): 
     '''Raised if the client closes the connection.
@@ -269,7 +271,9 @@ class Loop(object):
 
         while True:
             try:
-                if n_val is not None:
+                if isinstance(n_val, Exception):
+                    self.g.throw(n_val)
+                elif n_val is not None:
                     rets = self.g.send(n_val)
                 else:
                     rets = self.g.next()
@@ -307,13 +311,29 @@ class Loop(object):
                         break
                 elif type(ret) is connect:
                     def connect_callback():
-                        print 'called back!'
                         self.hub.unregister(ret.sock)
-                        cont = ret.callback()
-                        if cont:
+                        def finish():
+                            ret.callback()
                             self.multi_callin(pos, nrets)()
+                        if ret.security:
+                            ret.sock = ret.security.wrap(ret.sock)
+                            ssl_async_handshake(ret.sock, self.hub, finish)
+                        else:
+                            finish()
 
-                    self.hub.register(ret.sock, connect_callback, connect_callback, connect_callback)
+                    def error_callback():
+                        self.hub.unregister(ret.sock)
+                        raise ConnectionClosed("odd error on connect()!")
+
+                    def read_callback():
+                        self.hub.unregister(ret.sock)
+                        try:
+                            s = ret.sock.recv(100)
+                        except socket.error, e:
+                            self.multi_callin(pos, nrets)(ConnectionClosed(str(e)))
+
+                    self.hub.register(ret.sock, read_callback, connect_callback, error_callback)
+                    self.hub.enable_write(ret.sock)
                     exit = True
     
                 elif type(ret) is sleep:

@@ -199,7 +199,8 @@ class SelectEventHub(AbstractEventHub):
     def disable_write(self, fd):
         '''Disable write polling and the write callback.
         '''
-        self.out_set.remove(fd)
+        if fd in self.out_set:
+            self.out_set.remove(fd)
 
     def _remove_fd(self, fd):
         '''Remove this socket from the list of sockets the

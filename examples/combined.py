@@ -25,7 +25,7 @@ log = log.sublog('echo-system', log.info)
 
 def do_echos():
     client = EchoClient()
-    client.connect('localhost', 8000)
+    yield client.connect('localhost', 8000)
     t = time.time()
     for x in xrange(5000):
         msg = "hello, world #%s!" % x
