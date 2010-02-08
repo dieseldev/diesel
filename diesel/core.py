@@ -313,6 +313,7 @@ class Loop(object):
                         exit = False
                         break
                 elif type(ret) is connect:
+                    assert nrets == 1, "connect cannot be paired with any other yield token"
                     def connect_callback():
                         self.hub.unregister(ret.sock)
                         def finish():
