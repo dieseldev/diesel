@@ -1,2 +1,9 @@
  * Test exception handling _thoroughly_ , including finally behavior
- * Test all yield tokens
+ * Test all yield tokens (individually, and in groups)
+ * Test clients
+ * Test adding loops
+ * Test pools
+ * Protocol tests (HTTP, Mongo, etc)
+ * Connection shutdown handling
+ * Unit: logging module
+ * Process/bootstrap--select vs. epoll during test suite run
