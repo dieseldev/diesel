@@ -336,6 +336,8 @@ if __name__ == '__main__':
             with (yield d.diesel.test.find({'type':'test'}, limit=500)) as cursor:
                 while not cursor.finished:
                     counts.append(len((yield cursor.more())))
+            if not i:
+                yield wait('main.done')
         assert 0 in counts, counts
         assert 500 in counts, counts
         print "20 concurrent queries - passed"
