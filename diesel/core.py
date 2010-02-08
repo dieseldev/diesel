@@ -373,7 +373,7 @@ class Loop(object):
                     ret.go()
 
                 else:
-                    raise ValueError("Unknown yield token %s" % ret)
+                    raise ValueError("Unknown yield token %r" % (ret,))
             if exit: 
                 break
 
