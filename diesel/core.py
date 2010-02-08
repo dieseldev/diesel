@@ -290,6 +290,7 @@ class Loop(object):
 
             exit = False
             used_term = False
+            used_sleep = False
             nrets = len(rets)
             for pos, ret in enumerate(rets):
                 
@@ -297,7 +298,7 @@ class Loop(object):
                     assert nrets == 1, "a string or file cannot be paired with any other yield token"
                     self.pipeline.add(ret)
                 elif type(ret) is until or type(ret) is bytes:
-                    assert used_term == False, "only one terminal specifier (bytes, until) per yield"
+                    assert used_term == False, "only one terminal specifier (bytes, until) per yield is allowed"
                     used_term = True
                     self.buffer.set_term(ret.sentinel)
                     n_val = self.buffer.check()
@@ -341,6 +342,8 @@ class Loop(object):
                     exit = True
     
                 elif type(ret) is sleep:
+                    assert not used_sleep, "only one sleep token per yield is allowed"
+                    used_sleep = True
                     self._wakeup_timer = self.hub.call_later(ret.duration, self.multi_callin(pos, nrets), True)
                     exit = True
 
