@@ -1,16 +1,43 @@
+"""An example MongoDB proxy server.
+
+I don't know if this is a viable method for extending and interacting
+with MongoDB or not, but it seems like a neat hack to me at least.
+
+The idea for this example was to create a publish/subscribe system for
+MongoDB.  It adds an enhanced client with pub/sub extensions and the
+proxy server that handles the pubs and subs.
+
+Standard MongoDB clients can operate as usual and clients that support
+the pub/sub protocol addition can be notified even when actions
+originating in standard clients impact a document they are subscribed
+to.
+
+Author: Christian Wyglendowski <christian@dowski.com>
+"""
 import collections
 import struct
 from pymongo.bson import _make_c_string, BSON, _bson_to_dict
 from diesel import wait, fire, call, response, up, bytes
 from diesel.protocols.mongodb import MongoProxy, Ops, MongoClient
 
+# opcodes for extended operations
 OP_SUBSCRIBE = 1500
 OP_WAIT = 1501
+
+# operations that the proxy should handle - all others should be
+# passed directly to the backend MongoDB server.
 PROXIED_OPS = set([OP_WAIT, OP_SUBSCRIBE, Ops.OP_UPDATE])
 
 class SubscribingClient(MongoClient):
+    """An enhanced MongoDB client with pub/sub extensions.
+    
+    It can subscribe to a document based on a simple spec like
+    {'name':'foo'} and can then wait for updates to that document
+    and be notified immediately when they occur.
+    """
     @call
     def subscribe(self, col, spec):
+        """Subscribe to updates of document in col identified by spec."""
         data = [
             "\x00\x00\x00\x00",
             _make_c_string(col), 
@@ -23,6 +50,7 @@ class SubscribingClient(MongoClient):
 
     @call
     def wait(self, client_id):
+        """Wait for events to be published on subscribed docs."""
         data = "\x00\x00\x00\x00%s" % client_id
         yield self._put_request(OP_WAIT, data)
         doclen = struct.unpack('<i', (yield bytes(4)))[0]
@@ -74,38 +102,55 @@ class SubscriptionProxy(MongoProxy):
         if opcode in PROXIED_OPS:
             trimmed = body[4:]
             try:
-                col, rest = trimmed.split('\0', 1)
+                col, payload = trimmed.split('\0', 1)
             except ValueError:
                 col = trimmed.strip('\0')
-                rest = ''
+                payload = ''
             if opcode == OP_WAIT:
                 subscriber = col
-                chans = self.subscribers[subscriber]
-                ready = [self.channels[c].get(subscriber) for c in chans]
-                if not any(ready):
-                    chanupdates = tuple(('update',) + chan for chan in chans)
-                    yield tuple(wait(updates) for updates in chanupdates)
-                    ready = [self.channels[c].get(subscriber) for c in chans]
-                all_ready = "".join(ready)
-                rlen = len(all_ready)
-                resp = "%s%s" % (struct.pack('<i', rlen), all_ready)
-                yield up((resp, info, body))
+                resp = yield self.wait_and_notify(subscriber)
             elif opcode == OP_SUBSCRIBE:
                 subscriber, col = col.split('@')
-                sl, raw_bson = rest[:8], rest[8:]
-                spec = BSON(raw_bson).to_dict()
-                chan = (col, str(spec))
-                self.channels[chan].subscribe(subscriber)
-                self.subscribers[subscriber].add(chan)
-                yield up(('', info, body))
+                resp = yield self.add_subscription(subscriber, col, payload)
             elif opcode == Ops.OP_UPDATE:
-                upsert, raw_bson = rest[:4], rest[4:]
-                spec, raw_doc = _bson_to_dict(raw_bson)
-                uid = self.channels[(col, str(spec))].update(raw_doc)
-                yield fire(('update', col, str(spec)))
-                yield up((None, info, body))
+                resp = yield self.publish_and_update(col, payload)
         else:
-            yield up((None, info, body))
+            resp = None
+        yield up((resp, info, body))
+
+    def wait_and_notify(self, subscriber):
+        """Wait for published info that subscriber cares about and notify them.
+
+        The notification might be instant in the case of already published
+        information or it might occur some time in the future.
+        """
+        chans = self.subscribers[subscriber]
+        ready = [self.channels[c].get(subscriber) for c in chans]
+        if not any(ready):
+            chanupdates = tuple(('update',) + chan for chan in chans)
+            yield tuple(wait(updates) for updates in chanupdates)
+            ready = [self.channels[c].get(subscriber) for c in chans]
+        all_ready = "".join(ready)
+        rlen = len(all_ready)
+        resp = "%s%s" % (struct.pack('<i', rlen), all_ready)
+        yield up(resp)
+
+    def add_subscription(self, subscriber, collection, payload):
+        """Add a subscription to a document in a collection for subscriber."""
+        sl, raw_bson = payload[:8], payload[8:]
+        spec = BSON(raw_bson).to_dict()
+        chan = (collection, str(spec))
+        self.channels[chan].subscribe(subscriber)
+        self.subscribers[subscriber].add(chan)
+        yield up('')
+
+    def publish_and_update(self, collection, payload):
+        """Publish an update and yield None to relay the data to the backend."""
+        upsert, raw_bson = payload[:4], payload[4:]
+        spec, raw_doc = _bson_to_dict(raw_bson)
+        uid = self.channels[(collection, str(spec))].update(raw_doc)
+        yield fire(('update', collection, str(spec)))
+        yield up(None)
 
 if __name__ == '__main__':
     from diesel import Application, Service, sleep, Loop
