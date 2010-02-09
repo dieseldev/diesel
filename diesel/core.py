@@ -20,6 +20,16 @@ class ConnectionClosed(socket.error):
     '''
     pass
 
+class ClientConnectionError(socket.error): 
+    '''Raised if a client cannot connect.
+    '''
+    pass
+
+class ClientConnectionClosed(socket.error): 
+    '''Raised if a remote server closes the connection on a client.
+    '''
+    pass
+
 CRLF = '\r\n'
 BUFSIZ = 2 ** 14
 
@@ -144,9 +154,7 @@ def print_errstack(stack, e):
         for g, c in stack:
             eout(g.gi_code,)
             if c:
-                eout("catches %r" % c.exc_types)
-            else:
-                eout("")
+                eout(" .. catches %r" % c.exc_types)
         eout("")
     eout("")
     eout(" Standard Traceback:")
@@ -246,8 +254,8 @@ class Loop(object):
                         current, _ = stack.pop()
                     try:
                         last = (yield item)
-                    except ConnectionClosed, e:
-                        error = (ConnectionClosed, str(e))
+                    except Exception, e:
+                        error = (e.__class__, str(e))
 
     def multi_callin(self, pos, tot, real_f=None):
         '''Provide a callable that will pass `None` in all spots
@@ -275,7 +283,7 @@ class Loop(object):
         while True:
             try:
                 if isinstance(n_val, Exception):
-                    self.g.throw(n_val)
+                    rets = self.g.throw(n_val)
                 elif n_val is not None:
                     rets = self.g.send(n_val)
                 else:
@@ -328,14 +336,14 @@ class Loop(object):
 
                     def error_callback():
                         self.hub.unregister(ret.sock)
-                        raise ConnectionClosed("odd error on connect()!")
+                        raise ClientConnectionError("odd error on connect()!")
 
                     def read_callback():
                         self.hub.unregister(ret.sock)
                         try:
                             s = ret.sock.recv(100)
                         except socket.error, e:
-                            self.multi_callin(pos, nrets)(ConnectionClosed(str(e)))
+                            self.multi_callin(pos, nrets)(ClientConnectionError(str(e)))
 
                     self.hub.register(ret.sock, read_callback, connect_callback, error_callback)
                     self.hub.enable_write(ret.sock)
