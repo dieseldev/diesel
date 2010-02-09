@@ -69,6 +69,8 @@ class AbstractEventHub(object):
             
         tm = time()
         timeout = (self.timers[0][1].trigger_time - tm) if self.timers else 1e6
+        # epoll, etc, limit to 2^^31/1000 or OverflowError
+        timeout = min(timeout, 1e6) 
         if timeout < 0:
             timeout = 0
 
@@ -102,7 +104,7 @@ class AbstractEventHub(object):
             if not self.run:
                 return
 
-    def _get_events(self):
+    def _get_events(self, timeout):
         '''Get all events to process.
         '''
         raise NotImplementedError
