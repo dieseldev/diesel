@@ -15,10 +15,13 @@ to.
 Author: Christian Wyglendowski <christian@dowski.com>
 """
 import collections
+import os
 import struct
 from pymongo.bson import _make_c_string, BSON, _bson_to_dict
 from diesel import wait, fire, call, response, up, bytes
-from diesel.protocols.mongodb import MongoProxy, Ops, MongoClient
+from diesel.protocols.mongodb import (
+    MongoProxy, Ops, MongoClient, Collection,
+)
 
 # opcodes for extended operations
 OP_SUBSCRIBE = 1500
@@ -28,19 +31,30 @@ OP_WAIT = 1501
 # passed directly to the backend MongoDB server.
 PROXIED_OPS = set([OP_WAIT, OP_SUBSCRIBE, Ops.OP_UPDATE])
 
+class PubSubCollection(Collection):
+    """A Collection extended with some PubSub features."""
+    def subscribe(self, spec):
+        """Subscribe to updates to the document identified by spec."""
+        yield self.client.subscribe(self.name, spec)
+
+    def wait(self):
+        """Wait for updates to all subscribed docs in this collection."""
+        yield self.client.wait(self.name)
+
 class SubscribingClient(MongoClient):
-    """An enhanced MongoDB client with pub/sub extensions.
-    
-    It can subscribe to a document based on a simple spec like
-    {'name':'foo'} and can then wait for updates to that document
-    and be notified immediately when they occur.
-    """
+    """An enhanced MongoDB client with pub/sub extensions."""
+    collection_class = PubSubCollection
+
+    def __init__(self, *args, **params):
+        MongoClient.__init__(self, *args, **params)
+        self._pubsub_id = os.urandom(6).encode('hex')
+
     @call
     def subscribe(self, col, spec):
         """Subscribe to updates of document in col identified by spec."""
         data = [
             "\x00\x00\x00\x00",
-            _make_c_string(col), 
+            _make_c_string("%s@%s" % (self._pubsub_id, col)), 
             struct.pack('<ii', 0, 0),
             BSON.from_dict(spec),
         ]
@@ -49,9 +63,16 @@ class SubscribingClient(MongoClient):
         yield response('')
 
     @call
-    def wait(self, client_id):
-        """Wait for events to be published on subscribed docs."""
-        data = "\x00\x00\x00\x00%s" % client_id
+    def wait(self, collection=''):
+        """Wait for events to be published on subscribed docs in collection.
+        
+        If no collection is given, the proxy will notify for all subscribed
+        docs across collections.
+        """
+        data = "\x00\x00\x00\x00%s%s" % (
+                _make_c_string(collection),
+                self._pubsub_id, 
+        )
         yield self._put_request(OP_WAIT, data)
         doclen = struct.unpack('<i', (yield bytes(4)))[0]
         rawdoc = yield bytes(doclen)
@@ -92,23 +113,26 @@ class SubscriptionProxy(MongoProxy):
      wants to subscribe to.
      2) Events on a collection+document are recorded here in the proxy.
      3) If events occur while the client is away, they are notified of them
-     immediately the next time they return.
+     immediately the next time they return. The proxy will hold the connection
+     open if there are no events and immediately return when one is published.
     """
     channels = collections.defaultdict(Channel)
     subscribers = collections.defaultdict(set)
 
     def handle_request(self, info, body):
+        """Process a raw MongoDB or PubSub request.
+
+        PubSub related requests are given special treatment. Standard MongoDB
+        requests are simply passed on to the backend server and the response
+        is returned to the calling client.
+        """
         length, id, to, opcode = info
         if opcode in PROXIED_OPS:
             trimmed = body[4:]
-            try:
-                col, payload = trimmed.split('\0', 1)
-            except ValueError:
-                col = trimmed.strip('\0')
-                payload = ''
+            col, payload = trimmed.split('\0', 1)
             if opcode == OP_WAIT:
-                subscriber = col
-                resp = yield self.wait_and_notify(subscriber)
+                subscriber = payload.strip()
+                resp = yield self.wait_and_notify(col, subscriber)
             elif opcode == OP_SUBSCRIBE:
                 subscriber, col = col.split('@')
                 resp = yield self.add_subscription(subscriber, col, payload)
@@ -118,13 +142,16 @@ class SubscriptionProxy(MongoProxy):
             resp = None
         yield up((resp, info, body))
 
-    def wait_and_notify(self, subscriber):
+    def wait_and_notify(self, collection, subscriber):
         """Wait for published info that subscriber cares about and notify them.
 
         The notification might be instant in the case of already published
         information or it might occur some time in the future.
         """
         chans = self.subscribers[subscriber]
+        if collection:
+            # filter the channels by the passed collection
+            chans = set([c for c in chans if c[0] == collection])
         ready = [self.channels[c].get(subscriber) for c in chans]
         if not any(ready):
             chanupdates = tuple(('update',) + chan for chan in chans)
@@ -162,6 +189,7 @@ if __name__ == '__main__':
         c = MongoClient()
         c.connect(BACKEND_HOST, FRONTEND_PORT)
         yield c.drop_database('sub')
+        yield c.drop_database('bub')
         print "main: dropped the db"
         a.add_loop(Loop(subscriber))
         a.add_loop(Loop(publisher))
@@ -172,10 +200,11 @@ if __name__ == '__main__':
         c = SubscribingClient()
         c.connect(BACKEND_HOST, FRONTEND_PORT)
         print "subscriber: subscribing ..."
-        yield c.subscribe('subscriber@sub.test', {'room':'general'})
-        yield c.subscribe('subscriber@sub.test', {'name':'allrooms'})
+        yield c.bub.foo.subscribe({'junk':'yeah'})
+        yield c.sub.test.subscribe({'room':'general'})
+        yield c.sub.test.subscribe({'name':'allrooms'})
         print "subscriber: waiting for events ..."
-        events = yield c.wait('subscriber')
+        events = yield c.sub.test.wait()
         print "subscriber: saw events %r" % events
         with (yield c.sub.test.find({'room':'general'})) as cursor:
             result = yield cursor.more()
@@ -183,15 +212,17 @@ if __name__ == '__main__':
         print "subscriber: sleeping for 10 ..."
         yield sleep(10)
         print "subscriber: woke up"
-        events = yield c.wait('subscriber')
+        events = yield c.sub.test.wait()
         assert len(events) == 2
         print "subscriber: there were %d events while i was sleeping" % len(events)
         print "subscriber: events: %r" % events
         with (yield c.sub.test.find({'room':'general'})) as cursor:
             result = yield cursor.more()
             print "subscriber: final room state", result
-        events = yield c.wait('subscriber')
+        events = yield c.sub.test.wait()
         print "subscriber: more events: %r" % events
+        events = yield c.wait()
+        print "subscriber: EVEN MORE events: %r" % events
         a.halt()
 
     def publisher():
@@ -200,6 +231,7 @@ if __name__ == '__main__':
         print "publisher: sleeping ..."
         yield sleep(5)
         print "publisher: updating ..."
+        yield c.bub.foo.update({'junk':'yeah'}, {'$set': {'junk':'no'}}, upsert=1)
         yield c.sub.test.update({'room':'general'}, {'$push': {'users':'publisher'}}, upsert=1)
         print "publisher: updated"
         yield sleep(2)
