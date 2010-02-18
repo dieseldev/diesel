@@ -21,7 +21,8 @@ class TraversesCollections(object):
         return self[name]
 
     def __getitem__(self, name):
-        return Collection(_full_name(self.name, name), self.client)
+        cls = self.client.collection_class or Collection
+        return cls(_full_name(self.name, name), self.client)
 
 
 class Db(TraversesCollections):
@@ -41,6 +42,8 @@ class Collection(TraversesCollections):
         yield self.client.delete(self.name, spec)
 
 class MongoClient(Client):
+    collection_class = None
+
     def __init__(self, *args, **params):
         Client.__init__(self, *args, **params)
         self._msg_id_counter = itertools.count(1)
