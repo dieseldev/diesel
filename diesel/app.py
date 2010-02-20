@@ -4,12 +4,10 @@
 import socket
 import traceback
 import errno
-import os
 
 from diesel.hub import EventHub
 from diesel import logmod, log
 from diesel import Connection
-from diesel import Loop
 from diesel.security import ssl_async_handshake
 
 current_app = None
