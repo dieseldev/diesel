@@ -16,7 +16,6 @@ to.
 Author: Christian Wyglendowski <christian@dowski.com>
 """
 import collections
-import os
 import struct
 from pymongo.bson import _make_c_string, BSON, _bson_to_dict
 from diesel import wait, fire, call, response, up, bytes
