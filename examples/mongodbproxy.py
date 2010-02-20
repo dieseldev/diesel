@@ -22,6 +22,7 @@ from diesel import wait, fire, call, response, up, bytes
 from diesel.protocols.mongodb import (
     MongoProxy, Ops, MongoClient, Collection,
 )
+from diesel.protocols import http
 
 # opcodes for extended operations
 OP_SUBSCRIBE = 1500
@@ -45,9 +46,9 @@ class SubscribingClient(MongoClient):
     """An enhanced MongoDB client with pub/sub extensions."""
     collection_class = PubSubCollection
 
-    def __init__(self, *args, **params):
+    def __init__(self, id=None, *args, **params):
         MongoClient.__init__(self, *args, **params)
-        self._pubsub_id = os.urandom(6).encode('hex')
+        self._pubsub_id = id
 
     @call
     def subscribe(self, col, spec):
@@ -94,7 +95,8 @@ class Channel(object):
         return "".join(waiting)
 
     def subscribe(self, subscriber):
-        self.subscriptions[subscriber] = []
+		if subscriber not in self.subscriptions:
+			self.subscriptions[subscriber] = []
 
     def unsubscribe(self, subscriber):
         del self.subscriptions[subscriber]
@@ -187,7 +189,7 @@ if __name__ == '__main__':
 
     def main():
         c = MongoClient()
-        c.connect(BACKEND_HOST, FRONTEND_PORT)
+        yield c.connect(BACKEND_HOST, FRONTEND_PORT)
         yield c.drop_database('sub')
         yield c.drop_database('bub')
         print "main: dropped the db"
@@ -197,8 +199,8 @@ if __name__ == '__main__':
         c.close()
 
     def subscriber():
-        c = SubscribingClient()
-        c.connect(BACKEND_HOST, FRONTEND_PORT)
+        c = SubscribingClient(id='foo-sub')
+        yield c.connect(BACKEND_HOST, FRONTEND_PORT)
         print "subscriber: subscribing ..."
         yield c.bub.foo.subscribe({'junk':'yeah'})
         yield c.sub.test.subscribe({'room':'general'})
@@ -223,11 +225,10 @@ if __name__ == '__main__':
         print "subscriber: more events: %r" % events
         events = yield c.wait()
         print "subscriber: EVEN MORE events: %r" % events
-        a.halt()
 
     def publisher():
         c = MongoClient()
-        c.connect(BACKEND_HOST, FRONTEND_PORT)
+        yield c.connect(BACKEND_HOST, FRONTEND_PORT)
         print "publisher: sleeping ..."
         yield sleep(5)
         print "publisher: updating ..."
@@ -243,8 +244,31 @@ if __name__ == '__main__':
         yield sleep(8)
         yield c.sub.test.update({'name':'allrooms'}, {'name':'allrooms', 'value':['foo', 'bar', 'baz']}, upsert=1)
 
+    def wait_for_doc_update(req):
+        ##def junk_publisher():
+        ##    yield sleep(10)
+        ##    c = MongoClient()
+        ##    yield c.connect(BACKEND_HOST, FRONTEND_PORT)
+        ##    yield c.bub.foo.update(
+        ##        {'junk':'no'}, 
+        ##        {'$set':{'foo':'bar'}}, 
+        ##        upsert=True,
+        ##    )
+        ##a.add_loop(Loop(junk_publisher))
+        c = SubscribingClient(id='foo-sub')
+        yield c.connect(BACKEND_HOST, FRONTEND_PORT)
+        yield c.bub.foo.subscribe({'junk':'no'})
+        val = str((yield c.bub.foo.wait()))
+        headers = http.HttpHeaders()
+        headers.add('Content-Length', len(val))
+        headers.add('Content-Type', 'text/plain')
+        yield http.http_response(req, 200, headers, val)
+        ##yield sleep(2)
+        ##a.halt()
+
     a = Application()
     a.add_service(Service(SubscriptionProxy(BACKEND_HOST, BACKEND_PORT), FRONTEND_PORT))
+    a.add_service(Service(http.HttpServer(wait_for_doc_update), 8088))
     a.add_loop(Loop(main))
     a.run()
 
