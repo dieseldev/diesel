@@ -1,3 +1,4 @@
+# vim:ts=4:sw=4:expandtab
 """An example MongoDB proxy server.
 
 I don't know if this is a viable method for extending and interacting
@@ -95,8 +96,9 @@ class Channel(object):
         return "".join(waiting)
 
     def subscribe(self, subscriber):
-		if subscriber not in self.subscriptions:
-			self.subscriptions[subscriber] = []
+        """Idempotent subscribe operation to setup bucket for publications."""
+        if subscriber not in self.subscriptions:
+            self.subscriptions[subscriber] = []
 
     def unsubscribe(self, subscriber):
         del self.subscriptions[subscriber]
@@ -245,16 +247,6 @@ if __name__ == '__main__':
         yield c.sub.test.update({'name':'allrooms'}, {'name':'allrooms', 'value':['foo', 'bar', 'baz']}, upsert=1)
 
     def wait_for_doc_update(req):
-        ##def junk_publisher():
-        ##    yield sleep(10)
-        ##    c = MongoClient()
-        ##    yield c.connect(BACKEND_HOST, FRONTEND_PORT)
-        ##    yield c.bub.foo.update(
-        ##        {'junk':'no'}, 
-        ##        {'$set':{'foo':'bar'}}, 
-        ##        upsert=True,
-        ##    )
-        ##a.add_loop(Loop(junk_publisher))
         c = SubscribingClient(id='foo-sub')
         yield c.connect(BACKEND_HOST, FRONTEND_PORT)
         yield c.bub.foo.subscribe({'junk':'no'})
@@ -263,8 +255,6 @@ if __name__ == '__main__':
         headers.add('Content-Length', len(val))
         headers.add('Content-Type', 'text/plain')
         yield http.http_response(req, 200, headers, val)
-        ##yield sleep(2)
-        ##a.halt()
 
     a = Application()
     a.add_service(Service(SubscriptionProxy(BACKEND_HOST, BACKEND_PORT), FRONTEND_PORT))

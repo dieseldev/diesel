@@ -1,3 +1,4 @@
+# vim:ts=4:sw=4:expandtab
 """A mongodb client library for Diesel"""
 
 import itertools
@@ -278,6 +279,8 @@ class RawMongoClient(Client):
             yield response(header + body)
 
 class MongoProxy(object):
+    ClientClass = RawMongoClient
+
     def __init__(self, backend_host, backend_port):
         self.backend_host = backend_host
         self.backend_port = backend_port
@@ -301,7 +304,7 @@ class MongoProxy(object):
                     is_query = opcode in [Ops.OP_QUERY, Ops.OP_GET_MORE]
                     payload = header + body
                     (backend, resp) = yield self.from_backend(payload, is_query, backend)
-                    yield resp
+                    yield self.handle_response(resp)
         except ConnectionClosed:
             if backend:
                 backend.close()
@@ -311,9 +314,12 @@ class MongoProxy(object):
         print "saw request with opcode", opcode
         yield up(None, info, body)
 
+    def handle_response(self, response):
+        yield response
+
     def from_backend(self, data, respond, backend=None):
         if not backend:
-            backend = RawMongoClient()
+            backend = self.ClientClass()
             yield backend.connect(self.backend_host, self.backend_port)
         resp = yield backend.send(data, respond)
         yield up((backend, resp))
