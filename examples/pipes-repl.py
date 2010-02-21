@@ -6,9 +6,11 @@ from diesel import Application, Pipe, until
 DEFAULT_PROMPT = '>>> '
 
 def readcb():
+    from diesel.app import current_app
     print 'Diesel Console'
     cmd = ''
     prompt = DEFAULT_PROMPT
+    interp = code.InteractiveInterpreter(locals={'app':current_app})
     while 1:
         sys.stdout.write(prompt)
         sys.stdout.flush()
@@ -17,7 +19,7 @@ def readcb():
         if input.lstrip() == input or input == "\n":
             ret = code.compile_command(input)
             if ret:
-                out = eval(ret)
+                out = interp.runcode(ret)
                 if out:
                     print 'Out: %r' % out
                 cmd = ''
