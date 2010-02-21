@@ -11,7 +11,6 @@ except ImportError:
     EPOLLPRI = object()
     EPOLLOUT = object()
 
-import errno
 from collections import deque
 from time import time
 import itertools
