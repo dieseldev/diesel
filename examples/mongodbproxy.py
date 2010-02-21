@@ -188,17 +188,6 @@ if __name__ == '__main__':
     BACKEND_PORT = 27017
     FRONTEND_PORT = 27018
 
-    def main():
-        c = MongoClient()
-        yield c.connect(BACKEND_HOST, FRONTEND_PORT)
-        yield c.drop_database('sub')
-        yield c.drop_database('bub')
-        print "main: dropped the db"
-        a.add_loop(Loop(subscriber))
-        a.add_loop(Loop(publisher))
-        print "main: loops started"
-        c.close()
-
     def subscriber():
         c = SubscribingClient(id='foo-sub')
         yield c.connect(BACKEND_HOST, FRONTEND_PORT)
@@ -226,6 +215,11 @@ if __name__ == '__main__':
         print "subscriber: more events: %r" % events
         events = yield c.wait()
         print "subscriber: EVEN MORE events: %r" % events
+        print "subscribing: continuing to watch for events in sub"
+        while 1:
+            events = yield c.sub.test.wait()
+            for e in events:
+                print "subscriber: update! %r" % e
 
     def publisher():
         c = MongoClient()
@@ -254,6 +248,17 @@ if __name__ == '__main__':
         headers.add('Content-Length', len(val))
         headers.add('Content-Type', 'text/plain')
         yield http.http_response(req, 200, headers, val)
+
+    def main():
+        c = MongoClient()
+        yield c.connect(BACKEND_HOST, FRONTEND_PORT)
+        yield c.drop_database('sub')
+        yield c.drop_database('bub')
+        print "main: dropped the db"
+        a.add_loop(Loop(subscriber))
+        a.add_loop(Loop(publisher))
+        print "main: loops started"
+        c.close()
 
     a = Application()
     a.add_service(Service(SubscriptionProxy(BACKEND_HOST, BACKEND_PORT), FRONTEND_PORT))
