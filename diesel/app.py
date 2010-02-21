@@ -45,8 +45,8 @@ class Application(object):
 
         for s in self._services:
             s.bind_and_listen()
-            self.hub.register(s.sock, s.accept_new_connection, None, 
-            self.global_bail("low-level socket error on bound service"))
+            self.hub.register(s.sock, s.accept_new_connection, None,
+                self.global_bail("low-level socket error on bound service"))
         for l in self._loops:
             l.iterate()
 
@@ -73,13 +73,16 @@ class Application(object):
         handling connections when the Application is run().
         '''
         service.application = self
-        svc = service
         if self._run:
-            svc.bind_and_listen()
-            self.hub.register(svc.sock, svc.accept_new_connection, None,
-            self.global_bail("low-level socket error on bound service"))
+            service.bind_and_listen()
+            self.hub.register(
+                service.sock,
+                service.accept_new_connection,
+                None,
+                service.global_bail("low-level socket error on bound service")
+            )
         else:
-            self._services.append(svc)
+            self._services.append(service)
 
     def add_loop(self, loop, front=False):
         '''Add a Loop instance to this Application.
@@ -94,8 +97,8 @@ class Application(object):
                 self._loops.insert(0, loop)
             else:
                 self._loops.append(loop)
-        
-    def halt(self):    
+
+    def halt(self):
         '''Stop this application from running--the initial run() call
         will return.
         '''
