@@ -1,3 +1,12 @@
+'''
+Sample REPL code to integrate with Diesel
+
+Using InteractiveInterpreter broke block handling (if/def/etc.), but exceptions
+were handled well and the return value of code was printed.
+
+Using exec runs the input in the current context, but exception handling and other
+features of InteractiveInterpreter are lost.
+'''
 import sys
 import code
 
