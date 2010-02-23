@@ -1,42 +1,46 @@
-'''
-Sample REPL code to integrate with Diesel
-
-Using InteractiveInterpreter broke block handling (if/def/etc.), but exceptions
-were handled well and the return value of code was printed.
-
-Using exec runs the input in the current context, but exception handling and other
-features of InteractiveInterpreter are lost.
-'''
 import sys
 import code
+import traceback
 
 from diesel import Application, Pipe, until
 
+QUIT_STR = "quit()\n"
 DEFAULT_PROMPT = '>>> '
 
-def readcb():
+def diesel_repl():
+    '''Simple REPL for use inside a diesel app'''
+    # Import current_app into locals for use in REPL
     from diesel.app import current_app
     print 'Diesel Console'
+    print 'Type %r to exit REPL' % QUIT_STR
+    run = True
     cmd = ''
     prompt = DEFAULT_PROMPT
     while 1:
+        # Infinite REPL
         sys.stdout.write(prompt)
         sys.stdout.flush()
         input = yield until("\n")
+        if input == QUIT_STR:
+            break
         cmd += input
         if input.lstrip() == input or input == "\n":
             try:
-                ret = code.compile_command(input)
-            except SyntaxError, e:
-                # TODO Pretty print traceback
-                print e
+                ret = code.compile_command(cmd)
+            except (OverflowError, SyntaxError, ValueError):
+                print traceback.format_exc().rstrip()
                 # Reset repl
                 cmd = ''
                 prompt = DEFAULT_PROMPT
             else:
                 if ret:
-                    #interp.runcode(ret)
-                    exec cmd
+                    try:
+                        out = eval(ret)
+                    except:
+                        print traceback.format_exc().rstrip()
+                    else:
+                        if out is not None:
+                            print "%r" % out
                     cmd = ''
                     prompt = DEFAULT_PROMPT
                 else:
@@ -47,5 +51,5 @@ def readcb():
             prompt = '... '
 
 a = Application()
-a.add_loop(Pipe(sys.stdin, readcb))
+a.add_loop(Pipe(sys.stdin, diesel_repl))
 a.run()
