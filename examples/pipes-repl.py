@@ -2,7 +2,8 @@ import sys
 import code
 import traceback
 
-from diesel import Application, Pipe, until
+from diesel import Application, until
+from diesel.protocols.pipe import Pipe
 
 QUIT_STR = "quit()\n"
 DEFAULT_PROMPT = '>>> '

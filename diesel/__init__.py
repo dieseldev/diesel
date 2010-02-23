@@ -5,6 +5,5 @@ from logmod import Logger, LOGLVL_DEBUG, LOGLVL_INFO, LOGLVL_WARN, LOGLVL_ERR, L
 from core import until, until_eol, bytes, sleep, up, Connection, ConnectionClosed, Loop
 from core import fire, wait, catch, ClientConnectionError, ClientConnectionClosed
 from app import Application, Service
-from pipe import Pipe
 from client import Client, call, message, response
 from security import TLSv1ServiceWrapper, TLSv1ClientWrapper
