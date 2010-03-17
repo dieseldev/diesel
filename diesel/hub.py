@@ -79,7 +79,7 @@ class AbstractEventHub(object):
                 pass
             while True:
                 try:
-                    c, v = self.thread_comp_in.get()
+                    c, v = self.thread_comp_in.get(False)
                 except Empty:
                     break
                 else:
