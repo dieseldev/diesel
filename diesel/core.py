@@ -98,6 +98,12 @@ class catch(object):
         self.call = call
         self.exc_types = set(exc_types)
 
+class thread(object):
+    def __init__(self, f, *args, **kw):
+        self.f = f
+        self.args = args
+        self.kw = kw
+
 class WaitPool(object):
     '''A structure that manages all `wait`ers, makes sure fired events
     get to the right places, and that all other waits are canceled when
@@ -368,6 +374,11 @@ class Loop(object):
                     waits.wait(self, ret.event)
                     exit = True
 
+                elif type(ret) is thread:
+                    assert nrets == 1, "thread cannot be paired with any other yield token"
+                    self.hub.run_in_thread(self.multi_callin(pos, nrets), ret.f, *ret.args, **ret.kw)
+                    exit = True
+
                 elif type(ret) is response:
                     assert nrets == 1, "response cannot be paired with any other yield token"
                     c = self.callbacks.popleft()
@@ -449,9 +460,8 @@ class Connection(Loop):
         self.hub.unregister(self.sock)
         self.closed = True
         try:
-            if not remote_closed:
-                self.sock.close()
-            else:
+            self.sock.close()
+            if remote_closed:
                 try:
                     self.g.throw(ConnectionClosed)
                 except StopIteration:
@@ -491,7 +501,6 @@ class Connection(Loop):
         '''The low-level handler called by the event hub
         when the socket is ready for reading.
         '''
-        disconnect_reason = None
         try:
             data = self.sock.recv(BUFSIZ)
         except socket.error, e:
@@ -499,7 +508,6 @@ class Connection(Loop):
             if code in (errno.EAGAIN, errno.EINTR):
                 return
             data = ''
-            disconnect_reason = str(e)
 
         if not data:
             g = self.g
