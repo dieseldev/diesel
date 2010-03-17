@@ -91,7 +91,7 @@ class Application(object):
         '''
         loop.application = self
         if self._run:
-            loop.iterate()
+            self.hub.schedule(loop.iterate)
         else:
             if front:
                 self._loops.insert(0, loop)
