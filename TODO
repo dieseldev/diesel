@@ -1,3 +1,4 @@
+  * Track generator stack from loops or services
   * Update examples to use log instead of print
   * Write tests
 
