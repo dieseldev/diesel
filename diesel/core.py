@@ -6,7 +6,6 @@ import socket
 import traceback
 import errno
 import sys
-import ssl
 from types import GeneratorType
 from collections import deque, defaultdict
 

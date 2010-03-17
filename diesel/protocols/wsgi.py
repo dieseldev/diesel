@@ -7,7 +7,6 @@ Note: not well-tested.  Contributions welcome.
 import urlparse
 import os
 import cStringIO
-import traceback
 
 from diesel import Application, Service, log
 from diesel.protocols.http import HttpServer, HttpHeaders, http_response
