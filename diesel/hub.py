@@ -64,6 +64,7 @@ class AbstractEventHub(object):
         self.run = True
         self.events = {}
         self.run_now = deque()
+        self.fdmap = {}
         self._setup_threading()
 
     def _setup_threading(self):
@@ -172,8 +173,10 @@ class AbstractEventHub(object):
         By default, only the read behavior will be polled and the
         read callback used until enable_write is invoked.
         '''
-        assert fd.fileno() not in self.events
-        self.events[fd.fileno()] = (read_callback, write_callback, error_callback)
+        fn = fd.fileno()
+        self.fdmap[fd] = fn
+        assert fn not in self.events
+        self.events[fn] = (read_callback, write_callback, error_callback)
         self._add_fd(fd)
 
     def _add_fd(self, fd):
@@ -196,8 +199,8 @@ class AbstractEventHub(object):
         '''Remove this socket from the list of sockets the
         hub is polling on.
         '''
-        fn = fd.fileno()
-        if fn in self.events:
+        if fd in self.fdmap:
+            fn = self.fdmap.pop(fd)
             del self.events[fn]
 
             self._remove_fd(fd)

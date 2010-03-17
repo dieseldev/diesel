@@ -1,6 +1,7 @@
 # vim:ts=4:sw=4:expandtab
 import socket
 import errno
+from uuid import uuid4
 from collections import deque
 
 class call(object):
@@ -21,12 +22,13 @@ class call(object):
     def __get__(self, inst, cls):
         return call(self.f, inst)
 
-    def go(self, callback): # XXX errback-type stuff?
+    def go(self, callback): 
         if callback:
             self.client.conn.callbacks.append(callback)
 
         self.client.jobs.append(self.gen)
-        self.client.conn.wake()
+        if self.client.waiting:
+            self.client.conn.schedule()
 
 class message(call):
     '''An async message on a client connection, without
@@ -54,6 +56,12 @@ class connect(object):
         self.callback = callback
         self.security = security
 
+class _client_wait(object): 
+    '''Internal token indicating the client does not wish to
+    be scheduled until a new job is on the Queue.
+    '''
+    pass
+
 class Client(object):
     '''An agent that connects to an external host and provides an API to
     return data based on a protocol across that host.
@@ -64,6 +72,8 @@ class Client(object):
         self.conn = None
         self.security = security
         self.connected = False
+        self.closed = False
+        self.waiting = False
      
     def connect(self, addr, port, lazy=False):  
         self.addr = addr
@@ -95,9 +105,11 @@ class Client(object):
     def close(self):
         '''Close the socket to the remote host.
         '''
+        print '---CLEANUP---'
         self.conn.shutdown()
         self.conn = None
         self.connected = False
+        self.closed = True
 
     @property
     def is_closed(self):
@@ -107,21 +119,28 @@ class Client(object):
         '''The default connection handler.  Handles @call-ing
         behavior to client API methods.
         '''
-        from diesel.core import sleep, ConnectionClosed
+        from diesel.core import wait, ConnectionClosed
         yield self.on_connect()
 
-        while True:
-            try:
-                if not self.jobs:
-                    yield sleep()
-                if not self.jobs:
-                    continue
-                mygen = self.jobs.popleft()
-                yield mygen
-            except ConnectionClosed:
+        
+        try:
+            while True:
+                try:
+                    if not self.jobs:
+                        self.waiting = True
+                        yield _client_wait()
+                        self.waiting = False
+                    assert self.jobs
+                    mygen = self.jobs.popleft()
+                    yield mygen
+                except ConnectionClosed:
+                    self.close()
+                    self.on_close()
+                    break
+        finally:
+            if self.connected:
                 self.close()
                 self.on_close()
-                break
 
     def on_connect(self):
         '''Hook to implement a handler to do any setup after the

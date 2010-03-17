@@ -11,7 +11,7 @@ from collections import deque, defaultdict
 
 from diesel import pipeline
 from diesel import buffer
-from diesel.client import call, message, response, connect
+from diesel.client import call, message, response, connect, _client_wait
 from diesel.security import ssl_async_handshake
 
 class ConnectionClosed(socket.error): 
@@ -282,6 +282,7 @@ class Loop(object):
         Connection.  Run whenever a generator is (re-)scheduled.
         Handles all the `yield` tokens.
         '''
+        #print 'iter on', self
         if self.g is None:
             return 
 
@@ -306,6 +307,7 @@ class Loop(object):
             used_sleep = False
             nrets = len(rets)
             for pos, ret in enumerate(rets):
+                #print 'TOKEN', ret
                 
                 if type(ret) is str or hasattr(ret, 'seek'):
                     assert nrets == 1, "a string or file cannot be paired with any other yield token"
@@ -372,6 +374,9 @@ class Loop(object):
                     self.fire_handlers[ret.event] = self.multi_callin(pos, nrets, self.schedule)
                     waits.wait(self, ret.event)
                     exit = True
+                    
+                elif type(ret) is _client_wait:
+                    exit = True
 
                 elif type(ret) is thread:
                     assert nrets == 1, "thread cannot be paired with any other yield token"
@@ -382,7 +387,6 @@ class Loop(object):
                     assert nrets == 1, "response cannot be paired with any other yield token"
                     c = self.callbacks.popleft()
                     c(ret.value)
-                    exit = True
 
                 elif type(ret) is call:
                     assert nrets == 1, "call cannot be paired with any other yield token"
