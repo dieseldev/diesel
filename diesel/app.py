@@ -79,7 +79,7 @@ class Application(object):
                 service.sock,
                 service.accept_new_connection,
                 None,
-                service.global_bail("low-level socket error on bound service")
+                self.global_bail("low-level socket error on bound service")
             )
         else:
             self._services.append(service)

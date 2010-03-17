@@ -1,6 +1,6 @@
   * Update examples to use log instead of print
-  * Defer to thread
   * Write tests
+  * Check new service/loop adding, scheduling (without increasing stack depth)
 
 Future
   * Test/fix WSGI stuff

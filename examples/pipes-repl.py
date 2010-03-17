@@ -2,7 +2,7 @@ import sys
 import code
 import traceback
 
-from diesel import Application, until
+from diesel import *
 from diesel.protocols.pipe import Pipe
 
 QUIT_STR = "quit()\n"
@@ -14,6 +14,8 @@ def diesel_repl():
     from diesel.app import current_app
     print 'Diesel Console'
     print 'Type %r to exit REPL' % QUIT_STR
+    print 'The diesel application is called `a`, and all diesel exports'
+    print 'are in scope'
     run = True
     cmd = ''
     prompt = DEFAULT_PROMPT
