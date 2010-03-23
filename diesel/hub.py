@@ -11,10 +11,13 @@ except ImportError:
     EPOLLPRI = object()
     EPOLLOUT = object()
 
-import errno
 from collections import deque
 from time import time
 import itertools
+import thread
+from Queue import Queue, Empty
+import fcntl
+import os
 
 class Timer(object):
     '''A timer is a promise to call some function at a future date.
@@ -47,6 +50,13 @@ class Timer(object):
         '''
         return (self.trigger_time - time()) < self.ALLOWANCE
 
+class _PipeWrap(object):
+    def __init__(self, p):
+        self.p = p
+
+    def fileno(self):
+        return self.p
+
 class AbstractEventHub(object):
     def __init__(self):
         self.timers = deque()
@@ -54,6 +64,42 @@ class AbstractEventHub(object):
         self.run = True
         self.events = {}
         self.run_now = deque()
+        self.fdmap = {}
+        self._setup_threading()
+
+    def _setup_threading(self):
+        self._t_recv, self._t_wakeup = os.pipe()
+        fcntl.fcntl(self._t_recv, fcntl.F_SETFL, os.O_NONBLOCK)
+        fcntl.fcntl(self._t_wakeup, fcntl.F_SETFL, os.O_NONBLOCK)
+        self.thread_comp_in = Queue()
+
+        def handle_thread_done():
+            try:
+                os.read(self._t_recv, 65536)
+            except IOError:
+                pass
+            while True:
+                try:
+                    c, v = self.thread_comp_in.get(False)
+                except Empty:
+                    break
+                else:
+                    c(v)
+        self.register(_PipeWrap(self._t_recv), handle_thread_done, None, None)
+
+    def run_in_thread(self, reschedule, f, *args, **kw):
+        def wrap():
+            try:
+                res = f(*args, **kw)
+            except Exception, e:
+                self.thread_comp_in.put((reschedule, e))
+            else:
+                self.thread_comp_in.put((reschedule, res))
+            try:
+                os.write(self._t_wakeup, '\0')
+            except IOError:
+                pass
+        thread.start_new_thread(wrap, ())
 
     def handle_events(self):
         '''Run one pass of event handling.
@@ -70,7 +116,7 @@ class AbstractEventHub(object):
         tm = time()
         timeout = (self.timers[0][1].trigger_time - tm) if self.timers else 1e6
         # epoll, etc, limit to 2^^31/1000 or OverflowError
-        timeout = min(timeout, 1e6) 
+        timeout = min(timeout, 1e6)
         if timeout < 0:
             timeout = 0
 
@@ -127,8 +173,10 @@ class AbstractEventHub(object):
         By default, only the read behavior will be polled and the
         read callback used until enable_write is invoked.
         '''
-        assert fd.fileno() not in self.events
-        self.events[fd.fileno()] = (read_callback, write_callback, error_callback)
+        fn = fd.fileno()
+        self.fdmap[fd] = fn
+        assert fn not in self.events
+        self.events[fn] = (read_callback, write_callback, error_callback)
         self._add_fd(fd)
 
     def _add_fd(self, fd):
@@ -151,8 +199,8 @@ class AbstractEventHub(object):
         '''Remove this socket from the list of sockets the
         hub is polling on.
         '''
-        fn = fd.fileno()
-        if fn in self.events:
+        if fd in self.fdmap:
+            fn = self.fdmap.pop(fd)
             del self.events[fn]
 
             self._remove_fd(fd)
@@ -168,9 +216,8 @@ class SelectEventHub(AbstractEventHub):
     '''A select-based hub.
     '''
     def __init__(self):
-        super(SelectEventHub, self).__init__()
-
         self.in_set, self.out_set = set(), set()
+        super(SelectEventHub, self).__init__()
 
     def _get_events(self, timeout):
         '''Get all events to process.
@@ -218,8 +265,8 @@ class EPollEventHub(AbstractEventHub):
     '''
     SIZE_HINT = 50000
     def __init__(self):
-        super(EPollEventHub, self).__init__()
         self.epoll = select.epoll(self.SIZE_HINT)
+        super(EPollEventHub, self).__init__()
 
     def _get_events(self, timeout):
         '''Get all events to process.

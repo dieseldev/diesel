@@ -1,5 +1,5 @@
+  * Track generator stack from loops or services
   * Update examples to use log instead of print
-  * Defer to thread
   * Write tests
 
 Future

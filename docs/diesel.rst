@@ -284,7 +284,7 @@ Let's expand our echo application to cover all three object types::
 
     def do_echos():
         client = EchoClient()
-        client.connect('localhost', 8000)
+        yield client.connect('localhost', 8000)
         t = time.time()
         for x in xrange(5000):
             msg = "hello, world #%s!" % x
@@ -510,7 +510,7 @@ Let's start with an example that uses the `HttpClient`::
     def req_loop():
         host = 'www.boomplex.com'
         client = HttpClient()
-        client.connect(host, 80) 
+        yield client.connect(host, 80) 
         heads = HttpHeaders()
         heads.set('Host', host)
         print (yield client.request('GET', '/', heads))

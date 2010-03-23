@@ -1,7 +1,6 @@
 # vim:ts=4:sw=4:expandtab
 '''HTTP/1.1 implementation of client and server.
 '''
-import sys, socket
 import urllib
 from collections import defaultdict
 

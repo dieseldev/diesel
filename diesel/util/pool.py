@@ -17,13 +17,18 @@ class ConnectionPool(object):
     def get(self):
         if not self.connections:
             self.connections.append(self.init_callable())
-        return self.connections.pop()
+        conn = self.connections.pop()
+        if not conn.closed:
+            return conn
+        else:
+            return self.get()
 
     def release(self, conn):
-        if len(self.connections) < self.pool_size:
-            self.connections.append(conn)
-        else:
-            self.close_callable(conn)
+        if not conn.closed:
+            if len(self.connections) < self.pool_size:
+                self.connections.append(conn)
+            else:
+                self.close_callable(conn)
 
     @property
     def connection(self):

@@ -6,13 +6,12 @@ import socket
 import traceback
 import errno
 import sys
-import ssl
 from types import GeneratorType
 from collections import deque, defaultdict
 
 from diesel import pipeline
 from diesel import buffer
-from diesel.client import call, message, response, connect
+from diesel.client import call, message, response, connect, _client_wait
 from diesel.security import ssl_async_handshake
 
 class ConnectionClosed(socket.error): 
@@ -97,6 +96,12 @@ class catch(object):
     def __init__(self, call, *exc_types):
         self.call = call
         self.exc_types = set(exc_types)
+
+class thread(object):
+    def __init__(self, f, *args, **kw):
+        self.f = f
+        self.args = args
+        self.kw = kw
 
 class WaitPool(object):
     '''A structure that manages all `wait`ers, makes sure fired events
@@ -277,6 +282,7 @@ class Loop(object):
         Connection.  Run whenever a generator is (re-)scheduled.
         Handles all the `yield` tokens.
         '''
+        #print 'iter on', self
         if self.g is None:
             return 
 
@@ -301,6 +307,7 @@ class Loop(object):
             used_sleep = False
             nrets = len(rets)
             for pos, ret in enumerate(rets):
+                #print 'TOKEN', ret
                 
                 if type(ret) is str or hasattr(ret, 'seek'):
                     assert nrets == 1, "a string or file cannot be paired with any other yield token"
@@ -367,12 +374,19 @@ class Loop(object):
                     self.fire_handlers[ret.event] = self.multi_callin(pos, nrets, self.schedule)
                     waits.wait(self, ret.event)
                     exit = True
+                    
+                elif type(ret) is _client_wait:
+                    exit = True
+
+                elif type(ret) is thread:
+                    assert nrets == 1, "thread cannot be paired with any other yield token"
+                    self.hub.run_in_thread(self.multi_callin(pos, nrets), ret.f, *ret.args, **ret.kw)
+                    exit = True
 
                 elif type(ret) is response:
                     assert nrets == 1, "response cannot be paired with any other yield token"
                     c = self.callbacks.popleft()
                     c(ret.value)
-                    exit = True
 
                 elif type(ret) is call:
                     assert nrets == 1, "call cannot be paired with any other yield token"
@@ -449,9 +463,8 @@ class Connection(Loop):
         self.hub.unregister(self.sock)
         self.closed = True
         try:
-            if not remote_closed:
-                self.sock.close()
-            else:
+            self.sock.close()
+            if remote_closed:
                 try:
                     self.g.throw(ConnectionClosed)
                 except StopIteration:
@@ -491,7 +504,6 @@ class Connection(Loop):
         '''The low-level handler called by the event hub
         when the socket is ready for reading.
         '''
-        disconnect_reason = None
         try:
             data = self.sock.recv(BUFSIZ)
         except socket.error, e:
@@ -499,7 +511,6 @@ class Connection(Loop):
             if code in (errno.EAGAIN, errno.EINTR):
                 return
             data = ''
-            disconnect_reason = str(e)
 
         if not data:
             g = self.g
