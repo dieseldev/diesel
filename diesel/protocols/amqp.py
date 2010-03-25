@@ -1,3 +1,5 @@
+'''Enough of AMQP 0.8 to do useful things with RabbitMQ
+'''
 from diesel import Client, bytes, up, call, wait
 from struct import pack, unpack, calcsize
 from decimal import Decimal
