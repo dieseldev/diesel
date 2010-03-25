@@ -1,6 +1,6 @@
 '''Enough of AMQP 0.8 to do useful things with RabbitMQ
 '''
-from diesel import Client, bytes, up, call, wait
+from diesel import Client, bytes, up, call, wait, response
 from struct import pack, unpack, calcsize
 from decimal import Decimal
 from datetime import datetime
@@ -280,6 +280,57 @@ class ExchangeDeclareOkMethod(AMQPInMethod):
     def finish_feed(self, feed):
         pass
 
+#################################
+## Queue, class = 50
+
+class QueueDeclareMethod(AMQPOutMethod):
+    cls = 50
+    method = 10
+    def __init__(self, name, 
+        passive=False, durable=False, exclusive=False,
+        auto_delete=False, nowait=False, arguments=None):
+        arguments = arguments or {}
+        assert not name.startswith('amq.')
+        
+        self.out_fields = [
+            ('H', SECURE_TICKET),
+            ('SS', name),
+            ('B', pack_bits(passive, durable, exclusive, auto_delete, nowait)),
+            ('F', arguments),
+        ]
+
+class QueueDeclareOkMethod(AMQPInMethod):
+    cls = 50
+    method = 11
+
+    def finish_feed(self, feed):
+        self.name = feed.get('>%ss' % feed.get('>B'))
+        self.message_count = feed.get('>I')
+        self.consumer_count = feed.get('>I')
+
+class QueueBindMethod(AMQPOutMethod):
+    cls = 50
+    method = 20
+    def __init__(self, queue_name, exchange_name,
+        routing_key, nowait=False, arguments=None):
+        arguments = arguments or {}
+        
+        self.out_fields = [
+            ('H', SECURE_TICKET),
+            ('SS', queue_name),
+            ('SS', exchange_name),
+            ('SS', routing_key),
+            ('B', pack_bits(nowait)),
+            ('F', arguments),
+        ]
+
+class QueueBindOkMethod(AMQPInMethod):
+    cls = 50
+    method = 21
+
+    def finish_feed(self, feed):
+        pass
+
 #############################################
 ## Build the mapping of cls to protocol codes
 
@@ -329,12 +380,14 @@ class AMQPClient(Client):
         yield '\xce'
 
     @call
-    def get_frame(self, wakeup_event):
-        yield self._get_frame(wakeup_event)
+    def get_frame(self, wakeup_event=None):
+        frame = yield self._get_frame(wakeup_event)
+        yield response(frame)
 
     @call
     def send_method_frame(self, method):
         yield self._send_method_frame(method)
+        yield response(None)
 
     def on_connect(self):
         self.access_ticket = None
@@ -384,7 +437,6 @@ class AMQPClient(Client):
         self.access_ticket = method.ticket
 
         self.ready = True
-        print 'ready!'
 
 #########################################
 ## Hub, the system the app interacts with
@@ -427,10 +479,29 @@ class AMQPHub(object):
             resp = yield client.get_frame()
             assert type(resp) == ExchangeDeclareOkMethod
 
-    # XXX - clear queue ahead of time, declare binding key, LISTEN ON QUEUE LISTEN ON QUEUE LISTEN ON QUEUE LISTEN ON QUEUE
+    def declare_queue(self, *args, **kw):
+        assert 'durable' not in kw, "durability or queues is hard coded to true with AMQPHub"
+        kw['durable'] = True
+
+        with self.pool.connection as client:
+            yield client.send_method_frame(
+                QueueDeclareMethod(*args, **kw)
+            )
+            resp = yield client.get_frame()
+            assert type(resp) == QueueDeclareOkMethod
+
+    def bind(self, *args, **kw):
+        with self.pool.connection as client:
+            yield client.send_method_frame(
+                QueueBindMethod(*args, **kw)
+            )
+            resp = yield client.get_frame()
+            assert type(resp) == QueueBindOkMethod
+
+
+    # XXX - clear queue ahead of time, declare binding key, LISTEN ON QUEUE
 
     # --or-- create a temp queue directly on a binding key for a given exchange non-durable, private 
-    # queue
-    #with all message on queue, or with a binding
+    # queue with all message on queue, or with a binding
 
     # --or-- listen to all messages on a fanout exchange
