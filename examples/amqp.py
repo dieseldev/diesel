@@ -4,6 +4,7 @@
 
 from diesel import Application, Loop, log, sleep
 from diesel.protocols.amqp import AMQPHub, BasicContent
+import time, sys
 
 hub = AMQPHub()
 
@@ -12,15 +13,25 @@ def send_loop():
     yield hub.declare_queue("jam_q")
     yield hub.bind("jam_q", "the_hub", "mykey")
 
+    yield sleep(1)
+    print 'SEND S', time.time()
     bc = BasicContent('foo!')
-    yield hub.pub(bc, "the_hub", "mykey")
+    for x in xrange(500):
+        yield hub.pub(bc, "the_hub", "mykey")
 
-    print 'done!'
+    print 'SEND E', time.time()
 
 def recv_loop():
-    pass
+    print 'RECV S', time.time()
+    for x in xrange(2):
+        with hub.sub('jam_q') as fetch:
+            for x in xrange(250):
+                q, content = yield fetch()
+    print 'RECV E', time.time()
 
 a = Application()
-a.add_loop(Loop(send_loop))
-a.add_loop(Loop(hub.dispatch))
+if 'send' in sys.argv:
+    a.add_loop(Loop(send_loop))
+if 'recv' in sys.argv:    
+    a.add_loop(Loop(recv_loop))
 a.run()

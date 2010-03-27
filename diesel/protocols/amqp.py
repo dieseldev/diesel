@@ -1,6 +1,6 @@
 '''Enough of AMQP 0.8 to do useful things with RabbitMQ
 '''
-from diesel import Client, bytes, up, call, wait, response
+from diesel import Client, bytes, up, call, wait, response, fire, sleep, Loop
 from struct import pack, unpack, calcsize
 from decimal import Decimal
 from datetime import datetime
@@ -8,6 +8,7 @@ from collections import deque
 from uuid import uuid4
 import time
 from diesel.util.pool import ConnectionPool
+from contextlib import contextmanager
 
 FRAME_METHOD = 1
 FRAME_HEADER = 2
@@ -235,6 +236,23 @@ class ChannelOpenOkMethod(AMQPInMethod):
     def finish_feed(self, feed):
         pass
 
+class ChannelCloseMethod(AMQPOutMethod):
+    cls = 20
+    method = 40
+    def __init__(self):
+        self.out_fields = [
+            ('H', 320),
+            ('SS', "Connection closed by operator"),
+            ('H', 0), # class id associated with close
+            ('H', 0), # method id assciated with close
+        ]
+
+class ChannelCloseOkMethod(AMQPInMethod):
+    cls = 20
+    method = 41
+    def finish_feed(self, feed):
+        pass
+
 #################################
 ## Access, class = 30
 
@@ -354,7 +372,7 @@ class PublishMethod(AMQPOutMethod):
 class ConsumeMethod(AMQPOutMethod):
     cls = 60
     method = 20
-    def __init__(self, queue_name, consumer_tag, no_local=False, no_ack=True, 
+    def __init__(self, queue_name, consumer_tag, no_local=False, no_ack=False, 
         exclusive=False):
 
         nowait = False
@@ -366,11 +384,52 @@ class ConsumeMethod(AMQPOutMethod):
             ('B', pack_bits(no_local, no_ack, exclusive, nowait)),
         ]
 
-class ConsumeMethodOk(AMQPOutMethod):
+class ConsumeMethodOk(AMQPInMethod):
     cls = 60
     method = 21
     def finish_feed(self, feed):
         self.consumer_tag = feed.get('>%ss' % feed.get('>B'))
+
+class CancelMethod(AMQPOutMethod):
+    cls = 60
+    method = 30
+    def __init__(self, consumer_tag):
+        nowait = False
+        
+        self.out_fields = [
+            ('SS', consumer_tag),
+            ('B', pack_bits(nowait)),
+        ]
+
+class DeliverMethod(AMQPInMethod):
+    cls = 60
+    method = 60
+    def finish_feed(self, feed):
+        self.consumer_tag = feed.get('>%ss' % feed.get('>B'))
+        self.delivery_tag = feed.get('>Q')
+        self.redelivered = bool(feed.get('>B'))
+        self.exchange_name = feed.get('>%ss' % feed.get('>B'))
+        self.routing_key = feed.get('>%ss' % feed.get('>B'))
+
+class AckMethod(AMQPOutMethod):
+    cls = 60
+    method = 80
+    def __init__(self, delivery_tag, multiple=False):
+        self.out_fields = [
+            ('Q', delivery_tag),
+            ('B', pack_bits(multiple)),
+        ]
+
+class RejectMethod(AMQPOutMethod):
+    cls = 60
+    method = 90
+    def __init__(self, delivery_tag):
+        requeue = True
+        
+        self.out_fields = [
+            ('Q', delivery_tag),
+            ('B', pack_bits(requeue)),
+        ]
 
 class BasicContent(object):
     def __init__(self, content, 
@@ -378,7 +437,7 @@ class BasicContent(object):
         content_encoding="", headers={},
         persistent=False, priority=5,
         correlation_id="", reply_to="",
-        expiration="", message_id="",
+        expiration="", message_id="", timestamp=None,
         type="", user_id="", app_id="", cluster_id=""):
 
         self.children = []
@@ -393,7 +452,7 @@ class BasicContent(object):
         self.reply_to = reply_to
         self.expiration = expiration
         self.message_id = message_id
-        self.timestamp = time.time()
+        self.timestamp = timestamp or time.time()
         self.type = type
         self.user_id = user_id
         self.app_id = app_id
@@ -452,8 +511,8 @@ class BasicContent(object):
     @classmethod
     def from_stream(cls, header_frame):
         feed = BinaryFeed(header_frame)
-        cls, weight, c_l, flags = feed.get('>HHQH')
-        assert cls == 60
+        cls_id, weight, c_l, flags = feed.get('>HHQH')
+        assert cls_id == 60
         prop_set = set(x for x in xrange(14) if (1 << (15 - x)) & flags)
 
         kw = {}
@@ -520,19 +579,21 @@ for n, v in locals().items():
 ###########################################
 ## Client class, pushes these over the wire
 class AMQPClient(Client):
-    def _get_frame(self, ev=None):
+    def _get_frame(self, ev=None, timeout=None):
         res = None
 
         while True:
-            frame_header = yield bytes(7)
-            typ, chan, size = unpack('>BHI', frame_header)
 
-            if ev:
-                payload, ev = yield bytes(size), wait(ev)
+            if ev and timeout:
+                frame_header, ev, to = yield (bytes(7), wait(ev), sleep(timeout))
+            elif ev:
+                frame_header, ev = yield bytes(7), wait(ev)
             else:
-                payload = yield bytes(size)
+                frame_header = yield bytes(7)
 
-            if payload:
+            if frame_header:
+                typ, chan, size = unpack('>BHI', frame_header)
+                payload = yield bytes(size)
                 assert (yield bytes(1)) == FRAME_END
 
                 if typ == FRAME_METHOD:
@@ -566,8 +627,8 @@ class AMQPClient(Client):
         yield FRAME_END
 
     @call
-    def get_frame(self, wakeup_event=None):
-        frame = yield self._get_frame(wakeup_event)
+    def get_frame(self, wakeup_event=None, timeout=None):
+        frame = yield self._get_frame(wakeup_event, timeout)
         yield response(frame)
 
     @call
@@ -583,6 +644,7 @@ class AMQPClient(Client):
     def on_connect(self):
         self.access_ticket = None
         self.current_message = None
+        self.needs_reset = False
 
         yield pack('>4sBBBB', "AMQP", 1, 1, 9, 1) # protocol header
         method = yield self._get_frame()
@@ -614,7 +676,14 @@ class AMQPClient(Client):
         )
         method = yield self._get_frame()
         assert type(method) == ConnectionOpenOkMethod
+        yield self._open_channel()
+    
+    @call
+    def open_channel(self):
+        yield self._open_channel()
+        yield response(None)
 
+    def _open_channel(self):
         yield self._send_method_frame(
         ChannelOpenMethod()
         )
@@ -629,7 +698,16 @@ class AMQPClient(Client):
         assert type(method) == AccessRequestOkMethod
         self.access_ticket = method.ticket
 
-        self.ready = True
+    @call
+    def close_channel(self):
+        yield self._send_method_frame(
+        ChannelCloseMethod()
+        )
+        fm = (yield self._get_frame())
+        while type(fm) in (DeliverMethod, BasicContent):
+            fm = (yield self._get_frame())
+        assert type(fm) == ChannelCloseOkMethod
+        yield response(None)
 
 #########################################
 ## Hub, the system the app interacts with
@@ -638,27 +716,25 @@ class AMQPHub(object):
     def __init__(self, host='127.0.0.1', port=5672, pool_size=5):
         self.host = host
         self.port = port
-        self.wake_id = str(uuid4())
-        self.start_wait = str(uuid4())
-        self.make_client()
         self.pool = ConnectionPool(self.make_client, lambda x: x.close(), 
-        pool_size=pool_size)
+        pool_size=pool_size, release_callable=self.reset_client)
 
     def make_client(self):
         client = AMQPClient()
         client.connect(self.host, self.port, lazy=True)
         return client
 
-    def dispatch(self):
-        '''Send/rec network traffic.
-        '''
-        with self.pool.connection as client:
-            while True:
-                fm = (yield client.get_frame(self.wake_id))
-                
+    def reset_client(self, client, release):
+        def g():
+            yield client.close_channel()
+            yield client.open_channel() # b/c we can't reject packets!
+            release(client)
 
-    def _handle_frame(self, fm):
-        yield up(None)
+        if client.needs_reset:
+            from diesel.app import current_app
+            current_app.add_loop(Loop(g))
+        else:
+            release(client)
 
     def declare_exchange(self, *args, **kw):
         assert 'durable' not in kw, "durability of exchanges is hard coded to true with AMQPHub"
@@ -691,19 +767,42 @@ class AMQPHub(object):
             assert type(resp) == QueueBindOkMethod
 
     def pub(self, cont, *args, **kw):
-        print 'start!'
         with self.pool.connection as client:
-            print 's!'
             yield client.send_method_frame(
                 PublishMethod(*args, **kw)
             )
-            print 'r!'
             yield client.send_content(cont)
-            print 'yo!'
 
-    # XXX - clear queue ahead of time, declare binding key, LISTEN ON QUEUE
+    @contextmanager
+    def sub(self, qs, reliable=True, exclusive=False):
+        if type(qs) is str:
+            qs = [qs]
 
-    # --or-- create a temp queue directly on a binding key for a given exchange non-durable, private 
-    # queue with all message on queue, or with a binding
+        with self.pool.connection as client:
+            ctag_to_qname = {}
+            started = []
+            def fetch():
+                if not started:
+                    for qname in qs:
+                        ctag = str(uuid4())
+                        ctag_to_qname[ctag] = qname
 
-    # --or-- listen to all messages on a fanout exchange
+                        yield client.send_method_frame(
+                            ConsumeMethod(qname, ctag, no_ack=not reliable, exclusive=exclusive)
+                            )
+                        fm = yield client.get_frame()
+                        assert type(fm) == ConsumeMethodOk
+                    started.append(True)
+                    client.needs_reset = True
+
+                fm = yield client.get_frame()                  
+                if type(fm) == DeliverMethod:
+                    body = (yield client.get_frame())
+                    qname = ctag_to_qname[fm.consumer_tag]
+                    if reliable:
+                        yield client.send_method_frame(AckMethod(fm.delivery_tag))
+                    yield up((qname, body))
+                else:
+                    assert 0, ("unexpected frame on sub loop", fm)
+
+            yield fetch

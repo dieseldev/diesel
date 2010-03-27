@@ -106,10 +106,11 @@ class Client(object):
         '''Close the socket to the remote host.
         '''
         print '---CLEANUP---'
-        self.conn.shutdown()
-        self.conn = None
-        self.connected = False
-        self.closed = True
+        if not self.closed:
+            self.conn.shutdown()
+            self.conn = None
+            self.connected = False
+            self.closed = True
 
     @property
     def is_closed(self):
