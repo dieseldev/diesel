@@ -6,11 +6,13 @@ from decimal import Decimal
 from datetime import datetime
 from collections import deque
 from uuid import uuid4
+import time
 from diesel.util.pool import ConnectionPool
 
 FRAME_METHOD = 1
 FRAME_HEADER = 2
 FRAME_BODY = 3
+FRAME_END = '\xce'
 
 ##############################
 ## Utils
@@ -331,6 +333,181 @@ class QueueBindOkMethod(AMQPInMethod):
     def finish_feed(self, feed):
         pass
 
+##############################
+## Basic, class = 60
+
+class PublishMethod(AMQPOutMethod):
+    cls = 60
+    method = 40
+    def __init__(self, exchange_name, routing_key,
+        mandatory=True):
+        # XXX we can't handle return messages in arch
+        immediate = False 
+        
+        self.out_fields = [
+            ('H', SECURE_TICKET),
+            ('SS', exchange_name),
+            ('SS', routing_key),
+            ('B', pack_bits(mandatory, immediate)),
+        ]
+
+class ConsumeMethod(AMQPOutMethod):
+    cls = 60
+    method = 20
+    def __init__(self, queue_name, consumer_tag, no_local=False, no_ack=True, 
+        exclusive=False):
+
+        nowait = False
+        
+        self.out_fields = [
+            ('H', SECURE_TICKET),
+            ('SS', queue_name),
+            ('SS', consumer_tag),
+            ('B', pack_bits(no_local, no_ack, exclusive, nowait)),
+        ]
+
+class ConsumeMethodOk(AMQPOutMethod):
+    cls = 60
+    method = 21
+    def finish_feed(self, feed):
+        self.consumer_tag = feed.get('>%ss' % feed.get('>B'))
+
+class BasicContent(object):
+    def __init__(self, content, 
+        content_type="application/octet-stream",
+        content_encoding="", headers={},
+        persistent=False, priority=5,
+        correlation_id="", reply_to="",
+        expiration="", message_id="",
+        type="", user_id="", app_id="", cluster_id=""):
+
+        self.children = []
+
+        self.content = content
+        self.content_type = content_type
+        self.content_encoding = content_encoding
+        self.headers = headers
+        self.persistent = persistent
+        self.priority = priority
+        self.correlation_id = correlation_id
+        self.reply_to = reply_to
+        self.expiration = expiration
+        self.message_id = message_id
+        self.timestamp = time.time()
+        self.type = type
+        self.user_id = user_id
+        self.app_id = app_id
+        self.cluster_id = cluster_id
+
+    def add_child(self, child):
+        self.children.append(child)
+
+    @property
+    def weight(self):
+        return len(self.children)
+
+    def _ser_header(self):
+        yield pack('>HHQH', 60, self.weight, len(self.content), ((2**14)-1) << 2)
+
+        yield pack('>B%ssB%ss' % (len(self.content_type),len(self.content_encoding)),
+        len(self.content_type), self.content_type,
+        len(self.content_encoding), self.content_encoding)
+
+        yield make_field_table(self.headers)
+
+        yield pack('>BBB%ssB%ssB%ssB%ssQB%ssB%ssB%ssB%ss' % (
+        len(self.correlation_id), len(self.reply_to),
+        len(self.expiration), len(self.message_id),
+        len(self.type), len(self.user_id),
+        len(self.app_id), len(self.cluster_id)
+        ),
+        2 if self.persistent else 1, self.priority,
+        len(self.correlation_id), self.correlation_id,
+        len(self.reply_to), self.reply_to,
+        len(self.expiration), self.expiration,
+        len(self.message_id), self.message_id,
+        self.timestamp,
+        len(self.type), self.type,
+        len(self.user_id), self.user_id,
+        len(self.app_id), self.app_id,
+        len(self.cluster_id), self.cluster_id,
+        )
+    
+    def serialize(self, chan=1):
+        '''Including all frames, children, etc.'''
+        
+
+        head = ''.join(self._ser_header())
+        yield pack('>BHL', FRAME_HEADER, chan, len(head))
+        yield head
+        yield FRAME_END 
+
+        for child in self.children:
+            yield child.serialize()
+
+        yield pack('>BHL', FRAME_BODY, chan, len(self.content))
+        yield self.content
+        yield FRAME_END
+
+    @classmethod
+    def from_stream(cls, header_frame):
+        feed = BinaryFeed(header_frame)
+        cls, weight, c_l, flags = feed.get('>HHQH')
+        assert cls == 60
+        prop_set = set(x for x in xrange(14) if (1 << (15 - x)) & flags)
+
+        kw = {}
+        if 0 in prop_set:
+            kw['content_type'] = feed.get('>%ss' % feed.get('>B'))
+        if 1 in prop_set:
+            kw['content_encoding'] = feed.get('>%ss' % feed.get('>B'))
+        if 2 in prop_set:
+            kw['headers'] = get_field_table(feed)
+        if 3 in prop_set:
+            kw['persistent'] = True if feed.get('>B') == 2 else False
+        if 4 in prop_set:
+            kw['priority'] = feed.get('>B')
+        if 5 in prop_set:
+            kw['correlation_id'] = feed.get('>%ss' % feed.get('>B'))
+        if 6 in prop_set:
+            kw['reply_to'] = feed.get('>%ss' % feed.get('>B'))
+        if 7 in prop_set:
+            kw['expiration'] = feed.get('>%ss' % feed.get('>B'))
+        if 8 in prop_set:
+            kw['message_id'] = feed.get('>%ss' % feed.get('>B'))
+        if 9 in prop_set:
+            kw['timestamp'] = feed.get('>Q')
+        if 10 in prop_set:
+            kw['type'] = feed.get('>%ss' % feed.get('>B'))
+        if 11 in prop_set:
+            kw['user_id'] = feed.get('>%ss' % feed.get('>B'))
+        if 12 in prop_set:
+            kw['app_id'] = feed.get('>%ss' % feed.get('>B'))
+        if 13 in prop_set:
+            kw['cluster_id'] = feed.get('>%ss' % feed.get('>B'))
+
+        cont = cls('', **kw)
+        cont.setup_feed(weight)
+        return cont
+
+    def setup_feed(self, weight):
+        self._current_child = None
+        self._need_children = weight
+
+    def feed(self, data):
+        if self._current_child:
+            done = self._current_child.feed(data)
+            if done:
+                self.add_child(self._current_child)
+                self._current_child = None
+        else:
+            if self.weight < self._need_children:
+                self._current_child = cont.from_stream(data)
+            else:
+                self.content = data
+                return True
+        return False
+
 #############################################
 ## Build the mapping of cls to protocol codes
 
@@ -344,27 +521,36 @@ for n, v in locals().items():
 ## Client class, pushes these over the wire
 class AMQPClient(Client):
     def _get_frame(self, ev=None):
-        frame_header = yield bytes(7)
-        typ, chan, size = unpack('>BHI', frame_header)
+        res = None
 
-        if ev:
-            payload, ev = yield bytes(size), wait(ev)
-        else:
-            payload = yield bytes(size)
+        while True:
+            frame_header = yield bytes(7)
+            typ, chan, size = unpack('>BHI', frame_header)
 
-        if payload:
-            assert (yield bytes(1)) == '\xce' # frame-end
+            if ev:
+                payload, ev = yield bytes(size), wait(ev)
+            else:
+                payload = yield bytes(size)
 
-            if typ == FRAME_METHOD:
-                yield up(self.handle_method(payload))
+            if payload:
+                assert (yield bytes(1)) == FRAME_END
 
-            elif typ == FRAME_HEADER:
-                yield up(self.handle_content_header(payload))
-
-            elif typ == FRAME_BODY:
-                yield up(self.handle_content_body(payload))
-        else:
-            yield up(None)
+                if typ == FRAME_METHOD:
+                    res = self.handle_method(payload)
+                    break
+                else:
+                    if self.current_message:
+                        done = self.current_message.feed(payload)
+                        if done:
+                            msg = self.current_message 
+                            self.current_message = None
+                            res = msg
+                            break
+                    else:
+                        self.current_message = BasicContent.from_stream(payload)
+            else:
+                break
+        yield up(res)
 
     def handle_method(self, data):
         feed = BinaryFeed(data)
@@ -377,7 +563,7 @@ class AMQPClient(Client):
         resp = method.serialized(self.access_ticket)
         yield pack('>BHI', FRAME_METHOD, chan, len(resp))
         yield resp
-        yield '\xce'
+        yield FRAME_END
 
     @call
     def get_frame(self, wakeup_event=None):
@@ -389,8 +575,15 @@ class AMQPClient(Client):
         yield self._send_method_frame(method)
         yield response(None)
 
+    @call
+    def send_content(self, cont):
+        yield cont.serialize()
+        yield response(None)
+
     def on_connect(self):
         self.access_ticket = None
+        self.current_message = None
+
         yield pack('>4sBBBB', "AMQP", 1, 1, 9, 1) # protocol header
         method = yield self._get_frame()
         assert type(method) == ConnectionStartMethod
@@ -462,14 +655,13 @@ class AMQPHub(object):
         with self.pool.connection as client:
             while True:
                 fm = (yield client.get_frame(self.wake_id))
-                if fm:
-                    yield self._handle_frame(fm)
+                
 
     def _handle_frame(self, fm):
         yield up(None)
 
     def declare_exchange(self, *args, **kw):
-        assert 'durable' not in kw, "durability or exchanges is hard coded to true with AMQPHub"
+        assert 'durable' not in kw, "durability of exchanges is hard coded to true with AMQPHub"
         kw['durable'] = True
 
         with self.pool.connection as client:
@@ -480,7 +672,7 @@ class AMQPHub(object):
             assert type(resp) == ExchangeDeclareOkMethod
 
     def declare_queue(self, *args, **kw):
-        assert 'durable' not in kw, "durability or queues is hard coded to true with AMQPHub"
+        assert 'durable' not in kw, "durability of queues is hard coded to true with AMQPHub"
         kw['durable'] = True
 
         with self.pool.connection as client:
@@ -498,6 +690,16 @@ class AMQPHub(object):
             resp = yield client.get_frame()
             assert type(resp) == QueueBindOkMethod
 
+    def pub(self, cont, *args, **kw):
+        print 'start!'
+        with self.pool.connection as client:
+            print 's!'
+            yield client.send_method_frame(
+                PublishMethod(*args, **kw)
+            )
+            print 'r!'
+            yield client.send_content(cont)
+            print 'yo!'
 
     # XXX - clear queue ahead of time, declare binding key, LISTEN ON QUEUE
 
