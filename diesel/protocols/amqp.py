@@ -373,9 +373,7 @@ class ConsumeMethod(AMQPOutMethod):
     cls = 60
     method = 20
     def __init__(self, queue_name, consumer_tag, no_local=False, no_ack=False, 
-        exclusive=False):
-
-        nowait = False
+        exclusive=False, nowait=False):
         
         self.out_fields = [
             ('H', SECURE_TICKET),
@@ -393,8 +391,8 @@ class ConsumeMethodOk(AMQPInMethod):
 class CancelMethod(AMQPOutMethod):
     cls = 60
     method = 30
-    def __init__(self, consumer_tag):
-        nowait = False
+    def __init__(self, consumer_tag, nowait=True):
+        
         
         self.out_fields = [
             ('SS', consumer_tag),
@@ -644,7 +642,6 @@ class AMQPClient(Client):
     def on_connect(self):
         self.access_ticket = None
         self.current_message = None
-        self.needs_reset = False
 
         yield pack('>4sBBBB', "AMQP", 1, 1, 9, 1) # protocol header
         method = yield self._get_frame()
@@ -730,7 +727,7 @@ class AMQPHub(object):
             yield client.open_channel() # b/c we can't reject packets!
             release(client)
 
-        if client.needs_reset:
+        if hasattr(client, 'needs_reset'):
             from diesel.app import current_app
             current_app.add_loop(Loop(g))
         else:
@@ -775,34 +772,85 @@ class AMQPHub(object):
 
     @contextmanager
     def sub(self, qs, reliable=True, exclusive=False):
-        if type(qs) is str:
+        if type(qs) not in (tuple, list, set):
             qs = [qs]
 
         with self.pool.connection as client:
-            ctag_to_qname = {}
-            started = []
-            def fetch():
-                if not started:
-                    for qname in qs:
-                        ctag = str(uuid4())
-                        ctag_to_qname[ctag] = qname
+            class Poller(object):
+                def __init__(self):
+                    self.started = False
+                    self.ctag_to_qname = {}
+                    self.qname_to_ctag = {}
+                    self.buffered = deque()
 
-                        yield client.send_method_frame(
-                            ConsumeMethod(qname, ctag, no_ack=not reliable, exclusive=exclusive)
-                            )
+                def get_non_delivery_frame(self):
+                    fm = yield client.get_frame()
+                    while type(fm) == DeliverMethod:
+                        body = (yield client.get_frame())
+                        qname = self.ctag_to_qname[fm.consumer_tag]
+                        if reliable:
+                            yield client.send_method_frame(AckMethod(fm.delivery_tag))
+                        self.buffered.append((qname, body))
                         fm = yield client.get_frame()
-                        assert type(fm) == ConsumeMethodOk
-                    started.append(True)
-                    client.needs_reset = True
+                    yield up(fm)
 
-                fm = yield client.get_frame()                  
-                if type(fm) == DeliverMethod:
-                    body = (yield client.get_frame())
-                    qname = ctag_to_qname[fm.consumer_tag]
-                    if reliable:
-                        yield client.send_method_frame(AckMethod(fm.delivery_tag))
-                    yield up((qname, body))
-                else:
-                    assert 0, ("unexpected frame on sub loop", fm)
+                def _listen(self, qname):
+                    if type(qname) is QuickBind:
+                        spec = qname
+                        qname = qname.qname
+                    else:
+                        spec = None
+                    ctag = str(uuid4())
+                    self.ctag_to_qname[ctag] = qname
+                    self.qname_to_ctag[qname] = ctag
+                    if spec:
+                        yield client.send_method_frame(
+                            QueueDeclareMethod(qname, auto_delete=True)
+                            )
+                        assert type((yield self.get_non_delivery_frame())) == QueueDeclareOkMethod
+                        
+                        yield client.send_method_frame(
+                            QueueBindMethod(qname, spec.exchange,
+                            spec.routing_key)
+                            )
+                        assert type((yield self.get_non_delivery_frame())) == QueueBindOkMethod
 
-            yield fetch
+                    yield client.send_method_frame(
+                        ConsumeMethod(qname, ctag, no_ack=not reliable, exclusive=exclusive)
+                        )
+                    fm = yield self.get_non_delivery_frame()
+                    assert type(fm) == ConsumeMethodOk
+                
+                def start(self):
+                    for qname in qs:
+                        yield self._listen(qname)
+                        self.started = True
+                        client.needs_reset = True
+
+                def fetch(self, wakeup_event=None, timeout=None):
+                    if timeout:
+                        wakeup_event = wakeup_event or str(uuid4())
+                    if not self.started:
+                        yield self.start()
+                    if self.buffered:
+                        yield up(self.buffered.popleft())
+                    else:
+                        fm = yield client.get_frame(wakeup_event, timeout)
+                        if type(fm) == DeliverMethod:
+                            body = (yield client.get_frame())
+                            qname = self.ctag_to_qname[fm.consumer_tag]
+                            if reliable:
+                                yield client.send_method_frame(AckMethod(fm.delivery_tag))
+                            yield up((qname, body))
+                        elif fm == None:
+                            yield up((None, None))
+                        else:
+                            assert 0, ("unexpected frame on sub loop", fm)
+
+            yield Poller()
+
+class QuickBind(object):
+    def __init__(self, exchange, routing_key, qname=None):
+        self.exchange = exchange
+        self.routing_key = routing_key
+        self.qname = qname or routing_key

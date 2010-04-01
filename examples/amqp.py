@@ -24,9 +24,9 @@ def send_loop():
 def recv_loop():
     print 'RECV S', time.time()
     for x in xrange(2):
-        with hub.sub('jam_q') as fetch:
+        with hub.sub('jam_q') as poll:
             for x in xrange(250):
-                q, content = yield fetch()
+                q, content = yield poll.fetch()
     print 'RECV E', time.time()
 
 a = Application()

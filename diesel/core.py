@@ -149,7 +149,7 @@ def id_gen():
         x += 1
 ids = id_gen()
 
-def print_errstack(stack, e):
+def print_errstack(stack, e=None):
     eout = lambda s: sys.stderr.write(str(s) + "\n")
     eout("=== DIESEL ERROR ===")
     if stack:
@@ -162,9 +162,10 @@ def print_errstack(stack, e):
                 eout(" .. catches %r" % c.exc_types)
         eout("")
     eout("")
-    eout(" Standard Traceback:")
-    eout("")
-    traceback.print_exception(*e)
+    if e:
+        eout(" Standard Traceback:")
+        eout("")
+        traceback.print_exception(*e)
 
 class Loop(object):
     '''A cooperative generator that represents an arbitrary piece of
@@ -176,9 +177,12 @@ class Loop(object):
         self.buffer = NoBuffer()
         from diesel.app import current_app
         self.hub = current_app.hub
+        self.app = current_app
         self.id = ids.next()
         self._wakeup_timer = None
         self.fire_handlers = {}
+        self.stack = []
+        self.current = None
 
     def __hash__(self):
         return self.id
@@ -194,31 +198,36 @@ class Loop(object):
             self.fire_handlers = {}
             handler(value)
 
+    @property
+    def fullstack(self):
+        return self.stack + [(self.current, None)]
+
     def cycle_all(self, current, error=None):
         '''Effectively flattens all iterators, providing the
         "generator stack" effect.
         '''
+        self.current = current
         last = None
         in_self_call = False
-        stack = []
+        stack = self.stack
         while True:
             try:
                 if error != None:
-                    item = current.throw(*error)
+                    item = self.current.throw(*error)
                 elif last != None:
-                    item = current.send(last)
+                    item = self.current.send(last)
                 else:
-                    item = current.next()
+                    item = self.current.next()
             except StopIteration:
                 if stack:
-                    current, _ = stack.pop()
+                    self.current, _ = stack.pop()
                 else:
                     raise
             except Exception, e:
-                errstack = stack[:] + [(current, None)]
+                errstack = self.fullstack[:] # freeze!
                 error = None
                 while stack:
-                    current, level_catch = stack.pop()
+                    self.current, level_catch = stack.pop()
                     if level_catch and \
                     filter(None, map(lambda x: isinstance(e, x), 
                     level_catch.exc_types)):
@@ -226,7 +235,7 @@ class Loop(object):
                         error = tuple(sys.exc_info()[:2])
                         break
                     else:
-                        current.close()
+                        self.current.close()
                 if not error: # no one claims to handle it
                     print_errstack(errstack, sys.exc_info())
                     raise StopIteration()
@@ -239,24 +248,24 @@ class Loop(object):
                     item = item.call
 
                 if type(item) is GeneratorType:
-                    stack.append((current, level_catch))
-                    current = item
+                    stack.append((self.current, level_catch))
+                    self.current = item
                     last = None
                 elif type(item) is call and item.client.conn == self:
                     in_self_call = True
-                    stack.append((current, level_catch))
-                    current = item.gen
+                    stack.append((self.current, level_catch))
+                    self.current = item.gen
                     last = None
                 else:
                     if type(item) is response:
                         assert stack, "Cannot return a response from main handler"
-                        current, _ = stack.pop()
+                        self.current, _ = stack.pop()
                         if in_self_call:
                             in_self_call = False
                             item = up(item.value)
                     elif type(item) is up:
                         assert stack, "Cannot return an up from main handler"
-                        current, _ = stack.pop()
+                        self.current, _ = stack.pop()
                     try:
                         last = (yield item)
                     except Exception, e:
@@ -397,7 +406,12 @@ class Loop(object):
                     assert nrets == 1, "message cannot be paired with any other yield token"
                     ret.go()
 
+                elif type(ret) is Loop:
+                    assert nrets == 1, "a Loop cannot be paired with any other yield token"
+                    self.app.add_loop(ret)
+
                 else:
+                    print_errstack(self.fullstack)
                     raise ValueError("Unknown yield token %r" % (ret,))
             if exit: 
                 break
