@@ -713,7 +713,7 @@ class AMQPHub(object):
     def __init__(self, host='127.0.0.1', port=5672, pool_size=5):
         self.host = host
         self.port = port
-        self.pool = ConnectionPool(self.make_client, lambda x: x.close(), 
+        self.pool = ConnectionPool(self.make_client, lambda x: x.request_close(), 
         pool_size=pool_size, release_callable=self.reset_client)
 
     def make_client(self):

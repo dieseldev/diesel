@@ -182,6 +182,7 @@ class Loop(object):
         self._wakeup_timer = None
         self.fire_handlers = {}
         self.stack = []
+        self.inherit_callstack = []
         self.current = None
 
     def __hash__(self):
@@ -200,7 +201,7 @@ class Loop(object):
 
     @property
     def fullstack(self):
-        return self.stack + [(self.current, None)]
+        return self.inherit_callstack + self.stack + [(self.current, None)]
 
     def cycle_all(self, current, error=None):
         '''Effectively flattens all iterators, providing the
@@ -285,12 +286,14 @@ class Loop(object):
             return real_f(tuple(real_arg))
         return f
 
-    def iterate(self, n_val=None):
+    def iterate(self, n_val=None, inherit_callstack=None):
         '''The algorithm that represents iterating over all items
         in the nested generator that represents this Loop or
         Connection.  Run whenever a generator is (re-)scheduled.
         Handles all the `yield` tokens.
         '''
+        if self.inherit_callstack:
+            self.inherit_callstack = inherit_callstack 
         #print 'iter on', self
         if self.g is None:
             return 
@@ -399,12 +402,12 @@ class Loop(object):
 
                 elif type(ret) is call:
                     assert nrets == 1, "call cannot be paired with any other yield token"
-                    ret.go(self.iterate)
+                    ret.go(self.iterate, inherit_callstack=self.fullstack)
                     exit = True
 
                 elif type(ret) is message:
                     assert nrets == 1, "message cannot be paired with any other yield token"
-                    ret.go()
+                    ret.go(inherit_callstack=self.fullstack)
 
                 elif type(ret) is Loop:
                     assert nrets == 1, "a Loop cannot be paired with any other yield token"
@@ -427,18 +430,18 @@ class Loop(object):
         self.fire_handlers = {}
         waits.clear(self)
 
-    def schedule(self, value=None):
+    def schedule(self, value=None, callstack=None):
         '''Called by another Loop--reschedule this loop so the hub will run
         it.  Used in `response` and `fire` situations.
         '''
-        self.hub.schedule(lambda: self.wake(value))
+        self.hub.schedule(lambda: self.wake(value, callstack))
 
-    def wake(self, value=None):
+    def wake(self, value=None, callstack=None):
         '''Wake up this loop.  Called by the main hub to resume a loop
         when it is rescheduled.
         '''
         self.clear_pending_events()
-        self.iterate(value)
+        self.iterate(value, callstack)
 
 class Connection(Loop):
     '''A `Loop` with an associated socket and I/O stream.

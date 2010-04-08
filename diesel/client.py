@@ -22,13 +22,13 @@ class call(object):
     def __get__(self, inst, cls):
         return call(self.f, inst)
 
-    def go(self, callback): 
+    def go(self, callback, inherit_callstack=None): 
         if callback:
             self.client.conn.callbacks.append(callback)
 
         self.client.jobs.append(self.gen)
         if self.client.waiting:
-            self.client.conn.schedule()
+            self.client.conn.schedule(callstack=inherit_callstack)
 
 class message(call):
     '''An async message on a client connection, without
@@ -112,6 +112,11 @@ class Client(object):
             self.connected = False
             self.closed = True
 
+    def request_close(self):
+        self.jobs.append(None)
+        if self.waiting:
+            self.schedule()
+
     @property
     def is_closed(self):
         return self.conn is None
@@ -133,6 +138,8 @@ class Client(object):
                         self.waiting = False
                     assert self.jobs
                     mygen = self.jobs.popleft()
+                    if mygen == None:
+                        break
                     yield mygen
                 except ConnectionClosed:
                     self.close()
