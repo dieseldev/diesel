@@ -105,7 +105,6 @@ class Client(object):
     def close(self):
         '''Close the socket to the remote host.
         '''
-        print '---CLEANUP---'
         if not self.closed:
             self.conn.shutdown()
             self.conn = None

@@ -16,7 +16,7 @@ if not base_dir.endswith('/'):
 
 assert schema == 'http', 'http only'
 
-from diesel import Application, Loop, log
+from diesel import Application, Loop, log, up
 from diesel.protocols.http import HttpClient, HttpHeaders
 
 CONCURRENCY = 10 # go easy on those apache instances!
@@ -40,7 +40,7 @@ def get_client():
     yield client.connect(host, 80)
     heads = HttpHeaders()
     heads.set('Host', host)
-    return client, heads
+    yield up( (client, heads) )
 
 def ensure_dirs(lpath):
     def g(lpath):
@@ -61,7 +61,7 @@ def follow_loop():
     global count
     global files
     count += 1
-    client, heads = get_client()
+    client, heads = yield get_client()
     while True:
         try:
             lpath = links.next()
@@ -72,14 +72,14 @@ def follow_loop():
             break
         log.info(" -> %s" % lpath )
         if client.is_closed:
-            client, heads = get_client()
+            client, heads = yield get_client()
         code, heads, body = yield client.request('GET', lpath, heads)
         write_file(lpath, body)
         files +=1
     
 def req_loop():
     global links
-    client, heads = get_client()
+    client, heads = yield get_client()
     log.info(path)
     code, heads, body = yield client.request('GET', path, heads)
     write_file(path, body)

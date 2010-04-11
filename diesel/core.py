@@ -295,10 +295,10 @@ class Loop(object):
         if self.inherit_callstack:
             self.inherit_callstack = inherit_callstack 
         #print 'iter on', self
-        if self.g is None:
-            return 
 
         while True:
+            if self.g is None:
+                return 
             try:
                 if isinstance(n_val, Exception):
                     rets = self.g.throw(n_val)
