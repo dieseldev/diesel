@@ -29,3 +29,4 @@ Maybe?
    RabbitMQ "no reject" issue?
  * Use the Queues for "sub", keep one giant listener again.
    can queues be `yield`ed?
+ * Can the whole "Loop wrapper" thing be cleaned up?
