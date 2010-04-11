@@ -26,8 +26,7 @@ def getter():
     got = 0
     while got < 100000:
         try:
-#            s = yield catch(q.get(timeout=3), QueueTimeout)
-            s = yield q.get()
+            s = yield catch(q.get(timeout=3), QueueTimeout)
         except QueueTimeout:
             log.warn("timeout before getting a value, retrying...")
             continue

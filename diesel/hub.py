@@ -23,15 +23,21 @@ class Timer(object):
     '''A timer is a promise to call some function at a future date.
     '''
     ALLOWANCE = 0.03 # If we're within 30ms, the timer is due
-    def __init__(self, interval, f, *args, **kw):
+    def __init__(self, hub, interval, f, *args, **kw):
+        self.hub = hub
         self.trigger_time = time() + interval
         self.f = f
         self.args = args
         self.kw = kw
         self.pending = True
+        self.inq = False
 
     def cancel(self):
         self.pending = False
+        if self.inq:
+            self.inq = False
+            self.hub.timers.remove(self)
+            self.hub = None
 
     def callback(self):
         '''When the external entity checks this timer and determines
@@ -39,6 +45,8 @@ class Timer(object):
         callback.
         '''
         self.pending = False
+        self.inq = False
+        self.hub = None
         return self.f(*self.args, **self.kw)
 
     @property
@@ -49,6 +57,9 @@ class Timer(object):
         sleep() delay comes back a little early, we still go.
         '''
         return (self.trigger_time - time()) < self.ALLOWANCE
+
+    def __cmp__(self, o):
+        return cmp(self.trigger_time, o.trigger_time)
 
 class _PipeWrap(object):
     def __init__(self, p):
@@ -109,12 +120,15 @@ class AbstractEventHub(object):
         handled, and timers are handled as well.
         '''
         if self.new_timers:
-            self.timers.extend(self.new_timers)
+            for tr in self.new_timers:
+                if tr.pending:
+                    tr.inq = True
+                    self.timers.append(tr)
             self.timers = deque(sorted(self.timers))
             self.new_timers = []
             
         tm = time()
-        timeout = (self.timers[0][1].trigger_time - tm) if self.timers else 1e6
+        timeout = (self.timers[0].trigger_time - tm) if self.timers else 1e6
         # epoll, etc, limit to 2^^31/1000 or OverflowError
         timeout = min(timeout, 1e6)
         if timeout < 0:
@@ -124,8 +138,8 @@ class AbstractEventHub(object):
 
         # Run timers first, to try to nail their timings
         while self.timers:
-            if self.timers[0][1].due:
-                t = self.timers.popleft()[1]
+            if self.timers[0].due:
+                t = self.timers.popleft()
                 if t.pending:
                     t.callback()
                     while self.run_now and self.run:
@@ -158,8 +172,8 @@ class AbstractEventHub(object):
     def call_later(self, interval, f, *args, **kw):
         '''Schedule a timer on the hub.
         '''
-        t = Timer(interval, f, *args, **kw)
-        self.new_timers.append((t.trigger_time, t))
+        t = Timer(self, interval, f, *args, **kw)
+        self.new_timers.append(t)
         return t
 
     def schedule(self, c):
