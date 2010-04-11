@@ -13,7 +13,7 @@
  * Watch for @call returning non-response
  * Allow .schedule calls to avoid non-yield on some decorators 
    (like: pool acquire.., or connect()... or amqp queue listen)
- * Async resolver (defer to thread atm, with a queue).. A only
+ X Async resolver (defer to thread atm, with a queue).. A only
  * Issue Warnings on import of some protocols for (WSGI, and Pipe) 
    without tests, indicating dubious production-quality code until
    tests are submitted from 3rd parties
