@@ -13,6 +13,11 @@ cache = {}
 class DNSResolutionError(Exception): pass
 
 def resolve_dns_name(name):
+    '''Given a hostname `name`, invoke the socket.gethostbyname function
+    to retreive the A (IPv4 only) record on a background thread.
+
+    Keep a cache.
+    '''
     try:
         ip, tm = cache[name]
         if time.time() - tm > DNS_CACHE_TIME:
