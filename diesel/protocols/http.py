@@ -152,7 +152,7 @@ class HttpRequest(object):
 class HttpClose(Exception): pass    
 
 class HttpServer(object):
-    '''An HTTP/1.1 implementation or a server.
+    '''An HTTP/1.1 implementation of a server.
     '''
     def __init__(self, request_handler):
         '''`request_handler` is a callable that takes

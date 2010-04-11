@@ -1,0 +1,24 @@
+* Basic hub functions:
+    * Write-ready, ready ready
+    * EAGAIN behavior with mocks
+    * Socket close
+    * Timers and callbacks
+
+* Client:
+
+* Util
+    * Pool, client failure, release vs. reclaim
+    * Queue, callback patterns
+
+* Core
+    * Generator stack behavior
+    * Stack trace output
+    * bytes(), until() behavior and combinations
+    * sleep(), and combinations
+    * @call into 
+    * defer to thread behavior
+    * fire and wait
+    * connections vs. loops
+    * loops not using connection-specific things
+    * run tests over tls too--both client and server
+    * yielding loops, multiple loops, etc
