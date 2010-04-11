@@ -1,9 +1,0 @@
-  * Track generator stack from loops or services
-  * Update examples to use log instead of print
-  * Write tests
-
-Future
-  * Test/fix WSGI stuff
-  * Error handling and callback existence, response/no response conventions, client
-  * Exception handling in the stack.. doesn't work well!
-  * Docstring update

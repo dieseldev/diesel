@@ -1,0 +1,14 @@
+ * Tests
+ * Memory leak checks on load of various kinds, protocols, etc
+ * Client traceback niceties
+ * More client/pool failure mode investigation
+ * Docs of diesel patterns etc
+ * More helpers, ala queue?  Async-like patterns outlined?  yield Loop, wait or bytes
+ * AMQP helpers to make RPC-ish patterns easier
+ * AMQP - wrap up a few more messages in (failures, etc) and doc completeness
+ * Protocols: Tests for HTTP, mongodb, redis, AMQP
+ * Update docstrings and website docs
+
+Maybe?
+ * Strings--out(..) wrapper?
+ * Handling iter vs. non-iter more elegantly
