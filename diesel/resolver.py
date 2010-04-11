@@ -1,3 +1,7 @@
+'''Fetches the A record for a given name on a background thread, keeps
+a cache.
+'''
+
 import time
 import socket
 from diesel import up, catch, thread

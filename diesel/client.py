@@ -84,7 +84,10 @@ class Client(object):
     def _real_connect(self):
         '''Connect to a remote host.
         '''
-        remote_addr = (self.addr, self.port)
+        from resolver import resolve_dns_name
+
+        ip = yield resolve_dns_name(self.addr)
+        remote_addr = (ip, self.port)
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.setblocking(0)
         def _run():
