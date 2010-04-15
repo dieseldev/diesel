@@ -122,13 +122,16 @@ class RedisClient(Client):
             resp = []
             for x in xrange(count):
                 hl = yield until_eol()
-                assert hl[0] == '$'
-                l = int(hl[1:])
-                if l == -1:
-                    resp.append(None)
-                else:
-                    resp.append( (yield bytes(l) ) )
-                    yield until_eol() # noop
+                assert hl[0] in ['$', ':']
+                if hl[0] == '$':
+                    l = int(hl[1:])
+                    if l == -1:
+                        resp.append(None)
+                    else:
+                        resp.append( (yield bytes(l) ) )
+                        yield until_eol() # noop
+                elif hl[0] == ':':
+                    resp.append(int(hl[1:]))
             yield up(resp)
         elif c == ':':
             yield up(int(fl[1:]))
