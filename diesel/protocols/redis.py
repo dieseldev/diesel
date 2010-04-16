@@ -1,5 +1,5 @@
 from diesel import Client, call, response, until, until_eol, bytes, up
-import time
+import itertools, time
 
 class RedisError(Exception): pass
 
