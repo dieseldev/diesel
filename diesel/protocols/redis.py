@@ -1,21 +1,16 @@
 from diesel import Client, call, response, until, until_eol, bytes, up
 import time
+import operator as op
+
+def flatten_pairs(l):
+    o = []
+    for i in l:
+        o.extend(i)
+    return o
 
 class RedisError(Exception): pass
 
 class RedisClient(Client):
-    @call
-    def set(self, k, v):
-        yield self._send_bulk('SET', str(v), k)
-        resp = yield self._get_response()
-        yield response(resp)
-
-    @call
-    def get(self, k):
-        yield self._send('GET', k)
-        resp = yield self._get_response()
-        yield response(resp)
-
     @call
     def exists(self, k):
         yield self._send('EXISTS', k)
@@ -85,22 +80,82 @@ class RedisClient(Client):
         resp = yield self._get_response()
         yield response(resp)
 
-    def _send_bulk(self, cmd, data, *args):
+    @call
+    def move(self, key, idx):
+        yield self._send('MOVE', key, str(idx))
+        resp = yield self._get_response()
+        yield response(resp)
+
+    @call
+    def flushdb(self):
+        yield self._send('FLUSHDB')
+        resp = yield self._get_response()
+        yield response(resp)
+
+    @call
+    def flushall(self):
+        yield self._send('FLUSHALL')
+        resp = yield self._get_response()
+        yield response(resp)
+
+    @call
+    def set(self, k, v):
+        yield self._send_bulk('SET', str(v), k)
+        resp = yield self._get_response()
+        yield response(resp)
+
+    @call
+    def get(self, k):
+        yield self._send('GET', k)
+        resp = yield self._get_response()
+        yield response(resp)
+
+    @call
+    def getset(self, k, v):
+        yield self._send_bulk('GETSET', str(v), k)
+        resp = yield self._get_response()
+        yield response(resp)
+
+    @call
+    def mget(self, keylist):
+        yield self._send('MGET', list=keylist)
+        resp = yield self._get_response()
+        yield response(resp)
+
+    @call
+    def setnx(self, k, v):
+        yield self._send_bulk('SETNX', str(v), k)
+        resp = yield self._get_response()
+        yield response(resp)
+
+    @call
+    def mset(self, d):
+        yield self._send_bulk_multi('MSET', list=flatten_pairs(d.iteritems()))
+        resp = yield self._get_response()
+        yield response(resp)
+
+    def _send_bulk(self, cmd, data, *args, **kwargs):
+        if 'list' in kwargs:
+            args = kwargs['list']
         yield '%s %s%s\r\n' % (cmd, 
         (' '.join(args) + ' ') if args else '', len(data))
 
         yield data
         yield '\r\n'
 
-    def _send_bulk_multi(self, cmd, *args):
-        all = (cmd,) + args
+    def _send_bulk_multi(self, cmd, *args, **kwargs):
+        if 'list' in kwargs:
+            args = kwargs['list']
+        all = (cmd,) + tuple(args)
         yield '*%s\r\n' % len(all)
         for i in all:
             yield '$%s\r\n' % len(i)
             yield i
             yield '\r\n'
 
-    def _send(self, cmd, *args):
+    def _send(self, cmd, *args, **kwargs):
+        if 'list' in kwargs:
+            args = kwargs['list']
         yield '%s%s\r\n' % (cmd, 
         (' ' + ' '.join(args)) if args else '')
 
@@ -158,6 +213,11 @@ if __name__ == '__main__':
         print (yield r.rename('bar', 'foo'))
         print (yield r.dbsize())
         print (yield r.ttl('foo'))
+        yield r.set("one", "two")
+        print 'sets!'
+        print (yield r.mget(["one", "foo"]))
+        print (yield r.mset({"one" : "three", "foo":  "four"}))
+        print (yield r.mget(["one", "foo"]))
         print 'done!'
 
     a = Application()
