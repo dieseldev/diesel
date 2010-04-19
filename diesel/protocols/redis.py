@@ -3,15 +3,18 @@ import time
 import operator as op
 import itertools
 
-def flatten_pairs(l):
+def flatten_arg_pairs(l):
     o = []
     for i in l:
         o.extend(i)
-    return o
+    return map(str, o)
 
 class RedisError(Exception): pass
 
 class RedisClient(Client):
+
+    ##################################################
+    ### GENERAL OPERATIONS
     @call
     def exists(self, k):
         yield self._send('EXISTS', k)
@@ -28,7 +31,6 @@ class RedisClient(Client):
     def keys(self, pat):
         yield self._send('KEYS', pat)
         resp = yield self._get_response()
-        resp = [] if not resp else resp.split(' ')
         yield response(resp)
 
     @call
@@ -97,6 +99,8 @@ class RedisClient(Client):
         resp = yield self._get_response()
         yield response(resp)
 
+    ##################################################
+    ### STRING OPERATIONS
     @call
     def set(self, k, v):
         yield self._send_bulk('SET', str(v), k)
@@ -129,7 +133,149 @@ class RedisClient(Client):
 
     @call
     def mset(self, d):
-        yield self._send_bulk_multi('MSET', list=flatten_pairs(d.iteritems()))
+        yield self._send_bulk_multi('MSET', list=flatten_arg_pairs(d.iteritems()))
+        resp = yield self._get_response()
+        yield response(resp)
+
+    @call
+    def msetnx(self, d):
+        yield self._send_bulk_multi('MSETNX', list=flatten_arg_pairs(d.iteritems()))
+        resp = yield self._get_response()
+        yield response(resp)
+
+    @call
+    def incr(self, k):
+        yield self._send('INCR', k)
+        resp = yield self._get_response()
+        yield response(resp)
+
+    @call
+    def incrby(self, k, amt):
+        yield self._send('INCRBY', k, str(amt))
+        resp = yield self._get_response()
+        yield response(resp)
+
+    @call
+    def decr(self, k):
+        yield self._send('DECR', k)
+        resp = yield self._get_response()
+        yield response(resp)
+
+    @call
+    def decrby(self, k, amt):
+        yield self._send('DECRBY', k, str(amt))
+        resp = yield self._get_response()
+        yield response(resp)
+
+    ##################################################
+    ### LIST OPERATIONS
+    @call
+    def rpush(self, k, v):
+        yield self._send_bulk('RPUSH', str(v), k)
+        resp = yield self._get_response()
+        yield response(resp)
+
+    @call
+    def lpush(self, k, v):
+        yield self._send_bulk('LPUSH', str(v), k)
+        resp = yield self._get_response()
+        yield response(resp)
+
+    @call
+    def llen(self, k):
+        yield self._send('LLEN', k)
+        resp = yield self._get_response()
+        yield response(resp)
+
+    @call
+    def lrange(self, k, start, end):
+        yield self._send('LRANGE', k, str(start), str(end))
+        resp = yield self._get_response()
+        yield response(resp)
+
+    @call
+    def ltrim(self, k, start, end):
+        yield self._send('LTRIM', k, str(start), str(end))
+        resp = yield self._get_response()
+        yield response(resp)
+
+    @call
+    def lindex(self, k, idx):
+        yield self._send('LINDEX', k, str(idx))
+        resp = yield self._get_response()
+        yield response(resp)
+
+    @call
+    def lset(self, k, idx, v):
+        yield self._send_bulk('LSET', str(v), k, str(idx))
+        resp = yield self._get_response()
+        yield response(resp)
+
+    @call
+    def lrem(self, k, v, count=0):
+        yield self._send_bulk('LREM', str(v), k, str(count))
+        resp = yield self._get_response()
+        yield response(resp)
+
+    @call
+    def lpop(self, k):
+        yield self._send('LPOP', k)
+        resp = yield self._get_response()
+        yield response(resp)
+
+    @call
+    def rpop(self, k):
+        yield self._send('RPOP', k)
+        resp = yield self._get_response()
+        yield response(resp)
+
+    @call
+    def blpop(self, keylist, timeout=0):
+        yield self._send('BLPOP', list=list(keylist) + [str(timeout)])
+        resp = yield self._get_response()
+        if resp:
+            assert len(resp) == 2
+            resp = tuple(resp)
+        yield response(resp)
+
+    @call
+    def brpop(self, keylist, timeout=0):
+        yield self._send('BRPOP', list=list(keylist) + [str(timeout)])
+        resp = yield self._get_response()
+        if resp:
+            assert len(resp) == 2
+            resp = tuple(resp)
+        yield response(resp)
+
+    @call
+    def rpoplpush(self, src, dest):
+        yield self._send('RPOPLPUSH', src, dest)
+        resp = yield self._get_response()
+        yield response(resp)
+
+    @call
+    def sort(self, key, pattern=None, limit=None,
+    get=None, order='ASC', alpha=False, store=None):
+        
+        args = [key]
+        if pattern:
+            args += ['BY', pattern]
+
+        if limit:
+            args += ['LIMIT'] + list(limit)
+
+        if get:
+            args += ['GET', get]
+
+        args += [order]
+
+        if alpha:
+            args += 'ALPHA'
+
+        if store:
+            args += ['STORE', store]
+
+        yield self._send('SORT', *args)
         resp = yield self._get_response()
         yield response(resp)
 
@@ -283,6 +429,69 @@ if __name__ == '__main__':
         print (yield r.mget(["one", "foo"]))
         print (yield r.mset({"one" : "three", "foo":  "four"}))
         print (yield r.mget(["one", "foo"]))
+
+        print '--INCR--'
+        print (yield r.incr("counter"))
+        print (yield r.get('counter'))
+        print (yield r.incr("counter"))
+        print (yield r.get('counter'))
+        print (yield r.incrby("counter", 2))
+        print (yield r.get('counter'))
+
+        print '--DECR--'
+        print (yield r.decr("counter"))
+        print (yield r.get('counter'))
+        print (yield r.decr("counter"))
+        print (yield r.get('counter'))
+        print (yield r.decrby("counter", 2))
+        print (yield r.get('counter'))
+
+        print '--LISTS--'
+        print (yield r.rpush("ml", 5))
+        print (yield r.lpush("ml", 1))
+        print (yield r.lrange("ml", 0, 500))
+        print (yield r.llen("ml"))
+
+        print (yield r.ltrim("ml", 1, 3))
+
+        print (yield r.lrange("ml", 0, 500))
+        print (yield r.lset("ml", 0, 'nifty!'))
+
+        print (yield r.lindex("ml", 0))
+
+        print (yield r.lrem("ml", 'nifty!'))
+
+        print (yield r.lrange("ml", 0, 500))
+
+        print (yield r.rpush("ml", 'yes!'))
+        print (yield r.rpush("ml", 'no!'))
+        print (yield r.lrange("ml", 0, 500))
+
+        print (yield r.lpop("ml"))
+        print (yield r.rpop("ml"))
+
+        print (yield r.lrange("ml", 0, 500))
+        print (yield r.blpop(['ml'], 3))
+        print (yield r.rpush("ml", 'yes!'))
+        print (yield r.rpush("ml", 'no!'))
+        print (yield r.blpop(['ml'], 3))
+        print (yield r.blpop(['ml'], 3))
+
+        print '-- rotation --'
+        print (yield r.rpush("ml", 'yes!'))
+        print (yield r.rpush("ml", 'no!'))
+        print (yield r.rpush("ml2", 'one!'))
+        print (yield r.rpush("ml2", 'two!'))
+        print '-- before --'
+        print (yield r.lrange("ml", 0, 500))
+        print (yield r.lrange("ml2", 0, 500))
+        print (yield r.rpoplpush("ml", "ml2"))
+        print '-- after --'
+        print (yield r.lrange("ml", 0, 500))
+        print (yield r.lrange("ml2", 0, 500))
+
+        print (yield r.sort("ml2"))
+
         print 'done!'
 
     a = Application()
