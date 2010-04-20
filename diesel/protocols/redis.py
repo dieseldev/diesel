@@ -236,6 +236,8 @@ class RedisClient(Client):
         if resp:
             assert len(resp) == 2
             resp = tuple(resp)
+        else:
+            resp = None
         yield response(resp)
 
     @call
@@ -245,6 +247,8 @@ class RedisClient(Client):
         if resp:
             assert len(resp) == 2
             resp = tuple(resp)
+        else:
+            resp = None
         yield response(resp)
 
     @call
