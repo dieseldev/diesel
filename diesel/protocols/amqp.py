@@ -577,7 +577,6 @@ for n, v in locals().items():
 ###########################################
 ## Client class, pushes these over the wire
 class AMQPClient(Client):
-    COMMAND_CHANNEL = 1
     def _get_frame(self, ev=None, timeout=None):
         res = None
 
@@ -618,14 +617,10 @@ class AMQPClient(Client):
         cls = method_table[(class_id, method_id)]
         return cls(feed)
 
-    @call
-    def send_method_frame(self, method, channel=0):
-        yield self._send_method_frame(method, channel)
-        yield response(None)
-
-    def _send_method_frame(self, method, channel=0):
+    def _send_method_frame(self, method):
+        chan = 0 if method.cls == 10 else 1
         resp = method.serialized(self.access_ticket)
-        yield pack('>BHI', FRAME_METHOD, channel, len(resp))
+        yield pack('>BHI', FRAME_METHOD, chan, len(resp))
         yield resp
         yield FRAME_END
 
@@ -633,6 +628,11 @@ class AMQPClient(Client):
     def get_frame(self, wakeup_event=None, timeout=None):
         frame = yield self._get_frame(wakeup_event, timeout)
         yield response(frame)
+
+    @call
+    def send_method_frame(self, method):
+        yield self._send_method_frame(method)
+        yield response(None)
 
     @call
     def send_content(self, cont):
@@ -673,17 +673,16 @@ class AMQPClient(Client):
         )
         method = yield self._get_frame()
         assert type(method) == ConnectionOpenOkMethod
-        yield self._open_channel(self.COMMAND_CHANNEL)
+        yield self._open_channel()
     
     @call
-    def open_channel(self, chan):
-        yield self._open_channel(chan)
+    def open_channel(self):
+        yield self._open_channel()
         yield response(None)
 
-    def _open_channel(self, chan):
+    def _open_channel(self):
         yield self._send_method_frame(
-        ChannelOpenMethod(),
-        channel=chan,
+        ChannelOpenMethod()
         )
 
         method = yield self._get_frame()
