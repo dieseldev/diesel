@@ -13,9 +13,13 @@ def flatten_arg_pairs(l):
         o.extend(i)
     return map(str, o)
 
+REDIS_PORT = 6379
+
 class RedisError(Exception): pass
 
 class RedisClient(Client):
+    def connect(self, host='localhost', port=REDIS_PORT, *args, **kw):
+        yield Client.connect(self, host, port, *args, **kw)
 
     ##################################################
     ### GENERAL OPERATIONS
@@ -504,7 +508,7 @@ if __name__ == '__main__':
     from diesel import Application, Loop
     def do_set():
         r = RedisClient()
-        yield r.connect('localhost', 6379)
+        yield r.connect()
 
         for x in xrange(5000):
             yield r.set('foo', 'bar')
@@ -623,9 +627,9 @@ if __name__ == '__main__':
     a.run()
 
 #########################################
-## Hub, an abstraction of pub-sub behavior, etc
+## Hub, an abstraction of sub behavior, etc
 class RedisSubHub(object):
-    def __init__(self, host='127.0.0.1', port=6379):
+    def __init__(self, host='127.0.0.1', port=REDIS_PORT):
         self.host = host
         self.port = port
         self.sub_wake_signal = uuid.uuid4().hex

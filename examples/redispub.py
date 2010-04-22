@@ -8,7 +8,7 @@ import time, sys
 
 def send_loop():
     c = RedisClient()
-    yield c.connect('localhost', 6379)
+    yield c.connect()
     yield sleep(1)
 
     print 'SEND S', time.time()
@@ -18,10 +18,9 @@ def send_loop():
 
     print 'SEND E', time.time()
 
-def recv_loop():
-    hub = RedisSubHub()
-    yield Loop(hub) # start up the sub loop
+hub = RedisSubHub()
 
+def recv_loop():
     print 'RECV S', time.time()
     with hub.sub('foo') as poll:
         for x in xrange(500):
@@ -29,8 +28,10 @@ def recv_loop():
     print 'RECV E', time.time()
 
 a = Application()
+a.add_loop(Loop(hub)) # start up the sub loop
 if 'send' in sys.argv:
     a.add_loop(Loop(send_loop))
 if 'recv' in sys.argv:    
+    a.add_loop(Loop(recv_loop))
     a.add_loop(Loop(recv_loop))
 a.run()
