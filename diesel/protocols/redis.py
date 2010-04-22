@@ -257,6 +257,98 @@ class RedisClient(Client):
         resp = yield self._get_response()
         yield response(resp)
 
+    ##################################################
+    ### SET OPERATIONS
+    @call
+    def sadd(self, k, v):
+        yield self._send_bulk('SADD', str(v), k)
+        resp = yield self._get_response()
+        yield response(resp)
+
+    @call
+    def srem(self, k, v):
+        yield self._send_bulk('SREM', str(v), k)
+        resp = yield self._get_response()
+        yield response(resp)
+
+    @call
+    def spop(self, k):
+        yield self._send('SPOP', k)
+        resp = yield self._get_response()
+        yield response(resp)
+
+    @call
+    def smove(self, src, dst, v):
+        yield self._send_bulk('SMOVE', str(v), src, dst)
+        resp = yield self._get_response()
+        yield response(resp)
+
+    @call
+    def scard(self, k):
+        yield self._send('SCARD', k)
+        resp = yield self._get_response()
+        yield response(resp)
+
+    @call
+    def sismember(self, k, v):
+        yield self._send_bulk('SISMEMBER', str(v), k)
+        resp = yield self._get_response()
+        yield response(bool(resp))
+
+    @call
+    def sinter(self, keylist):
+        yield self._send('SINTER', list=keylist)
+        resp = yield self._get_response()
+        yield response(set(resp))
+
+    @call
+    def sinterstore(self, dst, keylist):
+        flist = [dst] + list(keylist)
+        yield self._send('SINTERSTORE', list=flist)
+        resp = yield self._get_response()
+        yield response(resp)
+
+    @call
+    def sunion(self, keylist):
+        yield self._send('SUNION', list=keylist)
+        resp = yield self._get_response()
+        yield response(set(resp))
+
+    @call
+    def sunionstore(self, dst, keylist):
+        flist = [dst] + list(keylist)
+        yield self._send('SUNIONSTORE', list=flist)
+        resp = yield self._get_response()
+        yield response(resp)
+
+    @call
+    def sdiff(self, keylist):
+        yield self._send('SDIFF', list=keylist)
+        resp = yield self._get_response()
+        yield response(set(resp))
+
+    @call
+    def sdiffstore(self, dst, keylist):
+        flist = [dst] + list(keylist)
+        yield self._send('SDIFFSTORE', list=flist)
+        resp = yield self._get_response()
+        yield response(resp)
+
+    @call
+    def smembers(self, key):
+        yield self._send('SMEMBERS', key)
+        resp = yield self._get_response()
+        yield response(set(resp))
+
+    @call
+    def srandmember(self, key):
+        yield self._send('SRANDMEMBER', key)
+        resp = yield self._get_response()
+        yield response(resp)
+
+    
+    ##################################################
+    ### Sorting...
     @call
     def sort(self, key, pattern=None, limit=None,
     get=None, order='ASC', alpha=False, store=None):
@@ -495,6 +587,32 @@ if __name__ == '__main__':
         print (yield r.lrange("ml2", 0, 500))
 
         print (yield r.sort("ml2"))
+
+        print '-- SETS --'
+
+        print (yield r.sadd("s1", "one"))
+        print (yield r.sadd("s1", "two"))
+        print (yield r.sadd("s1", "three"))
+        print (yield r.srem("s1", "three"))
+        print (yield r.srem("s1", "three"))
+
+        print (yield r.smove("s1", "s2", "one"))
+        print (yield r.spop("s2"))
+        print (yield r.scard("s1"))
+
+        print (yield r.sismember("s1", "two"))
+        print (yield r.sismember("s1", "one"))
+
+        yield r.sadd("s1", "four")
+        yield r.sadd("s2", "four")
+        print (yield r.sinter(["s1", "s2"]))
+        print (yield r.sinterstore("s3", ["s1", "s2"]))
+
+        print (yield r.sunion(["s1", "s2"]))
+        print (yield r.sunionstore("s3", ["s1", "s2"]))
+
+        print (yield r.smembers("s3"))
+        print (yield r.srandmember("s3"))
 
         print 'done!'
 
