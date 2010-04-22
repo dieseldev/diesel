@@ -119,6 +119,9 @@ class AbstractEventHub(object):
         timer.  When epoll returns, all fd-related events (if any) are
         handled, and timers are handled as well.
         '''
+        while self.run_now and self.run:
+            self.run_now.popleft()()
+
         if self.new_timers:
             for tr in self.new_timers:
                 if tr.pending:

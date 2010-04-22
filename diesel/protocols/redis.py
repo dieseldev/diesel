@@ -1,7 +1,11 @@
-from diesel import Client, call, response, until, until_eol, bytes, up
+from contextlib import contextmanager
+from diesel import (Client, call, response, until, until_eol, bytes, 
+                    up, fire, wait, ConnectionClosed, catch)
+from diesel.util.queue import Queue
 import time
 import operator as op
 import itertools
+import uuid
 
 def flatten_arg_pairs(l):
     o = []
@@ -378,54 +382,45 @@ class RedisClient(Client):
     @call
     def subscribe(self, *channels):
         '''Subscribe to the given channels.
-        
-        Returns the number of channels this client is currently subscribed to.
-        
-        NOTE: You probably shouldn't run multiple subscribe commands, because
-              between the time you run the first and the time you run the next
-              a published message may come in which will mess up the response
-              to the subscribe command (and cause you to lose a message).
+
+        Note: assumes subscriptions succeed
         '''
-        if not channels:
-            yield response(None)
-        else:
-            yield self._send('SUBSCRIBE', *channels)
-            for channel in channels:
-                s, c, n = yield self._get_response()
-            yield response(n)
+        yield self._send('SUBSCRIBE', *channels)
+        yield response(None)
 
     @call
     def unsubscribe(self, *channels):
         '''Unsubscribe from the given channels, or all of them if none are given.
-        
-        Returns the number of channels this client is still subscribed to.
-        
-        NOTE: This is not really working.  A published message may come in before
-              the unsubscribe command's response and mess things up.  This is
-              something we'll need to fix.
+
+        Note: assumes subscriptions don't succeed
         '''
         yield self._send('UNSUBSCRIBE', *channels)
-        
-        resp_iter = xrange(len(channels)) if channels else itertools.cycle([None])
-        for _ in resp_iter:
-            s, c, n = yield self._get_response()
-            if not n:
-                break
-        yield response(n)
+        yield response(None)
 
     @call
-    def get_from_subscriptions(self):
+    def get_from_subscriptions(self, wake_sig=None):
         '''Wait for a published message on a subscribed channel.
         
         Returns a tuple consisting of:
         
             * The channel the message was received from.
             * The message itself.
+
+        -- OR -- None, if wake_sig was fired
         
         NOTE: The message will always be a string.  Handle this as you see fit.
+        NOTE: subscribe/unsubscribe acks are ignored here
         '''
-        m, channel, payload = yield self._get_response()
-        yield response((channel, payload))
+        m = None
+        while m != 'message':
+            r = yield self._get_response(wake_sig)
+            if r:
+                m, channel, payload = r
+                repl = channel, payload
+            else:
+                repl = None
+
+        yield response(repl)
 
     @call
     def publish(self, channel, message):
@@ -463,8 +458,15 @@ class RedisClient(Client):
         yield '%s%s\r\n' % (cmd, 
         (' ' + ' '.join(args)) if args else '')
 
-    def _get_response(self):
-        fl = (yield until_eol()).strip()
+    def _get_response(self, wake_sig=None):
+        if wake_sig:
+            raw, wk = yield (until_eol(), wait(wake_sig))
+            if not raw:
+                yield up(None)
+            fl = raw.strip()
+        else:
+            fl = (yield until_eol()).strip()
+
         c = fl[0]
         if c == '+':
             yield up(fl[1:])
@@ -619,3 +621,97 @@ if __name__ == '__main__':
     a = Application()
     a.add_loop(Loop(do_set))
     a.run()
+
+#########################################
+## Hub, an abstraction of pub-sub behavior, etc
+class RedisSubHub(object):
+    def __init__(self, host='127.0.0.1', port=6379):
+        self.host = host
+        self.port = port
+        self.sub_wake_signal = uuid.uuid4().hex
+        self.sub_adds = []
+        self.sub_rms = []
+
+    def make_client(self):
+        client = RedisClient()
+        yield client.connect(self.host, self.port)
+        yield up( client )
+
+    def sub_loop(self, conn, subs):
+        if subs:
+            yield conn.subscribe(list(subs))
+        while True:
+            new = rm = None
+            if self.sub_adds:
+                sa = self.sub_adds[:]
+                self.sub_adds = []
+                new = set()
+                for k, q in sa:
+                    if k not in subs:
+                        new.add(k)
+                        subs[k] = set([q])
+                    else:
+                        subs[k].add(q)
+                if new:
+                    yield conn.subscribe(*new)
+
+            if self.sub_rms:
+                sr = self.sub_rms[:]
+                self.sub_rms = []
+                rm = set()
+                for k, q in sr:
+                    subs[k].remove(q)
+                    if not subs[k]:
+                        del subs[k]
+                        rm.add(k)
+                if rm:
+                    yield conn.unsubscribe(*rm)
+
+            if not self.sub_rms and not self.sub_adds:
+                r = yield conn.get_from_subscriptions(self.sub_wake_signal)
+                if r:
+                    cls, msg = r
+                    if cls in subs:
+                        for q in subs[cls]:
+                            yield q.put((cls, msg))
+
+    def __call__(self):
+        subs = {}
+        while True:
+            conn = yield self.make_client()
+            try:
+                yield catch(self.sub_loop(conn, subs), ConnectionClosed)
+            except ConnectionClosed:
+                traceback.print_exc()
+
+    @contextmanager
+    def sub(self, classes):
+        if type(classes) not in (set, list, tuple):
+            classes = [classes]
+
+        hb = self
+        q = Queue()
+        class Poller(object):
+            def __init__(self):
+                self.started = False
+
+            def start(self):
+                self.started = True
+                for cls in classes:
+                    hb.sub_adds.append((cls, q))
+
+                yield fire(hb.sub_wake_signal)
+        
+            def fetch(self):
+                if not self.started:
+                    yield self.start()
+                qn, msg = yield q.get()
+                yield up((qn, msg))
+
+            def close(self):
+                for cls in classes:
+                    hb.sub_rms.append((cls, q))
+
+        pl = Poller()
+        yield pl
+        pl.close()
