@@ -66,9 +66,11 @@ class HttpHeaders(object):
 
     Parsing, modifying, formatting, etc.
     '''
-    def __init__(self):
+    def __init__(self, **kw):
         self._headers = defaultdict(list)
         self.link()
+        for k, v in kw.iteritems():
+            self.set(k, v)
 
     def add(self, k, v):
         self._headers[k.lower()].append(str(v).strip())
