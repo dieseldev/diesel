@@ -19,7 +19,7 @@ class RedisError(Exception): pass
 
 class RedisClient(Client):
     def connect(self, host='localhost', port=REDIS_PORT, *args, **kw):
-        yield Client.connect(self, host, port, *args, **kw)
+        return Client.connect(self, host, port, *args, **kw)
 
     ##################################################
     ### GENERAL OPERATIONS
