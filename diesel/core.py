@@ -29,6 +29,12 @@ class ClientConnectionClosed(socket.error):
     '''
     pass
 
+class LoopKeepAlive(Exception):
+    '''Raised when an exception occurs that causes a loop to terminate;
+    allows the app to re-schedule keep_alive loops.
+    '''
+    pass
+
 CRLF = '\r\n'
 BUFSIZ = 2 ** 14
 
@@ -171,22 +177,34 @@ class Loop(object):
     '''A cooperative generator that represents an arbitrary piece of
     logic.
     '''
+    RUNNING, ENDED_NORMAL, ENDED_EXCEPTION = range(3)
     def __init__(self, loop_callable, *callable_args):
-        self.g = self.cycle_all(loop_callable(*callable_args))
-        self.pipeline = NoPipeline()
-        self.buffer = NoBuffer()
+        self.loop_callable = loop_callable
+        self.callable_args = callable_args
+        self.keep_alive = False
         from diesel.app import current_app
         self.hub = current_app.hub
         self.app = current_app
         self.id = ids.next()
+        self.reset()
+
+    def reset(self):
+        self.g = self.cycle_all(self.loop_callable(*self.callable_args))
+        self.pipeline = NoPipeline()
+        self.buffer = NoBuffer()
         self._wakeup_timer = None
         self.fire_handlers = {}
         self.stack = []
         self.inherit_callstack = []
         self.current = None
+        self.state = self.RUNNING
 
     def __hash__(self):
         return self.id
+
+    def __str__(self):
+        return '<Loop id=%s callable=%s>' % (self.id,
+        str(self.callable_args))
 
     def __eq__(self, other):
         return other.id == self.id
@@ -223,6 +241,7 @@ class Loop(object):
                 if stack:
                     self.current, _ = stack.pop()
                 else:
+                    self.state = self.ENDED_NORMAL
                     raise
             except Exception, e:
                 errstack = self.fullstack[:] # freeze!
@@ -239,7 +258,11 @@ class Loop(object):
                         self.current.close()
                 if not error: # no one claims to handle it
                     print_errstack(errstack, sys.exc_info())
-                    raise StopIteration()
+                    self.state = self.ENDED_EXCEPTION
+                    if self.keep_alive:
+                        raise LoopKeepAlive()
+                    else:
+                        raise StopIteration()
             else:
                 level_catch = None
                 error = None
@@ -415,6 +438,7 @@ class Loop(object):
 
                 else:
                     print_errstack(self.fullstack)
+                    self.state = self.ENDED_EXCEPTION
                     raise ValueError("Unknown yield token %r" % (ret,))
             if exit: 
                 break

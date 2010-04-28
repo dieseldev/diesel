@@ -7,7 +7,7 @@ import errno
 
 from diesel.hub import EventHub
 from diesel import logmod, log
-from diesel import Connection
+from diesel import Connection, LoopKeepAlive
 from diesel.security import ssl_async_handshake
 
 current_app = None
@@ -47,8 +47,9 @@ class Application(object):
             s.bind_and_listen()
             self.hub.register(s.sock, s.accept_new_connection, None,
                 self.global_bail("low-level socket error on bound service"))
+
         for l in self._loops:
-            l.iterate()
+            self.hub.schedule(l.iterate)
 
         self.setup()
         while self._run:
@@ -61,8 +62,14 @@ class Application(object):
                 log.warn("-- KeyboardInterrupt raised.. exiting main loop --")
                 break
             except Exception, e:
-                log.error("-- Unhandled Exception in main loop --")
-                log.error(traceback.format_exc())
+                if type(e) != LoopKeepAlive:
+                    log.error("-- Unhandled Exception rose to main loop --")
+                    log.error(traceback.format_exc())
+                for l in self._loops:
+                    if l.keep_alive and l.state == l.ENDED_EXCEPTION:
+                        log.error("-- Keep-Alive loop %s being restarted --" % l)
+                        l.reset()
+                        self.hub.schedule(l.iterate)
 
         log.info('Ending diesel application')
 
@@ -84,12 +91,14 @@ class Application(object):
         else:
             self._services.append(service)
 
-    def add_loop(self, loop, front=False):
+    def add_loop(self, loop, front=False, keep_alive=False):
         '''Add a Loop instance to this Application.
 
         The loop will be started when the Application is run().
         '''
-        loop.application = self
+        if keep_alive:
+            loop.keep_alive = True
+
         if self._run:
             self.hub.schedule(loop.iterate)
         else:
