@@ -661,7 +661,6 @@ class RedisSubHub(object):
                     else:
                         subs[k].add(q)
                 if new:
-                    print 'adding sub', new
                     yield conn.subscribe(*new)
 
             if self.sub_rms:
@@ -677,7 +676,6 @@ class RedisSubHub(object):
                     yield conn.unsubscribe(*rm)
 
             if not self.sub_rms and not self.sub_adds:
-                print 'sleeping for sub', self.sub_wake_signal
                 r = yield conn.get_from_subscriptions(self.sub_wake_signal)
                 if r:
                     cls, msg = r
@@ -701,7 +699,6 @@ class RedisSubHub(object):
                 for cls in classes:
                     hb.sub_adds.append((cls, q))
 
-                print 'firing', hb.sub_wake_signal
                 yield fire(hb.sub_wake_signal)
         
             def fetch(self, timeout=None):
