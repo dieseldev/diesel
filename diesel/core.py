@@ -180,6 +180,7 @@ class Loop(object):
     RUNNING, ENDED_NORMAL, ENDED_EXCEPTION = range(3)
     def __init__(self, loop_callable, *callable_args):
         self.loop_callable = loop_callable
+        self.callbacks = deque()
         self.callable_args = callable_args
         self.keep_alive = False
         from diesel.app import current_app
@@ -257,12 +258,18 @@ class Loop(object):
                     else:
                         self.current.close()
                 if not error: # no one claims to handle it
-                    print_errstack(errstack, sys.exc_info())
-                    self.state = self.ENDED_EXCEPTION
-                    if self.keep_alive:
-                        raise LoopKeepAlive()
-                    else:
+                    if self.callbacks:
+                        while self.callbacks:
+                            c = self.callbacks.pop()
+                            c(e)
                         raise StopIteration()
+                    else:
+                        print_errstack(errstack, sys.exc_info())
+                        self.state = self.ENDED_EXCEPTION
+                        if self.keep_alive:
+                            raise LoopKeepAlive()
+                        else:
+                            raise StopIteration()
             else:
                 level_catch = None
                 error = None
@@ -479,7 +486,6 @@ class Connection(Loop):
         self.hub.register(sock, self.handle_read, self.handle_write, self.handle_error)
         self._wakeup_timer = None
         self._writable = False
-        self.callbacks = deque()
         self.closed = False
 
     def set_writable(self, val):
