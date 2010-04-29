@@ -1,7 +1,7 @@
 from contextlib import contextmanager
 from diesel import (Client, call, response, until, until_eol, bytes, 
                     up, fire, wait, ConnectionClosed, catch)
-from diesel.util.queue import Queue
+from diesel.util.queue import Queue, QueueTimeout
 import time
 import operator as op
 import itertools
@@ -423,6 +423,7 @@ class RedisClient(Client):
                 repl = channel, payload
             else:
                 repl = None
+                break
 
         yield response(repl)
 
@@ -635,13 +636,16 @@ class RedisSubHub(object):
         self.sub_wake_signal = uuid.uuid4().hex
         self.sub_adds = []
         self.sub_rms = []
+        self.subs = {}
 
     def make_client(self):
         client = RedisClient()
         yield client.connect(self.host, self.port)
         yield up( client )
 
-    def sub_loop(self, conn, subs):
+    def __call__(self):
+        conn = yield self.make_client()
+        subs = self.subs
         if subs:
             yield conn.subscribe(list(subs))
         while True:
@@ -657,6 +661,7 @@ class RedisSubHub(object):
                     else:
                         subs[k].add(q)
                 if new:
+                    print 'adding sub', new
                     yield conn.subscribe(*new)
 
             if self.sub_rms:
@@ -672,21 +677,13 @@ class RedisSubHub(object):
                     yield conn.unsubscribe(*rm)
 
             if not self.sub_rms and not self.sub_adds:
+                print 'sleeping for sub', self.sub_wake_signal
                 r = yield conn.get_from_subscriptions(self.sub_wake_signal)
                 if r:
                     cls, msg = r
                     if cls in subs:
                         for q in subs[cls]:
                             yield q.put((cls, msg))
-
-    def __call__(self):
-        subs = {}
-        while True:
-            conn = yield self.make_client()
-            try:
-                yield catch(self.sub_loop(conn, subs), ConnectionClosed)
-            except ConnectionClosed:
-                traceback.print_exc()
 
     @contextmanager
     def sub(self, classes):
@@ -704,13 +701,18 @@ class RedisSubHub(object):
                 for cls in classes:
                     hb.sub_adds.append((cls, q))
 
+                print 'firing', hb.sub_wake_signal
                 yield fire(hb.sub_wake_signal)
         
-            def fetch(self):
+            def fetch(self, timeout=None):
                 if not self.started:
                     yield self.start()
-                qn, msg = yield q.get()
-                yield up((qn, msg))
+                try:
+                    qn, msg = yield catch(q.get(timeout=timeout), QueueTimeout)
+                except QueueTimeout:
+                    yield up((None, None))
+                else:
+                    yield up((qn, msg))
 
             def close(self):
                 for cls in classes:
