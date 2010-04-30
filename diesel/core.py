@@ -357,9 +357,17 @@ class Loop(object):
                 
                 if type(ret) is str or hasattr(ret, 'seek'):
                     assert nrets == 1, "a string or file cannot be paired with any other yield token"
+                    if self.closed:
+                        print_errstack(self.fullstack)
+                        self.state = self.ENDED_EXCEPTION
+                        raise ValueError("Associated socket closed; cannot yield outgoing string")
                     self.pipeline.add(ret)
                 elif type(ret) is until or type(ret) is bytes:
                     assert used_term == False, "only one terminal specifier (bytes, until) per yield is allowed"
+                    if self.closed:
+                        print_errstack(self.fullstack)
+                        self.state = self.ENDED_EXCEPTION
+                        raise ValueError("Associated socket closed; cannot yield input terminator")
                     used_term = True
                     self.buffer.set_term(ret.sentinel)
                     n_val = self.buffer.check()
@@ -513,21 +521,15 @@ class Connection(Loop):
         '''
         self.hub.unregister(self.sock)
         self.closed = True
-        try:
-            self.sock.close()
-            if remote_closed:
-                try:
-                    self.g.throw(ConnectionClosed)
-                except StopIteration:
-                    pass
-        finally:
-            self.g = None
+        self.sock.close()
+        if remote_closed:
+            self.schedule(ConnectionClosed())
 
     def handle_write(self):
         '''The low-level handler called by the event hub
         when the socket is ready for writing.
         '''
-        if not self.pipeline.empty:
+        if not self.pipeline.empty and not self.closed:
             try:
                 data = self.pipeline.read(BUFSIZ)
             except pipeline.PipelineCloseRequest:
@@ -555,6 +557,8 @@ class Connection(Loop):
         '''The low-level handler called by the event hub
         when the socket is ready for reading.
         '''
+        if self.closed:
+            return
         try:
             data = self.sock.recv(BUFSIZ)
         except socket.error, e:
