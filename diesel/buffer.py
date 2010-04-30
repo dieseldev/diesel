@@ -19,6 +19,11 @@ class Buffer(object):
         '''
         self._atterm = term
 
+    def clear_term(self):
+        '''Set the terminal to None.
+        '''
+        self._atterm = None
+
     def feed(self, data):
         '''Feed some data into the buffer.
 
@@ -44,7 +49,7 @@ class Buffer(object):
                 ind = res + len(self._atterm)
         if ind is None:
             return None
-        self._atterm = None # this terminator was used
+        self.clear_term()
         use = self._atinbuf[:ind]
         self._atinbuf = self._atinbuf[ind:]
 

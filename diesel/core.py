@@ -145,8 +145,11 @@ class NoBuffer(object):
     '''Fake buffer for loops that aren't managing a connection and have no
     I/O stream.
     '''
+    def clear_term(*args, **kw):
+        pass
+
     def __getattr__(self, *args, **kw):
-        return ValueError("Cannot check incoming buffer on socketless Loops (yield until, bytes, etc)")
+        raise ValueError("Cannot check incoming buffer on socketless Loops (yield until, bytes, etc)")
 
 def id_gen():
     x = 1
@@ -348,6 +351,7 @@ class Loop(object):
             used_term = False
             used_sleep = False
             nrets = len(rets)
+            self.buffer.clear_term()
             for pos, ret in enumerate(rets):
                 #print 'TOKEN', ret
                 
