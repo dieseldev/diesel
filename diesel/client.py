@@ -109,7 +109,8 @@ class Client(object):
         '''Close the socket to the remote host.
         '''
         if not self.closed:
-            self.conn.shutdown()
+            self.on_close()
+            self.conn.pipeline.close_request()
             self.conn = None
             self.connected = False
             self.closed = True
@@ -144,13 +145,10 @@ class Client(object):
                         break
                     yield mygen
                 except ConnectionClosed:
-                    self.close()
-                    self.on_close()
                     break
         finally:
             if self.connected:
                 self.close()
-                self.on_close()
 
     def on_connect(self):
         '''Hook to implement a handler to do any setup after the
