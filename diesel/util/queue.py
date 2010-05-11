@@ -28,3 +28,7 @@ class Queue(object):
             else:
                 yield wait(self.wait_id)
             yield up(self.inp.popleft())
+
+    @property
+    def is_empty(self):
+        return not bool(self.inp)
