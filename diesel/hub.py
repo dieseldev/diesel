@@ -158,7 +158,8 @@ class AbstractEventHub(object):
                 self.events[fd][0]()
             elif evtype & EPOLLERR or evtype & EPOLLHUP:
                 self.events[fd][2]()
-            if evtype & EPOLLOUT:
+            # fd could be removed by above read 
+            if evtype & EPOLLOUT and fd in self.events:
                 self.events[fd][1]()
 
             while self.run_now and self.run:
