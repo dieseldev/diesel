@@ -242,7 +242,24 @@ def http_response(req, code, heads, body):
     if close:
         raise HttpClose()
 
-from diesel import Client, call, response
+import time
+from diesel import Client, call, response, sleep
+
+class HttpRequestTimeout(Exception): pass
+
+class TimeoutHandler(object):
+    def __init__(self, timeout):
+        self._timeout = timeout
+        self._start = time.time()
+
+    def remaining(self, raise_on_timeout=True):
+        remaining = self._timeout - (time.time() - self._start)
+        if remaining < 0 and raise_on_timeout:
+            self.timeout()
+        return remaining
+
+    def timeout(self):
+        raise HttpRequestTimeout()
 
 def handle_chunks(headers):
     '''Generic chunk handling code, used by both client
@@ -282,7 +299,7 @@ class HttpClient(Client):
     be a string.
     '''
     @call
-    def request(self, method, path, headers, body=None):
+    def request(self, method, path, headers, body=None, timeout=None):
         '''Issues a `method` request to `path` on the
         connected server.  Sends along `headers`, and
         body.
@@ -291,6 +308,7 @@ class HttpClient(Client):
         for example.  It will set Content-Length, 
         however.
         '''
+        timeout_handler = TimeoutHandler(timeout or 60)
         req = HttpRequest(method, path, '1.1')
         
         if body:
@@ -302,20 +320,27 @@ class HttpClient(Client):
         if body:    
             yield body
 
-        resp_line = yield until_eol()
+        resp_line, t = yield (until_eol(), sleep(timeout_handler.remaining()))
+        if t: timeout_handler.timeout()
+        
         version, code, status = resp_line.split(None, 2)
         code = int(code)
 
-        header_block = yield until('\r\n\r\n')
+        header_block, t = yield (until('\r\n\r\n'), sleep(timeout_handler.remaining()))
+        if t: timeout_handler.timeout()
+
+        
         heads = HttpHeaders()
         heads.parse(header_block)
 
         if heads.get_one('Transfer-Encoding') == 'chunked':
-            body = yield handle_chunks(heads)
+            body, t = yield (handle_chunks(heads), sleep(timeout_handler.remaining()))
+            if t: timeout_handler.timeout()
         else:
             cl = int(heads.get_one('Content-Length', 0))
             if cl:
-                body = yield bytes(cl)
+                body, t = yield (bytes(cl), sleep(timeout_handler.remaining()))
+                if t: timeout_handler.timeout()
             else:
                 body = None
 
