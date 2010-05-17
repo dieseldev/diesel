@@ -295,7 +295,7 @@ class HttpClient(Client):
         
         if body:
             headers.set('Content-Length', len(body))
-        
+
         yield '%s\r\n%s\r\n\r\n' % (req.format(), 
         headers.format())
 
@@ -322,3 +322,9 @@ class HttpClient(Client):
         if version < '1.0' or heads.get_one('Connection') == 'close':
             self.close()
         yield response((code, heads, body))
+
+from diesel.security import TLSv1ClientWrapper
+
+class HttpsClient(HttpClient):
+    def __init__(self):
+        HttpClient.__init__(self, security=TLSv1ClientWrapper())
