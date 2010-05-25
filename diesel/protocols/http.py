@@ -261,15 +261,19 @@ class TimeoutHandler(object):
     def timeout(self):
         raise HttpRequestTimeout()
 
-def handle_chunks(headers):
+def handle_chunks(headers, timeout=None):
     '''Generic chunk handling code, used by both client
     and server.
 
     Modifies the passed-in HttpHeaders instance.
     '''
+    timeout_handler = TimeoutHandler(timeout or 60)
+
     chunks = []
     while True:
-        chunk_head = yield until_eol()
+        chunk_head, t = yield (until_eol(), sleep(timeout_handler.remaining()))
+        if t: timeout_handler.timeout()
+
         if ';' in chunk_head:
             # we don't support any chunk extensions
             chunk_head = chunk_head[:chunk_head.find(';')]
@@ -281,7 +285,9 @@ def handle_chunks(headers):
             _ = yield bytes(2) # ignore trailing CRLF
 
     while True:
-        trailer = yield until_eol()
+        trailer, t = yield (until_eol(), sleep(timeout_handler.remaining()))
+        if t: timeout_handler.timeout()
+
         if trailer.strip():
             headers.add(*tuple(trailer.split(':', 1)))
         else:
@@ -334,8 +340,7 @@ class HttpClient(Client):
         heads.parse(header_block)
 
         if heads.get_one('Transfer-Encoding') == 'chunked':
-            body, t = yield (handle_chunks(heads), sleep(timeout_handler.remaining()))
-            if t: timeout_handler.timeout()
+            body = yield handle_chunks(heads, timeout_handler.remaining())
         else:
             cl = int(heads.get_one('Content-Length', 0))
             if cl:
