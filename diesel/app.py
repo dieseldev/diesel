@@ -40,6 +40,7 @@ class Application(object):
         '''Start up an Application--blocks until the program ends
         or .halt() is called.
         '''
+        global current_app
         self._run = True
         log.info('Starting diesel application')
 
@@ -72,6 +73,7 @@ class Application(object):
                         self.hub.schedule(l.iterate)
 
         log.info('Ending diesel application')
+        current_app = None
 
     def add_service(self, service):
         '''Add a Service instance to this Application.
@@ -111,8 +113,6 @@ class Application(object):
         '''Stop this application from running--the initial run() call
         will return.
         '''
-        global current_app
-        current_app = None
         self.hub.run = False
         self._run = False
 
