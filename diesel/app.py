@@ -111,6 +111,8 @@ class Application(object):
         '''Stop this application from running--the initial run() call
         will return.
         '''
+        global current_app
+        current_app = None
         self.hub.run = False
         self._run = False
 

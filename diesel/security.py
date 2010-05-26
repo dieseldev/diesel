@@ -24,11 +24,15 @@ class TLSv1ServiceWrapper(SecureWrapper):
         do_handshake_on_connect=False)
 
 class TLSv1ClientWrapper(SecureWrapper):
-    def __init__(self):
+    def __init__(self, key_file=None, cert_file=None):
         SecureWrapper.__init__(self)
+        self.key_file = key_file
+        self.cert_file = cert_file
 
     def wrap(self, sock):
-        return ssl.wrap_socket(sock, ssl_version = ssl.PROTOCOL_TLSv1,
+        return ssl.wrap_socket(sock, 
+        certfile=self.cert_file, keyfile=self.key_file,
+        ssl_version = ssl.PROTOCOL_TLSv1,
         do_handshake_on_connect=False)
 
 def ssl_async_handshake(sock, hub, next):
