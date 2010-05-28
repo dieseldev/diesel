@@ -106,11 +106,14 @@ class AbstractEventHub(object):
                 self.thread_comp_in.put((reschedule, e))
             else:
                 self.thread_comp_in.put((reschedule, res))
-            try:
-                os.write(self._t_wakeup, '\0')
-            except IOError:
-                pass
+            self.wake_from_other_thread()
         thread.start_new_thread(wrap, ())
+
+    def wake_from_other_thread(self):
+        try:
+            os.write(self._t_wakeup, '\0')
+        except IOError:
+            pass
 
     def handle_events(self):
         '''Run one pass of event handling.
