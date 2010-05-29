@@ -59,9 +59,12 @@ class TestTrigger(object):
 class TestTimeout(Exception): pass
 
 class DieselTest(object):
-    def prepare_test(self):
-        self._app = Application()
+    def setup_method(self, *args):
+        self._app = Application(allow_app_replacement=True)
         self._trigger = TestTrigger()
+
+    # XXX py.test magic args?
+    def prepare_test(self):
         return self._app, self._trigger.touch, TestAccumulator()
 
     def run_test(self, count=1, timeout=10):
@@ -74,3 +77,7 @@ class DieselTest(object):
         self._app.run()
         if self._trigger.timed_out:
             raise TestTimeout()
+
+    def teardown_method(self, *args):
+        self._app.halt()
+        self._app = self._trigger = None

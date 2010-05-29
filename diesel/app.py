@@ -17,9 +17,9 @@ class Application(object):
     the coordinating entity that runs all Services, Loops,
     Client protocol work, etc.
     '''
-    def __init__(self, logger=None):
+    def __init__(self, logger=None, allow_app_replacement=False):
         global current_app
-        assert current_app is None, "Only one Application instance per program allowed"
+        assert (allow_app_replacement or current_app is None), "Only one Application instance per program allowed"
         current_app = self
         self.hub = EventHub()
         self._run = False
@@ -83,6 +83,7 @@ class Application(object):
         '''
         service.application = self
         if self._run:
+            # TODO -- this path doesn't clean up binds yet
             service.bind_and_listen()
             self.hub.register(
                 service.sock,
@@ -115,6 +116,8 @@ class Application(object):
         '''
         self.hub.run = False
         self._run = False
+        for s in self._services:
+            s.sock.close()
 
     def setup(self):
         '''Do some initialization right before the main loop is entered.
