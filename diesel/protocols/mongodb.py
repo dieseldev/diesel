@@ -33,8 +33,8 @@ class Collection(TraversesCollections):
     def find(self, spec=None, fields=None, skip=0, limit=0):
         yield up(MongoCursor(self.name, self.client, spec, fields, skip, limit))
 
-    def update(self, spec, doc, upsert=0):
-        yield self.client.update(self.name, spec, doc, upsert)
+    def update(self, spec, doc, upsert=False, multi=False):
+        yield self.client.update(self.name, spec, doc, upsert, multi)
 
     def insert(self, doc_or_docs):
         yield self.client.insert(self.name, doc_or_docs)
@@ -100,8 +100,8 @@ class MongoClient(Client):
             yield response([])
 
     @call
-    def update(self, col, spec, doc, upsert=0):
-        data = Ops.update(col, spec, doc, upsert)
+    def update(self, col, spec, doc, upsert=False, multi=False):
+        data = Ops.update(col, spec, doc, upsert, multi)
         yield self._put_request(Ops.OP_UPDATE, data)
         yield response(None)
 
@@ -170,10 +170,15 @@ class Ops(object):
         return data
 
     @staticmethod
-    def update(col, spec, doc, upsert):
+    def update(col, spec, doc, upsert, multi):
         colname = _make_c_string(col)
+        flags = 0
+        if upsert:
+            flags |= 1 << 0
+        if multi:
+            flags |= 1 << 1
         fmt = '<i%dsi' % len(colname)
-        part = struct.pack(fmt, 0, colname, upsert)
+        part = struct.pack(fmt, 0, colname, flags)
         return "%s%s%s" % (part, BSON.from_dict(spec), BSON.from_dict(doc))
 
     @staticmethod
