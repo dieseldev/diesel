@@ -647,7 +647,7 @@ class RedisSubHub(object):
         conn = yield self.make_client()
         subs = self.subs
         if subs:
-            yield conn.subscribe(list(subs))
+            yield conn.subscribe(*subs)
         while True:
             new = rm = None
             if self.sub_adds:
