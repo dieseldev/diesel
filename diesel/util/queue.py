@@ -37,3 +37,48 @@ class Queue(object):
     @property
     def is_empty(self):
         return not bool(self.inp)
+
+if __name__ == '__main__':
+    from diesel import Application, Loop, sleep, catch
+
+    app = Application()
+
+    queue = Queue()
+
+    def worker():
+        yield sleep(0.25)
+
+        yield queue.put(1)
+        yield queue.put(2)
+
+    def consumer_no_wait():
+        try:
+            yield catch(queue.get(waiting=False), QueueEmpty)
+        except QueueEmpty:
+            pass
+        else:
+            assert False
+
+    def consumer_timeout():
+        try:
+            yield catch(queue.get(timeout=0.1), QueueTimeout)
+        except QueueTimeout:
+            pass
+        else:
+            assert False
+
+    def consumer(expected):
+        val = yield queue.get()
+        assert expected == val, '%s != %s' % (expected, val)
+
+        if queue.is_empty:
+            app.halt()
+
+    app.add_loop(Loop(worker))
+    app.add_loop(Loop(consumer_no_wait))
+    app.add_loop(Loop(consumer_timeout))
+    app.add_loop(Loop(lambda: consumer(1)))
+    app.add_loop(Loop(lambda: consumer(2)))
+    app.run()
+
+
