@@ -118,7 +118,7 @@ class Client(object):
     def request_close(self):
         self.jobs.append(None)
         if self.waiting:
-            self.schedule()
+            self.conn.schedule()
 
     @property
     def is_closed(self):
