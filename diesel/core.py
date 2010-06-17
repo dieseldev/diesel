@@ -109,6 +109,11 @@ class thread(object):
         self.args = args
         self.kw = kw
 
+class packet(object):
+    def __init__(self, s, priority=5):
+        self.s = s
+        self.priority = priority
+
 class WaitPool(object):
     '''A structure that manages all `wait`ers, makes sure fired events
     get to the right places, and that all other waits are canceled when
@@ -355,7 +360,14 @@ class Loop(object):
             for pos, ret in enumerate(rets):
                 #print 'TOKEN', ret
                 
-                if type(ret) is str or hasattr(ret, 'seek'):
+                if type(ret) is packet:
+                    assert nrets == 1, "a packet cannot be paired with any other yield token"
+                    if self.closed:
+                        print_errstack(self.fullstack)
+                        self.state = self.ENDED_EXCEPTION
+                        raise ValueError("Associated socket closed; cannot yield outgoing packet")
+                    self.pipeline.add(ret.s, ret.priority)
+                elif type(ret) is str or hasattr(ret, 'seek'):
                     assert nrets == 1, "a string or file cannot be paired with any other yield token"
                     if self.closed:
                         print_errstack(self.fullstack)

@@ -7,7 +7,7 @@ try:
 except ImportError:
     raise ImportError, "cStringIO is required"
 
-from collections import deque
+from bisect import bisect_right
 
 _obj_SIO = cStringIO.StringIO
 _type_SIO = cStringIO.OutputType
@@ -27,36 +27,69 @@ def get_file_length(f):
 class PipelineCloseRequest(Exception): pass
 class PipelineClosed(Exception): pass
 
+class PipelineItem(object):
+    def __init__(self, d):
+        if type(d) is str:
+            self.f = make_SIO(d)
+            self.length = len(d)
+            self.is_sio = True
+            self.f.seek(0, 2)
+        elif hasattr(d, 'seek'):
+            self.f = d
+            self.length = get_file_length(d)
+            self.is_sio = False
+        else:
+            raise ValueError("argument to add() must be either a str or a file-like object")
+        self.read = self.f.read
+
+    def merge(self, s):
+        self.f.write(s)
+        self.length += len(s)
+
+    def reset(self):
+        if self.is_sio:
+            self.is_sio = False
+            self.f.seek(0, 0)
+
+    @property
+    def done(self):
+        return self.f.tell() == self.length
+
+    def __cmp__(self, other):
+        if other is PipelineStandIn:
+            return -1
+        return cmp(self, other) 
+
+class PipelineStandIn(object): pass
+
 class Pipeline(object):
     '''A pipeline that supports appending strings or
     files and can read() transparently across object
     boundaries in the outgoing buffer.
     '''
     def __init__(self):
-        self.line = deque()
+        self.line = []
+        self.current = None
         self.want_close = False
 
-    def add(self, d):
+    def add(self, d, priority=5):
         '''Add object `d` to the pipeline.
         '''
         if self.want_close:
             raise PipelineClosed
 
-        if type(d) is str:
-            if self.line and type(self.line[-1][0]) is _type_SIO:
-                fd, l = self.line[-1]
-                m = fd.tell()
-                fd.seek(0, 2)
-                fd.write(d)
-                fd.seek(m)
-                self.line[-1] = [fd, l + len(d)]
-            else:
-                self.line.append([make_SIO(d), len(d)])
-        elif hasattr(d, 'tell'): # best we're gonna do until 3.0 ABCs
-            self.line.append([d, get_file_length(d)])
-        else:
-            raise ValueError("argument to add() must be either a str or a file-like object")
+        priority *= -1
 
+        dummy = (priority, PipelineStandIn)
+        ind = bisect_right(self.line, dummy)
+        if ind > 0 and type(d) is str and self.line[ind - 1][-1].is_sio:
+            a_pri, adjacent = self.line[ind - 1]
+            if adjacent.is_sio and a_pri == priority:
+                adjacent.merge(d)
+            else:
+                self.line.insert(ind, (priority, PipelineItem(d)))
+        else:
+            self.line.insert(ind, (priority, PipelineItem(d)))
 
     def close_request(self):
         '''Add a close request to the outgoing pipeline.
@@ -72,26 +105,34 @@ class Pipeline(object):
         May raise PipelineCloseRequest if the pipeline is
         empty and the connected stream should be closed.
         '''
-        if not self.line and self.want_close:
-            raise PipelineCloseRequest
+        if not self.current and not self.line:
+            if self.want_close:
+                raise PipelineCloseRequest()
+            return ''
 
-        rbuf = []
-        read = 0
-        while self.line and read < amt:
-            data = self.line[0][0].read(amt - read)
+        if not self.current:
+            _, self.current = self.line.pop(0)
+            self.current.reset()
+
+        out = ''
+        while len(out) < amt:
+            data = self.current.read(amt - len(out))
             if data == '':
-                self.line.popleft()
+                if not self.line:
+                    self.current = None
+                    break
+                _, self.current = self.line.pop(0)
+                self.current.reset()
             else:
-                rbuf.append(data)
-                read += len(data)
+                out += data
 
         # eagerly evict and EOF that's been read _just_ short of 
         # the EOF '' read() call.. so that we know we're empty,
         # and we don't bother with useless iterations
-        if self.line and self.line[0][0].tell() == self.line[0][1]:
-            self.line.popleft()
+        if self.current and self.current.done:
+            self.current = None
 
-        return ''.join(rbuf)
+        return out
     
     def backup(self, d):
         '''Pop object d back onto the front the pipeline.
@@ -99,7 +140,11 @@ class Pipeline(object):
         Used in cases where not all data is sent() on the socket,
         for example--the remainder will be placed back in the pipeline.
         '''
-        self.line.appendleft([make_SIO(d), len(d)])
+        cur = self.current
+        self.current = PipelineItem(d)
+        self.current.reset()
+        if cur:
+            self.line.insert(0, (-1000000, cur))
 
     @property
     def empty(self):
@@ -108,4 +153,4 @@ class Pipeline(object):
         A close request is "data" that needs to be consumed,
         too.
         '''
-        return self.want_close == False and not self.line
+        return self.want_close == False and not self.line and not self.current

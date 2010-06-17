@@ -129,3 +129,17 @@ class TestLongInteractions(object):
         py.test.raises(PipelineCloseRequest, p.read, 1000)
         assert not p.empty
         py.test.raises(PipelineCloseRequest, p.read, 1000)
+
+class TestPriority(object):
+    def test_pri_clean(self):
+        p = Pipeline()
+        p.add("two")
+        p.add("three")
+        p.add("one")
+        assert p.read(18) == "twothreeone"
+
+        p.add("two", 2)
+        p.add("three", 3)
+        p.add("six", 2)
+        p.add("one", 1)
+        assert p.read(18) == "threetwosixone"
