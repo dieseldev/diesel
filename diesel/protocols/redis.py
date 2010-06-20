@@ -354,7 +354,33 @@ class RedisClient(Client):
         resp = yield self._get_response()
         yield response(resp)
 
-    
+    ##################################################
+    ### ZSET OPERATIONS
+
+    @call
+    def zadd(self, key, score, member):
+        yield self._send_bulk('ZADD', str(member), key, str(score))
+        resp = yield self._get_response()
+        yield response(resp)
+
+    @call
+    def zrem(self, key, member):
+        yield self._send_bulk('ZREM', str(member), key)
+        resp = yield self._get_response()
+        yield response(resp)
+
+    @call
+    def zrange(self, key, start, end):
+        yield self._send('ZRANGE', key, str(start), str(end))
+        resp = yield self._get_response()
+        yield response(resp)
+
+    @call
+    def zrevrange(self, key, start, end):
+        yield self._send('ZREVRANGE', key, str(start), str(end))
+        resp = yield self._get_response()
+        yield response(resp)
+
     ##################################################
     ### Sorting...
     @call
@@ -620,6 +646,22 @@ if __name__ == '__main__':
 
         print (yield r.smembers("s3"))
         print (yield r.srandmember("s3"))
+
+        print '-- ZSETS --'
+
+        print (yield r.zadd("z1", 10, "ten"))
+        print (yield r.zadd("z1", 1, "one"))
+        print (yield r.zadd("z1", 2, "two"))
+        print (yield r.zadd("z1", 0, "zero"))
+
+
+        print (yield r.zrange("z1", 0, -1))
+        print (yield r.zrem("z1", "two"))
+        print (yield r.zrange("z1", 0, -1))
+        print (yield r.zrevrange("z1", 0, -1))
+
+        print (yield r.zrem("z1", (yield r.zrange("z1", 0, 0))[0]))
+        print (yield r.zrange("z1", 0, -1))
 
         print 'done!'
 
