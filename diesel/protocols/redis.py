@@ -533,6 +533,9 @@ class RedisClient(Client):
 
 if __name__ == '__main__':
     from diesel import Application, Loop
+
+    a = Application()
+
     def do_set():
         r = RedisClient()
         yield r.connect()
@@ -665,7 +668,8 @@ if __name__ == '__main__':
 
         print 'done!'
 
-    a = Application()
+        a.halt()
+
     a.add_loop(Loop(do_set))
     a.run()
 
