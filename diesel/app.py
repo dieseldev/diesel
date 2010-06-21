@@ -70,7 +70,7 @@ class Application(object):
                     if l.keep_alive and l.state == l.ENDED_EXCEPTION:
                         log.error("-- Keep-Alive loop %s being restarted --" % l)
                         l.reset()
-                        self.hub.schedule(l.iterate)
+                        self.hub.call_later(0.2, l.iterate)
 
         log.info('Ending diesel application')
         current_app = None
