@@ -381,6 +381,12 @@ class RedisClient(Client):
         resp = yield self._get_response()
         yield response(resp)
 
+    @call
+    def zscore(self, key, member):
+        yield self._send_bulk('ZSCORE', str(member), key)
+        resp = yield self._get_response()
+        yield response(float(resp))
+
     ##################################################
     ### Sorting...
     @call
