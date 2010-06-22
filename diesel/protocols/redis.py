@@ -277,7 +277,7 @@ class RedisClient(Client):
     def srem(self, k, v):
         yield self._send_bulk('SREM', str(v), k)
         resp = yield self._get_response()
-        yield response(resp)
+        yield response(bool(resp))
 
     @call
     def spop(self, k):
@@ -367,7 +367,7 @@ class RedisClient(Client):
     def zrem(self, key, member):
         yield self._send_bulk('ZREM', str(member), key)
         resp = yield self._get_response()
-        yield response(resp)
+        yield response(bool(resp))
 
     @call
     def zrange(self, key, start, end):
