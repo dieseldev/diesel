@@ -1,19 +1,11 @@
 # vim:ts=4:sw=4:expandtab
 '''An event hub that supports sockets and timers, based
-on Python 2.6's epoll support.
+on Python 2.6's select & epoll support.
 '''
 import select
-try:
-    from select import EPOLLIN, EPOLLOUT, EPOLLPRI, EPOLLERR, EPOLLHUP
-except ImportError:
-    # Some fallbacks used in non-epoll implementations
-    EPOLLIN = object()
-    EPOLLPRI = object()
-    EPOLLOUT = object()
 
 from collections import deque
 from time import time
-import itertools
 import thread
 from Queue import Queue, Empty
 import fcntl
@@ -117,62 +109,6 @@ class AbstractEventHub(object):
 
     def handle_events(self):
         '''Run one pass of event handling.
-
-        epoll() is called, with a timeout equal to the next-scheduled
-        timer.  When epoll returns, all fd-related events (if any) are
-        handled, and timers are handled as well.
-        '''
-        while self.run_now and self.run:
-            self.run_now.popleft()()
-
-        if self.new_timers:
-            for tr in self.new_timers:
-                if tr.pending:
-                    tr.inq = True
-                    self.timers.append(tr)
-            self.timers = deque(sorted(self.timers))
-            self.new_timers = []
-            
-        tm = time()
-        timeout = (self.timers[0].trigger_time - tm) if self.timers else 1e6
-        # epoll, etc, limit to 2^^31/1000 or OverflowError
-        timeout = min(timeout, 1e6)
-        if timeout < 0:
-            timeout = 0
-
-        events = self._get_events(timeout)
-
-        # Run timers first, to try to nail their timings
-        while self.timers:
-            if self.timers[0].due:
-                t = self.timers.popleft()
-                if t.pending:
-                    t.callback()
-                    while self.run_now and self.run:
-                        self.run_now.popleft()()
-                    if not self.run:
-                        return
-            else:
-                break
-
-        # Handle all socket I/O
-        for (fd, evtype) in events:
-            if evtype & EPOLLIN or evtype & EPOLLPRI:
-                self.events[fd][0]()
-            elif evtype & EPOLLERR or evtype & EPOLLHUP:
-                self.events[fd][2]()
-            # fd could be removed by above read 
-            if evtype & EPOLLOUT and fd in self.events:
-                self.events[fd][1]()
-
-            while self.run_now and self.run:
-                self.run_now.popleft()()
-
-            if not self.run:
-                return
-
-    def _get_events(self, timeout):
-        '''Get all events to process.
         '''
         raise NotImplementedError
 
@@ -240,20 +176,53 @@ class SelectEventHub(AbstractEventHub):
         self.in_set, self.out_set = set(), set()
         super(SelectEventHub, self).__init__()
 
-    def _get_events(self, timeout):
-        '''Get all events to process.
-        '''
-        readables, writables, _ = select.select(self.in_set,
-                                                self.out_set,
-                                                set(), timeout)
+    def handle_events(self):
+        '''Run one pass of event handling.
 
-        # Make our return value look like the return value of epoll
-        return tuple(
-            itertools.chain(
-                ((fd.fileno(), EPOLLIN) for fd in readables),
-                ((fd.fileno(), EPOLLOUT) for fd in writables)
-            )
-        )
+        select() is called, with a timeout equal to the next-scheduled
+        timer.  When select returns, all fd-related events (if any) are
+        handled, and timers are handled as well.
+        '''
+        while self.run_now and self.run:
+            self.run_now.popleft()()
+
+        if self.new_timers:
+            for tr in self.new_timers:
+                if tr.pending:
+                    tr.inq = True
+                    self.timers.append(tr)
+            self.timers = deque(sorted(self.timers))
+            self.new_timers = []
+
+        tm = time()
+        timeout = (self.timers[0].trigger_time - tm) if self.timers else 1e6
+        # epoll, etc, limit to 2^31/1000 or OverflowError
+        timeout = min(timeout, 1e6)
+        if timeout < 0:
+            timeout = 0
+
+        # Run timers first, to try to nail their timings
+        while self.timers:
+            if self.timers[0].due:
+                t = self.timers.popleft()
+                if t.pending:
+                    t.callback()
+                    while self.run_now and self.run:
+                        self.run_now.popleft()()
+                    if not self.run:
+                        return
+            else:
+                break
+
+        select_lists = select.select(self.in_set, self.out_set, [], timeout)
+        for i, fds in enumerate(select_lists):
+            for fd in fds:
+                self.events[fd.fileno()][i]()
+                while self.run_now and self.run:
+                    self.run_now.popleft()()
+
+                if not self.run:
+                    return
 
     def _add_fd(self, fd):
         '''Add this socket to the list of sockets used in the
@@ -289,26 +258,76 @@ class EPollEventHub(AbstractEventHub):
         self.epoll = select.epoll(self.SIZE_HINT)
         super(EPollEventHub, self).__init__()
 
-    def _get_events(self, timeout):
-        '''Get all events to process.
+    def handle_events(self):
+        '''Run one pass of event handling.
+
+        epoll() is called, with a timeout equal to the next-scheduled
+        timer.  When epoll returns, all fd-related events (if any) are
+        handled, and timers are handled as well.
         '''
-        return self.epoll.poll(timeout)
-        
+        while self.run_now and self.run:
+            self.run_now.popleft()()
+
+        if self.new_timers:
+            for tr in self.new_timers:
+                if tr.pending:
+                    tr.inq = True
+                    self.timers.append(tr)
+            self.timers = deque(sorted(self.timers))
+            self.new_timers = []
+
+        tm = time()
+        timeout = (self.timers[0].trigger_time - tm) if self.timers else 1e6
+        # epoll, etc, limit to 2^^31/1000 or OverflowError
+        timeout = min(timeout, 1e6)
+        if timeout < 0:
+            timeout = 0
+
+        # Run timers first, to try to nail their timings
+        while self.timers:
+            if self.timers[0].due:
+                t = self.timers.popleft()
+                if t.pending:
+                    t.callback()
+                    while self.run_now and self.run:
+                        self.run_now.popleft()()
+                    if not self.run:
+                        return
+            else:
+                break
+
+        # Handle all socket I/O
+        for (fd, evtype) in self.epoll.poll(timeout):
+            if evtype & select.EPOLLIN or evtype & select.EPOLLPRI:
+                self.events[fd][0]()
+            elif evtype & select.EPOLLERR or evtype & select.EPOLLHUP:
+                self.events[fd][2]()
+            # fd could be removed by above read
+            if evtype & select.EPOLLOUT and fd in self.events:
+                self.events[fd][1]()
+
+            while self.run_now and self.run:
+                self.run_now.popleft()()
+
+            if not self.run:
+                return
+
     def _add_fd(self, fd):
         '''Add this socket to the list of sockets used in the
         poll call.
         '''
-        self.epoll.register(fd, EPOLLIN | EPOLLPRI)
+        self.epoll.register(fd, select.EPOLLIN | select.EPOLLPRI)
 
     def enable_write(self, fd):
         '''Enable write polling and the write callback.
         '''
-        self.epoll.modify(fd, EPOLLIN | EPOLLPRI | EPOLLOUT)
+        self.epoll.modify(
+                fd, select.EPOLLIN | select.EPOLLPRI | select.EPOLLOUT)
 
     def disable_write(self, fd):
         '''Disable write polling and the write callback.
         '''
-        self.epoll.modify(fd, EPOLLIN | EPOLLPRI)
+        self.epoll.modify(fd, select.EPOLLIN | select.EPOLLPRI)
 
     def _remove_fd(self, fd):
         '''Remove this socket from the list of sockets the
@@ -317,12 +336,7 @@ class EPollEventHub(AbstractEventHub):
         self.epoll.unregister(fd)
 
 # Expose a usable EventHub implementation
-import os
-try:
-    if 'DIESEL_NO_EPOLL' in os.environ:
-        raise AttributeError('epoll')
-    select.epoll
-except AttributeError:
+if os.environ.get('DIESEL_NO_EPOLL') or not hasattr(select, 'epoll'):
     EventHub = SelectEventHub
 else:
     EventHub = EPollEventHub
