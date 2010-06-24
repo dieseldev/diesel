@@ -55,6 +55,9 @@ def packet(s, priority=5):
 
 def sleep(*args, **kw):
     return current_loop.sleep(*args, **kw)
+    
+def thread(*args, **kw):
+    return current_loop.thread(*args, **kw)
 
 current_loop = None
 
@@ -127,6 +130,10 @@ class Loop(object):
         self.fire_handlers = {}
         self.app.waits.clear(self)
 
+    def thread(self, f, *args, **kw):
+        self.hub.run_in_thread(self.wake, f, *args, **kw)
+        return self.dispatch()
+
     def sleep(self, v=0):
         self._sleep(v)
         return self.dispatch()
@@ -172,7 +179,9 @@ class Loop(object):
         global current_loop
         self.clear_pending_events()
         current_loop = self
-        if value != ContinueNothing:
+        if isinstance(value, Exception):
+            self.coroutine.throw(value)
+        elif value != ContinueNothing:
             self.coroutine.switch(value)
         else:
             self.coroutine.switch()
