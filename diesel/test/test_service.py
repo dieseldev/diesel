@@ -1,5 +1,5 @@
 from diesel.tests import DieselTest
-from diesel import Loop, sleep, Service, until_eol, until, bytes
+from diesel import Loop, sleep, Service, until_eol, until, count, send
 import thread, socket, time
 from uuid import uuid4
 
@@ -9,8 +9,8 @@ class TestEchoService(DieselTest):
         NUM = 5
         app, touch, acc = self.prepare_test()
         def handle_echo(conn):
-            said = yield until_eol()
-            yield 'YS:' + said
+            said = until_eol()
+            send( 'YS:' + said )
             touch()
 
         def b_client():
@@ -37,12 +37,12 @@ class TestEchoService(DieselTest):
         NUM = 5
         app, touch, acc = self.prepare_test()
         def handle_echo(conn):
-            said = yield until_eol()
+            said = until_eol()
             out = 'YS:' + said
 
-            yield out
+            send( out )
             for c in out:
-                yield c
+                send( c )
 
             touch()
 
@@ -71,11 +71,11 @@ class TestEchoService(DieselTest):
         NUM = 5
         app, touch, acc = self.prepare_test()
         def handle_echo(conn):
-            size = int((yield until('|'))[:-1])
-            said = yield bytes(size)
+            size = int((until('|'))[:-1])
+            said = count(size)
             out = 'YS:' + said
 
-            yield out
+            send( out )
 
             touch()
 
