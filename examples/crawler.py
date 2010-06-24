@@ -72,7 +72,8 @@ def follow_loop():
         log.info(" -> %s" % lpath )
         for x in xrange(2):
             try:
-                client, heads = get_client()
+                if client.is_closed:
+                    client, heads = get_client()
                 code, heads, body = client.request('GET', lpath, heads)
             except ConnectionClosed:
                 pass

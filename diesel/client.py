@@ -11,7 +11,6 @@ class Client(object):
     def __init__(self, addr, port, security=None):
         self.security = security
         self.connected = False
-        self.closed = False
         self.conn = None
         self.addr = addr
         self.port = port
@@ -35,25 +34,11 @@ class Client(object):
     def close(self):
         '''Close the socket to the remote host.
         '''
-        if not self.closed:
-            self.on_close()
+        if not self.is_closed:
             self.conn.pipeline.close_request()
             self.conn = None
-            self.closed = True
             self.connected = True
 
     @property
     def is_closed(self):
-        return self.conn is None
-
-    def on_connect(self):
-        '''Hook to implement a handler to do any setup after the
-        connection has been established.
-        '''
-        pass
-
-    def on_close(self):
-        '''Hook called when the remote side closes the connection,
-        for cleanup.
-        '''
-        pass
+        return not self.conn or self.conn.closed
