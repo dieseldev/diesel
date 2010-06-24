@@ -35,6 +35,7 @@ class Client(object):
         '''Close the socket to the remote host.
         '''
         if not self.is_closed:
+            self.conn.set_writable(True)
             self.conn.pipeline.close_request()
             self.conn = None
             self.connected = True
