@@ -2,19 +2,19 @@ from time import time
 from uuid import uuid4
 from collections import deque
 
-from diesel import wait, fire, up, sleep
+from diesel import wait, fire, sleep, first
 
 class QueueEmpty(Exception): pass
 class QueueTimeout(Exception): pass
 
 class Queue(object):
     def __init__(self):
-        self.wait_id = uuid4()
+        self.wait_id = uuid4().hex
         self.inp = deque()
 
     def put(self, i=None):
         self.inp.append(i)
-        yield fire(self.wait_id)
+        fire(self.wait_id)
 
     def get(self, waiting=True, timeout=None):
         start = time()
@@ -24,12 +24,12 @@ class Queue(object):
                 if remaining <= 0:
                     raise QueueTimeout()
                 else:
-                    yield (wait(self.wait_id), sleep(remaining))
+                    first(waits=[self.wait_id], sleep=remaining)
             else:
-                yield wait(self.wait_id)
+                wait(self.wait_id)
 
         if self.inp:
-            yield up(self.inp.popleft())
+            return self.inp.popleft()
         elif not waiting:
             raise QueueEmpty()
 
@@ -39,21 +39,21 @@ class Queue(object):
         return not bool(self.inp)
 
 if __name__ == '__main__':
-    from diesel import Application, Loop, sleep, catch
+    from diesel import Application, Loop, sleep
 
     app = Application()
 
     queue = Queue()
 
     def worker():
-        yield sleep(0.25)
+        sleep(0.25)
 
-        yield queue.put(1)
-        yield queue.put(2)
+        queue.put(1)
+        queue.put(2)
 
     def consumer_no_wait():
         try:
-            yield catch(queue.get(waiting=False), QueueEmpty)
+            queue.get(waiting=False)
         except QueueEmpty:
             pass
         else:
@@ -61,17 +61,18 @@ if __name__ == '__main__':
 
     def consumer_timeout():
         try:
-            yield catch(queue.get(timeout=0.1), QueueTimeout)
+            queue.get(timeout=0.1)
         except QueueTimeout:
             pass
         else:
             assert False
 
     def consumer(expected):
-        val = yield queue.get()
+        val = queue.get()
         assert expected == val, '%s != %s' % (expected, val)
 
         if queue.is_empty:
+            print 'success!'
             app.halt()
 
     app.add_loop(Loop(worker))
