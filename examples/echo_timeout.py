@@ -3,15 +3,15 @@
 '''
 import time
 
-from diesel import Application, Service, until_eol, sleep, log
+from diesel import Application, Service, until_eol, sleep, log, send, first
 
 def hi_server(addr):
     while 1:
-        inp, to = (yield (until_eol(), sleep(3)))
-        if to:
+        ev, val = first(until_eol=True, sleep=3)
+        if ev == 'sleep':
             log.warn('%s timeout!' % time.asctime())
         else:
-            yield "you said %s" % inp
+            send("you said %s" % val)
 
 app = Application()
 log = log.sublog('echo-timeout-server', log.info)

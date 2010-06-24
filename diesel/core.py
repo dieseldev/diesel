@@ -62,6 +62,9 @@ def thread(*args, **kw):
 def _private_connect(*args, **kw):
     return current_loop.connect(*args, **kw)
 
+def first(*args, **kw):
+    return current_loop.first(*args, **kw)
+
 class call(object):
     def __init__(self, f, inst=None):
         self.f = f
@@ -153,6 +156,42 @@ class Loop(object):
 
     def thread(self, f, *args, **kw):
         self.hub.run_in_thread(self.wake, f, *args, **kw)
+        return self.dispatch()
+
+    def first(self, sleep=None, waits=None,
+            count=None, until=None, until_eol=None):
+        def marked_cb(kw):
+            def deco(f):
+                def mark(d):
+                    return f((kw, d))
+                return mark
+            return deco
+
+        f_sent = filter(None, (count, until, until_eol))
+        assert len(f_sent) <= 1,(
+        "only 1 of (count, until, until_eol) may be provided")
+        sentinel = None
+        if count:
+            sentinel = count
+            tok = 'count'
+        elif until:
+            sentinel = until
+            tok = 'until'
+        elif until_eol:
+            sentinel = "\r\n"
+            tok = 'until_eol'
+        if sentinel:
+            early_val = self._input_op(sentinel, marked_cb(tok))
+            if early_val:
+                return early_val
+            # othewise.. process others and dispatch
+
+        if sleep is not None:
+            self._sleep(sleep, marked_cb('sleep'))
+
+        if waits:
+            for w in waits:
+                self._wait(w, marked_cb('wait-' + w))
         return self.dispatch()
 
     def connect(self, client, ip, sock):
