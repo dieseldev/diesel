@@ -12,6 +12,8 @@ from diesel.security import ssl_async_handshake
 from diesel import runtime
 from diesel.events import WaitPool
 
+class ApplicationEnd(Exception): pass
+
 class Application(object):
     '''The Application represents diesel's main loop--
     the coordinating entity that runs all Services, Loops,
@@ -63,6 +65,9 @@ class Application(object):
                 except KeyboardInterrupt:
                     log.warn("-- KeyboardInterrupt raised.. exiting main loop --")
                     break
+                except ApplicationEnd:
+                    log.warn("-- ApplicationEnd raised.. exiting main loop --")
+                    break
                 except Exception, e:
                     log.error("-- Unhandled Exception rose to main loop --")
                     log.error(traceback.format_exc())
@@ -111,10 +116,9 @@ class Application(object):
         '''Stop this application from running--the initial run() call
         will return.
         '''
-        self.hub.run = False
-        self._run = False
         for s in self._services:
             s.sock.close()
+        raise ApplicationEnd()
 
     def setup(self):
         '''Do some initialization right before the main loop is entered.

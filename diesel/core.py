@@ -15,6 +15,7 @@ from diesel import buffer
 from diesel.client import call, message, response, connect, _client_wait
 from diesel.security import ssl_async_handshake
 from diesel import runtime
+from diesel import logmod, log
 
 class ConnectionClosed(socket.error): 
     '''Raised if the client closes the connection.
@@ -54,7 +55,6 @@ def packet(s, priority=5):
 
 def sleep(*args, **kw):
     return current_loop.sleep(*args, **kw)
-
 
 current_loop = None
 
@@ -106,6 +106,10 @@ class Loop(object):
         try:
             self.loop_callable(*self.args, **self.kw)
         except:
+            if self.keep_alive:
+                log.warn("(Keep-Alive loop %s died; restarting)" % self)
+                self.reset()
+                self.hub.call_later(0.5, self.wake)
             self.app.runhub.throw(*sys.exc_info())
 
     def __hash__(self):
@@ -113,7 +117,7 @@ class Loop(object):
 
     def __str__(self):
         return '<Loop id=%s callable=%s>' % (self.id,
-        str(self.callable_args))
+        str(self.loop_callable))
         
     def clear_pending_events(self):
         '''When a loop is rescheduled, cancel any other timers or waits.
