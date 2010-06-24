@@ -7,7 +7,7 @@ import errno
 from greenlet import greenlet
 
 from diesel.hub import EventHub
-from diesel import logmod, log
+from diesel import logmod, log, Connection, Loop
 from diesel.security import ssl_async_handshake
 from diesel import runtime
 from diesel.events import WaitPool
@@ -105,7 +105,7 @@ class Application(object):
             loop.keep_alive = True
 
         if self._run:
-            self.hub.schedule(loop.iterate)
+            self.hub.schedule(loop.wake)
         else:
             if front:
                 self._loops.insert(0, loop)
@@ -177,7 +177,10 @@ class Service(object):
             raise
         sock.setblocking(0)
         def make_connection():
-            Connection(sock, addr, self.connection_handler).iterate()
+            c = Connection(runtime.current_app.hub, sock, addr)
+            l = Loop(self.connection_handler, addr)
+            l.connection_stack.append(c)
+            runtime.current_app.add_loop(l)
         if self.security:
             sock = self.security.wrap(sock)
             ssl_async_handshake(sock, self.application.hub, make_connection)
