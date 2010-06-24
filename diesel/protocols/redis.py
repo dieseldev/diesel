@@ -382,6 +382,12 @@ class RedisClient(Client):
         return resp
 
     @call
+    def zcard(self, key):
+        self._send('ZCARD', key)
+        resp = self._get_response()
+        response(int(resp))
+
+    @call
     def zscore(self, key, member):
         self._send_bulk('ZSCORE', str(member), key)
         resp = self._get_response()
@@ -392,7 +398,7 @@ class RedisClient(Client):
     @call
     def sort(self, key, pattern=None, limit=None,
     get=None, order='ASC', alpha=False, store=None):
-        
+
         args = [key]
         if pattern:
             args += ['BY', pattern]
@@ -666,6 +672,7 @@ if __name__ == '__main__':
 
         print (r.zrem("z1", (r.zrange("z1", 0, 0))[0]))
         print (r.zrange("z1", 0, -1))
+        print (r.zcard("z1"))
 
         print 'done!'
 
