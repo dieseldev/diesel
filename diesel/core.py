@@ -227,6 +227,7 @@ class Loop(object):
         
     def _sleep(self, v, cb_maker=identity):
         cb = lambda: cb_maker(self.wake)(True)
+        assert v >= 0
             
         if v > 0:
             self._wakeup_timer = self.hub.call_later(v, cb)
