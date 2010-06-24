@@ -122,6 +122,8 @@ class Loop(object):
                 self.reset()
                 self.hub.call_later(0.5, self.wake)
             self.app.runhub.throw(*sys.exc_info())
+        else:
+            self.dispatch()
         finally:
             if self.connection_stack:
                 self.connection_stack.pop().shutdown()
