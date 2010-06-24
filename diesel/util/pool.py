@@ -8,10 +8,9 @@ class ConnectionPool(object):
     to close_callable() connections that will not fit on the pool.
     '''
     
-    def __init__(self, init_callable, close_callable, release_callable=None, pool_size=5):
+    def __init__(self, init_callable, close_callable, pool_size=5):
         self.init_callable = init_callable
         self.close_callable = close_callable
-        self.release_callable = release_callable
         self.pool_size = pool_size
         self.connections = deque()
 
@@ -24,13 +23,10 @@ class ConnectionPool(object):
         else:
             return self.get()
 
-    def release(self, conn):
+    def release(self, conn, error=False):
         if not conn.closed:
-            if len(self.connections) < self.pool_size:
-                if self.release_callable:
-                    self.release_callable(conn, self.connections.append)
-                else:
-                    self.connections.append(conn)
+            if not error and len(self.connections) < self.pool_size:
+                self.connections.append(conn)
             else:
                 self.close_callable(conn)
 
@@ -52,5 +48,6 @@ class ConnContextWrapper(object):
     def __enter__(self):
         return self.conn
 
-    def __exit__(self, *args, **kw):
-        self.pool.release(self.conn)
+    def __exit__(self, type, value, tb):
+        error = not type
+        self.pool.release(self.conn, error)
