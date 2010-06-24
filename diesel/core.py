@@ -87,19 +87,6 @@ current_loop = None
 
 class ContinueNothing(object): pass
 
-def multi_callback(pos, tot):
-    def complete(f):
-        if tot == 1:
-            return f
-        def m_c(res):
-            if isinstance(res, Exception):
-                return f(res)
-            real_arg = [None] * tot
-            real_arg[pos] = res
-            return f(tuple(real_arg))
-        return m_c
-    return complete
-
 def identity(cb): return cb
 
 def id_gen():
