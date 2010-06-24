@@ -4,7 +4,7 @@
 import urllib
 from collections import defaultdict
 
-from diesel import until, until_eol, count, ConnectionClosed, send
+from diesel import until, until_eol, receive, ConnectionClosed, send
 
 status_strings = {
     100 : "Continue",
@@ -207,7 +207,7 @@ class HttpServer(object):
                 req.body = None
 
             elif more_mode is self.BODY_CL:
-                req.body = count(int(heads.get_one('Content-Length')))
+                req.body = receive(int(heads.get_one('Content-Length')))
 
             elif more_mode is self.BODY_CHUNKED:
                 req.body = handle_chunks(heads)
@@ -280,8 +280,8 @@ def handle_chunks(headers, timeout=None):
         if size == 0:
             break
         else:
-            chunks.append(count(size))
-            _ = count(2) # ignore trailing CRLF
+            chunks.append(receive(size))
+            _ = receive(2) # ignore trailing CRLF
 
     while True:
         ev, val = first(until_eol=True, sleep=timeout_handler.remaining())
@@ -348,7 +348,7 @@ class HttpClient(Client):
         else:
             cl = int(heads.get_one('Content-Length', 0))
             if cl:
-                ev, val = first(count=cl, sleep=timeout_handler.remaining())
+                ev, val = first(receive=cl, sleep=timeout_handler.remaining())
                 if ev == 'sleep': timeout_handler.timeout()
                 body = val
             else:

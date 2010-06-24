@@ -6,6 +6,7 @@ import socket
 import traceback
 import errno
 import sys
+import itertools
 from greenlet import greenlet
 from types import GeneratorType
 from collections import deque, defaultdict
@@ -41,7 +42,7 @@ def until(*args, **kw):
 def until_eol():
     return until("\r\n")
 
-def count(*args, **kw):
+def receive(*args, **kw):
     return current_loop.input_op(*args, **kw)
     
 def send(*args, **kw):
@@ -143,7 +144,7 @@ class Loop(object):
         return self.dispatch()
 
     def first(self, sleep=None, waits=None,
-            count=None, until=None, until_eol=None):
+            receive=None, until=None, until_eol=None):
         def marked_cb(kw):
             def deco(f):
                 def mark(d):
@@ -153,13 +154,13 @@ class Loop(object):
                 return mark
             return deco
 
-        f_sent = filter(None, (count, until, until_eol))
+        f_sent = filter(None, (receive, until, until_eol))
         assert len(f_sent) <= 1,(
-        "only 1 of (count, until, until_eol) may be provided")
+        "only 1 of (receive, until, until_eol) may be provided")
         sentinel = None
-        if count:
-            sentinel = count
-            tok = 'count'
+        if receive:
+            sentinel = receive
+            tok = 'receive'
         elif until:
             sentinel = until
             tok = 'until'
@@ -271,8 +272,8 @@ class Loop(object):
         else:
             self.coroutine.switch()
 
-    def input_op(self, sentinel_or_count):
-        v = self._input_op(sentinel_or_count)
+    def input_op(self, sentinel_or_receive):
+        v = self._input_op(sentinel_or_receive)
         if v:
             return v
         else:

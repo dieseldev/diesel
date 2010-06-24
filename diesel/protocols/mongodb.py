@@ -4,7 +4,7 @@
 import itertools
 import struct
 from collections import deque
-from diesel import Client, call, sleep, send, count, first, Loop, Application, ConnectionClosed
+from diesel import Client, call, sleep, send, receive, first, Loop, Application, ConnectionClosed
 from pymongo.bson import BSON, _make_c_string, _to_dicts
 from pymongo.son import SON
 
@@ -58,9 +58,9 @@ class MongoClient(Client):
 
     def _put_request_get_response(self, op, data):
         self._put_request(op, data)
-        header = count(HEADER_SIZE)
+        header = receive(HEADER_SIZE)
         length, id, to, code = struct.unpack('<4i', header)
-        message = count(length - HEADER_SIZE)
+        message = receive(length - HEADER_SIZE)
         cutoff = struct.calcsize('<iqii')
         flag, cid, start, numret = struct.unpack('<iqii', message[:cutoff])
         body = _to_dicts(message[cutoff:])
@@ -307,9 +307,9 @@ class RawMongoClient(Client):
         if not respond:
             return ''
         else:
-            header = count(HEADER_SIZE)
+            header = receive(HEADER_SIZE)
             length, id, to, opcode = struct.unpack('<4i', header)
-            body = count(length - HEADER_SIZE)
+            body = receive(length - HEADER_SIZE)
             return header + body
 
 class MongoProxy(object):
@@ -324,10 +324,10 @@ class MongoProxy(object):
         try:
             backend = None
             while True:
-                header = count(HEADER_SIZE)
+                header = receive(HEADER_SIZE)
                 info = struct.unpack('<4i', header)
                 length, id, to, opcode = info
-                body = count(length - HEADER_SIZE)
+                body = receive(length - HEADER_SIZE)
                 resp, info, body = self.handle_request(info, body)
                 if resp is not None:
                     # our proxy will respond without talking to the backend
