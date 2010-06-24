@@ -18,13 +18,13 @@ class ConnectionPool(object):
         if not self.connections:
             self.connections.append(self.init_callable())
         conn = self.connections.pop()
-        if not conn.closed:
+        if not conn.is_closed:
             return conn
         else:
             return self.get()
 
     def release(self, conn, error=False):
-        if not conn.closed:
+        if not conn.is_closed:
             if not error and len(self.connections) < self.pool_size:
                 self.connections.append(conn)
             else:
@@ -49,5 +49,5 @@ class ConnContextWrapper(object):
         return self.conn
 
     def __exit__(self, type, value, tb):
-        error = not type
+        error = type is not None
         self.pool.release(self.conn, error)
