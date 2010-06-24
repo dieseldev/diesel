@@ -333,14 +333,14 @@ class Connection(object):
                     code, s = e
                     if code in (errno.EAGAIN, errno.EINTR):
                         self.pipeline.backup(data)
-                        return True
+                        return 
                     self.shutdown(True)
                 else:
                     if bsent != len(data):
                         self.pipeline.backup(data[bsent:])
 
                     if not self.pipeline.empty:
-                        return True
+                        return 
                     else:
                         self.set_writable(False)
 
