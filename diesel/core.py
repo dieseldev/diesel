@@ -89,12 +89,7 @@ class ContinueNothing(object): pass
 
 def identity(cb): return cb
 
-def id_gen():
-    x = 1
-    while True:
-        yield x
-        x += 1
-ids = id_gen()
+ids = itertools.count(1)
 
 class Loop(object):
     def __init__(self, loop_callable, *args, **kw):
