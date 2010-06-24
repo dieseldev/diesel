@@ -6,8 +6,8 @@ from logmod import Logger, LOGLVL_DEBUG, LOGLVL_INFO, LOGLVL_WARN, LOGLVL_ERR, L
 #from core import ClientConnectionError, ClientConnectionClosed
 import events
 from core import sleep, Loop, wait, fire, thread, until, Connection, ConnectionClosed
-from core import until_eol, send, count
+from core import until_eol, send, count, call
 from app import Application, Service 
-from client import Client, call, message, response
+from client import Client
 from security import TLSv1ServiceWrapper, TLSv1ClientWrapper
 from resolver import resolve_dns_name, DNSResolutionError

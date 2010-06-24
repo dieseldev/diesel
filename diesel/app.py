@@ -177,7 +177,7 @@ class Service(object):
             raise
         sock.setblocking(0)
         def make_connection():
-            c = Connection(runtime.current_app.hub, sock, addr)
+            c = Connection(sock, addr)
             l = Loop(self.connection_handler, addr)
             l.connection_stack.append(c)
             runtime.current_app.add_loop(l)

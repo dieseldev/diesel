@@ -3,45 +3,41 @@
 Utilizes sleep as well.
 '''
 
-from diesel import Application, Client, call, Loop, sleep, until_eol, response, log
+from diesel import Application, Client, call, Loop, sleep, until_eol, log, send
 import time
 
 class EchoClient(Client):
     @call
     def echo(self, message):
-        yield "%s!\r\n" % message
-        back = yield until_eol()
-        yield response(back)
+        send("%s!\r\n" % message)
+        back = until_eol()
+        return back
 
     @call
     def echo_whatup(self):
-        resp = yield self.echo('whatup?')
-        yield response(resp)
+        return self.echo('whatup?')
 
     def on_close(self):
         log.info('ouch!  closed!')
 
-
 def echo_loop(n):
     def _loop():
-        client = EchoClient()
-        yield client.connect('localhost', 8013)
+        client = EchoClient('localhost', 8013)
         while 1:
-            bar = yield client.echo("foo %s" % n)
+            bar = client.echo("foo %s" % n)
             tms = time.asctime()
             log.info("[%s] %s: remote service said %r" % (tms, n, bar))
-            yield sleep(2)
+            sleep(2)
     return _loop
 
 def echo_self_loop(n):
     def _loop():
-        client = EchoClient()
-        yield client.connect('localhost', 8013)
+        client = EchoClient('localhost', 8013)
         while 1:
-            bar = yield client.echo_whatup()
+            bar = client.echo_whatup()
             tms = time.asctime()
             log.info("[%s] %s: (whatup) remote service said %r" % (tms, n, bar))
-            yield sleep(3)
+            sleep(3)
     return _loop
 
 a = Application()

@@ -12,7 +12,6 @@ from collections import deque, defaultdict
 
 from diesel import pipeline
 from diesel import buffer
-from diesel.client import call, message, response, connect, _client_wait
 from diesel.security import ssl_async_handshake
 from diesel import runtime
 from diesel import logmod, log
@@ -24,11 +23,6 @@ class ConnectionClosed(socket.error):
 
 class ClientConnectionError(socket.error): 
     '''Raised if a client cannot connect.
-    '''
-    pass
-
-class ClientConnectionClosed(socket.error): 
-    '''Raised if a remote server closes the connection on a client.
     '''
     pass
 
@@ -64,6 +58,27 @@ def sleep(*args, **kw):
     
 def thread(*args, **kw):
     return current_loop.thread(*args, **kw)
+
+def _private_connect(*args, **kw):
+    return current_loop.connect(*args, **kw)
+
+class call(object):
+    def __init__(self, f, inst=None):
+        self.f = f
+        self.client = inst
+
+    def __get__(self, inst, cls):
+        return call(self.f, inst)
+
+    def __call__(self, *args, **kw):
+        if not self.client.connected:
+            raise RuntimeError("Client call failed: client is not connected")
+        current_loop.connection_stack.append(self.client.conn)
+        try:
+            r = self.f(self.client, *args, **kw)
+        finally:
+            current_loop.connection_stack.pop()
+        return r
 
 current_loop = None
 
@@ -103,8 +118,6 @@ class Loop(object):
         self.reset()
 
     def reset(self):
-#        self.pipeline = NoPipeline()
-#        self.buffer = NoBuffer()
         self._wakeup_timer = None
         self.fire_handlers = {}
         self.coroutine = greenlet(self.run)
@@ -140,6 +153,44 @@ class Loop(object):
 
     def thread(self, f, *args, **kw):
         self.hub.run_in_thread(self.wake, f, *args, **kw)
+        return self.dispatch()
+
+    def connect(self, client, ip, sock):
+        def connect_callback():
+            self.hub.unregister(sock)
+            def finish():
+                client.conn = Connection(fsock, ip)
+                client.connected = True
+                self.hub.schedule(
+                lambda: self.wake()
+                )
+                
+            if client.security:
+                fsock = client.security.wrap(sock)
+                ssl_async_handshake(fsock, self.hub, finish)
+            else:
+                fsock = sock
+                finish()
+
+        def error_callback():
+            self.hub.unregister(ret.sock)
+            self.hub.schedule(
+            lambda: self.wake(
+            ClientConnectionError("odd error on connect()!")
+            ))
+
+        def read_callback():
+            self.hub.unregister(ret.sock)
+            try:
+                s = ret.sock.recv(100)
+            except socket.error, e:
+                self.hub.schedule(
+                lambda: self.wake(
+                ClientConnectionError(str(e))
+                ))
+
+        self.hub.register(sock, read_callback, connect_callback, error_callback)
+        self.hub.enable_write(sock)
         return self.dispatch()
 
     def sleep(self, v=0):
@@ -229,8 +280,8 @@ class Loop(object):
         conn.set_writable(True)
 
 class Connection(object):
-    def __init__(self, hub, sock, addr):
-        self.hub = hub
+    def __init__(self, sock, addr):
+        self.hub = runtime.current_app.hub
         self.pipeline = pipeline.Pipeline()
         self.buffer = buffer.Buffer()
         self.sock = sock
