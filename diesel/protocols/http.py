@@ -4,7 +4,7 @@
 import urllib
 from collections import defaultdict
 
-from diesel import up, until, until_eol, bytes, ConnectionClosed, catch
+from diesel import until, until_eol, count, ConnectionClosed, send
 
 status_strings = {
     100 : "Continue",
@@ -185,21 +185,21 @@ class HttpServer(object):
         while True:
             chunks = []
             try:
-                header_line = yield until_eol()
+                header_line = until_eol()
             except ConnectionClosed:
                 break
 
             method, url, version = parse_request_line(header_line)    
             req = HttpRequest(method, url, version, remote_addr=addr)
 
-            header_block = yield until('\r\n\r\n')
+            header_block = until('\r\n\r\n')
 
             heads = HttpHeaders()
             heads.parse(header_block)
             req.headers = heads
 
             if req.version >= '1.1' and heads.get_one('Expect') == '100-continue':
-                yield 'HTTP/1.1 100 Continue\r\n\r\n'
+                send('HTTP/1.1 100 Continue\r\n\r\n')
 
             more_mode = self.check_for_http_body(heads)
 
@@ -207,17 +207,13 @@ class HttpServer(object):
                 req.body = None
 
             elif more_mode is self.BODY_CL:
-                req.body = yield bytes(int(heads.get_one('Content-Length')))
+                req.body = count(int(heads.get_one('Content-Length')))
 
             elif more_mode is self.BODY_CHUNKED:
                 req.body = handle_chunks(heads)
 
             leave_loop = False
-            try:
-                yield catch(self.request_handler(req), HttpClose)
-            except HttpClose:
-                leave_loop = True
-            if leave_loop:
+            if not self.request_handler(req):
                 break
 
 def http_response(req, code, heads, body):
@@ -234,16 +230,17 @@ def http_response(req, code, heads, body):
     else:
         close = False
         heads.set('Connection', 'keep-alive')
-    yield '''HTTP/%s %s %s\r\n%s\r\n\r\n''' % (
+    send('''HTTP/%s %s %s\r\n%s\r\n\r\n''' % (
     req.version, code, status_strings.get(code, "Unknown Status"), 
-    heads.format())
+    heads.format()))
     if body:
-        yield body
+        send(body)
     if close:
-        raise HttpClose()
+        return False
+    return True
 
 import time
-from diesel import Client, call, response, sleep
+from diesel import Client, call, sleep
 
 class HttpRequestTimeout(Exception): pass
 
