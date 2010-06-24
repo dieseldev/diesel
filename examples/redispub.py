@@ -8,13 +8,12 @@ import time, sys
 
 def send_loop():
     c = RedisClient()
-    yield c.connect()
-    yield sleep(1)
+    sleep(1)
 
     print 'SEND S', time.time()
 
     for x in xrange(500):
-        yield c.publish("foo", "bar")
+        c.publish("foo", "bar")
 
     print 'SEND E', time.time()
 
@@ -24,7 +23,7 @@ def recv_loop():
     print 'RECV S', time.time()
     with hub.sub('foo') as poll:
         for x in xrange(500):
-            q, content = yield poll.fetch()
+            q, content = poll.fetch()
     print 'RECV E', time.time()
 
 a = Application()
