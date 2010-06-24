@@ -66,6 +66,9 @@ def _private_connect(*args, **kw):
 def first(*args, **kw):
     return current_loop.first(*args, **kw)
 
+def fork(*args, **kw):
+    return current_loop.fork(*args, **kw)
+
 class call(object):
     def __init__(self, f, inst=None):
         self.f = f
@@ -144,6 +147,11 @@ class Loop(object):
     def thread(self, f, *args, **kw):
         self.hub.run_in_thread(self.wake, f, *args, **kw)
         return self.dispatch()
+
+    def fork(self, f, *args, **kw):
+        def wrap():
+            return f(*args, **kw)
+        self.app.add_loop(Loop(wrap))
 
     def first(self, sleep=None, waits=None,
             receive=None, until=None, until_eol=None):
