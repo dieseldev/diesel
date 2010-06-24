@@ -4,13 +4,13 @@
 import socket
 import traceback
 import errno
+from greenlet import greenlet
 
 from diesel.hub import EventHub
 from diesel import logmod, log
-from diesel import Connection, LoopKeepAlive
 from diesel.security import ssl_async_handshake
-
-current_app = None
+from diesel import runtime
+from diesel.events import WaitPool
 
 class Application(object):
     '''The Application represents diesel's main loop--
@@ -18,10 +18,10 @@ class Application(object):
     Client protocol work, etc.
     '''
     def __init__(self, logger=None, allow_app_replacement=False):
-        global current_app
-        assert (allow_app_replacement or current_app is None), "Only one Application instance per program allowed"
-        current_app = self
+        assert (allow_app_replacement or runtime.current_app is None), "Only one Application instance per program allowed"
+        runtime.current_app = self
         self.hub = EventHub()
+        self.waits = WaitPool()
         self._run = False
         if logger is None:
             logger = logmod.Logger()
@@ -50,29 +50,26 @@ class Application(object):
                 self.global_bail("low-level socket error on bound service"))
 
         for l in self._loops:
-            self.hub.schedule(l.iterate)
+            self.hub.schedule(l.wake)
 
         self.setup()
-        while self._run:
-            try:
-                self.hub.handle_events()
-            except SystemExit:
-                log.warn("-- SystemExit raised.. exiting main loop --")
-                break
-            except KeyboardInterrupt:
-                log.warn("-- KeyboardInterrupt raised.. exiting main loop --")
-                break
-            except Exception, e:
-                if type(e) != LoopKeepAlive:
+        def main():
+            while self._run:
+                try:
+                    self.hub.handle_events()
+                except SystemExit:
+                    log.warn("-- SystemExit raised.. exiting main loop --")
+                    break
+                except KeyboardInterrupt:
+                    log.warn("-- KeyboardInterrupt raised.. exiting main loop --")
+                    break
+                except Exception, e:
                     log.error("-- Unhandled Exception rose to main loop --")
                     log.error(traceback.format_exc())
-                for l in self._loops:
-                    if l.keep_alive and l.state == l.ENDED_EXCEPTION:
-                        log.error("-- Keep-Alive loop %s being restarted --" % l)
-                        l.reset()
-                        self.hub.call_later(0.2, l.iterate)
 
-        log.info('Ending diesel application')
+            log.info('Ending diesel application')
+        self.runhub = greenlet(main)
+        self.runhub.switch()
         current_app = None
 
     def add_service(self, service):
