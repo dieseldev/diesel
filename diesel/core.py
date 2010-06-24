@@ -152,6 +152,8 @@ class Loop(object):
         def marked_cb(kw):
             def deco(f):
                 def mark(d):
+                    if isinstance(d, Exception):
+                        return f(d)
                     return f((kw, d))
                 return mark
             return deco
@@ -172,7 +174,7 @@ class Loop(object):
         if sentinel:
             early_val = self._input_op(sentinel, marked_cb(tok))
             if early_val:
-                return early_val
+                return tok, early_val
             # othewise.. process others and dispatch
 
         if sleep is not None:

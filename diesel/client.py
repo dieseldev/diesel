@@ -11,6 +11,7 @@ class Client(object):
     def __init__(self, addr, port, security=None):
         self.security = security
         self.connected = False
+        self.closed = False
         self.conn = None
         self.addr = addr
         self.port = port
