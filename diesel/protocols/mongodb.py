@@ -108,7 +108,7 @@ class MongoClient(Client):
         _, _, _, r = res
         doc = r[0]
         if doc.get('err'):
-            raise MongoOperationalError(doc['error'])
+            raise MongoOperationalError(doc['err'])
 
     @call
     def update(self, col, spec, doc, upsert=False, multi=False, safe=True):
