@@ -215,16 +215,16 @@ class Loop(object):
                 finish()
 
         def error_callback():
-            self.hub.unregister(ret.sock)
+            self.hub.unregister(sock)
             self.hub.schedule(
             lambda: self.wake(
             ClientConnectionError("odd error on connect()!")
             ))
 
         def read_callback():
-            self.hub.unregister(ret.sock)
+            self.hub.unregister(sock)
             try:
-                s = ret.sock.recv(100)
+                s = sock.recv(100)
             except socket.error, e:
                 self.hub.schedule(
                 lambda: self.wake(
