@@ -73,9 +73,9 @@ class Application(object):
                     log.error(traceback.format_exc())
 
             log.info('Ending diesel application')
+            current_app = None
         self.runhub = greenlet(main)
         self.runhub.switch()
-        current_app = None
 
     def add_service(self, service):
         '''Add a Service instance to this Application.
