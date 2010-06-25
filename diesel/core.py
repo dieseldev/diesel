@@ -311,7 +311,7 @@ class Loop(object):
         except IndexError:
             raise RuntimeError("Cannot complete socket operation: no associated connection")
         if conn.closed:
-            raise RuntimeError("Cannot complete socket operation: associated connection is closed")
+            raise ConnectionClosed("Cannot complete socket operation: associated connection is closed")
         return conn
 
     def send(self, o, priority=5):
