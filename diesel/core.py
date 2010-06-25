@@ -111,23 +111,26 @@ class Loop(object):
     def reset(self):
         self._wakeup_timer = None
         self.fire_handlers = {}
-        self.coroutine = greenlet(self.run)
         self.connection_stack = []
+        self.coroutine = None
 
     def run(self):
+        from diesel.app import ApplicationEnd
         try:
             self.loop_callable(*self.args, **self.kw)
+        except (SystemExit, KeyboardInterrupt, ApplicationEnd):
+            raise
         except:
-            if self.keep_alive:
-                log.warn("(Keep-Alive loop %s died; restarting)" % self)
-                self.reset()
-                self.hub.call_later(0.5, self.wake)
-            self.app.runhub.throw(*sys.exc_info())
-        else:
-            self.dispatch()
+            log.error("-- Unhandled Exception in local loop --")
+            log.error(traceback.format_exc())
         finally:
             if self.connection_stack:
+                assert len(self.connection_stack) == 1
                 self.connection_stack.pop().shutdown()
+        if self.keep_alive:
+            log.warn("(Keep-Alive loop %s died; restarting)" % self)
+            self.reset()
+            self.hub.call_later(0.5, self.wake)
 
     def __hash__(self):
         return self.id
@@ -276,6 +279,9 @@ class Loop(object):
         when it is rescheduled.
         '''
         global current_loop
+        if self.coroutine is None:
+            self.coroutine = greenlet(self.run)
+            assert self.coroutine.parent == runtime.current_app.runhub
         self.clear_pending_events()
         current_loop = self
         if isinstance(value, Exception):
