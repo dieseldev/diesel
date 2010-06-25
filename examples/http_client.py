@@ -9,11 +9,11 @@ from diesel import Application, Loop, log
 from diesel.protocols.http import HttpClient, HttpHeaders
 
 def req_loop():
-    client = HttpClient('www.jamwt.com', 80)
-    heads = HttpHeaders()
-    heads.set('Host', 'www.jamwt.com')
-    log.info(client.request('GET', '/Py-TOC/', heads))
-    log.info(client.request('GET', '/', heads))
+    with HttpClient('www.jamwt.com', 80) as client:
+        heads = HttpHeaders()
+        heads.set('Host', 'www.jamwt.com')
+        log.info(client.request('GET', '/Py-TOC/', heads))
+        log.info(client.request('GET', '/', heads))
     a.halt()
 
 a = Application()

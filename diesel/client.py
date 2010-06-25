@@ -31,6 +31,12 @@ class Client(object):
             else:
                 raise
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args, **kw):
+        self.close()
+
     def close(self):
         '''Close the socket to the remote host.
         '''
