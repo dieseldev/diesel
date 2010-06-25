@@ -361,5 +361,6 @@ class HttpClient(Client):
 from diesel.security import TLSv1ClientWrapper
 
 class HttpsClient(HttpClient):
-    def __init__(self):
-        HttpClient.__init__(self, security=TLSv1ClientWrapper())
+    def __init__(self, *args, **kw):
+        kw['security'] = TLSv1ClientWrapper()
+        HttpClient.__init__(self, *args, **kw)
