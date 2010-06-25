@@ -141,6 +141,9 @@ class Loop(object):
         '''
         if self._wakeup_timer and self._wakeup_timer.pending:
             self._wakeup_timer.cancel()
+        if self.connection_stack:
+            self.connection_stack[-1].buffer.clear_term()
+            self.connection_stack[-1].waiting_callback = None
         self.fire_handlers = {}
         self.app.waits.clear(self)
 
@@ -292,11 +295,8 @@ class Loop(object):
     def _input_op(self, sentinel, cb_maker=identity):
         conn = self.check_connection()
         cb = cb_maker(self.wake)
-        def full_cb(v):
-            conn.waiting_callback = None
-            return cb(v)
         res = conn.buffer.set_term(sentinel)
-        return self.check_buffer(conn, full_cb)
+        return self.check_buffer(conn, cb)
         
     def check_buffer(self, conn, cb):
         res = conn.buffer.check()
