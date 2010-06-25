@@ -385,7 +385,7 @@ class RedisClient(Client):
     def zcard(self, key):
         self._send('ZCARD', key)
         resp = self._get_response()
-        response(int(resp))
+        return int(resp)
 
     @call
     def zscore(self, key, member):
