@@ -42,7 +42,6 @@ class Application(object):
         '''Start up an Application--blocks until the program ends
         or .halt() is called.
         '''
-        global current_app
         self._run = True
         log.info('Starting diesel application')
 
@@ -73,7 +72,7 @@ class Application(object):
                     log.error(traceback.format_exc())
 
             log.info('Ending diesel application')
-            current_app = None
+            runtime.current_app = None
         self.runhub = greenlet(main)
         self.runhub.switch()
 
