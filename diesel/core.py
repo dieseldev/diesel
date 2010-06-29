@@ -126,7 +126,7 @@ class Loop(object):
         finally:
             if self.connection_stack:
                 assert len(self.connection_stack) == 1
-                self.connection_stack.pop().shutdown()
+                self.connection_stack.pop().close()
         if self.keep_alive:
             log.warn("(Keep-Alive loop %s died; restarting)" % self)
             self.reset()
@@ -352,6 +352,10 @@ class Connection(object):
             self.hub.disable_write(self.sock)
             self._writable = False
 
+    def close(self):
+        self.set_writable(True)
+        self.pipeline.close_request()
+        
     def shutdown(self, remote_closed=False):
         '''Clean up after a client disconnects or after
         the connection_handler ends (and we disconnect).
