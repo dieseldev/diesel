@@ -388,12 +388,6 @@ class RedisClient(Client):
         return int(resp)
 
     @call
-    def zcard(self, key):
-        yield self._send('ZCARD', key)
-        resp = yield self._get_response()
-        yield response(int(resp))
-
-    @call
     def zscore(self, key, member):
         self._send_bulk('ZSCORE', str(member), key)
         resp = self._get_response()
