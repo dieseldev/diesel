@@ -345,6 +345,14 @@ class HttpClient(Client):
 
         if heads.get_one('Transfer-Encoding') == 'chunked':
             body = handle_chunks(heads, timeout_handler.remaining())
+        elif heads.get_one('Connection') == 'close' and 'Content-Length' not in heads:
+            body = ''
+            try:
+                while True:
+                    c = receive(1)
+                    body += c
+            except ConnectionClosed:
+                pass
         else:
             cl = int(heads.get_one('Content-Length', 0))
             if cl:
