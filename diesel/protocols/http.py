@@ -349,10 +349,11 @@ class HttpClient(Client):
             body = ''
             try:
                 while True:
-                    c = receive(1)
-                    body += c
-            except ConnectionClosed:
-                pass
+                    s = receive(2**16)
+                    body += s
+            except ConnectionClosed, e:
+                if e.buffer:
+                    body += e.buffer
         else:
             cl = int(heads.get_one('Content-Length', 0))
             if cl:

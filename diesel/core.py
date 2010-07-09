@@ -20,7 +20,9 @@ from diesel import logmod, log
 class ConnectionClosed(socket.error): 
     '''Raised if the client closes the connection.
     '''
-    pass
+    def __init__(self, msg, buffer=None):
+        socket.error.__init__(self, msg)
+        self.buffer = buffer
 
 class ClientConnectionError(socket.error): 
     '''Raised if a client cannot connect.
@@ -365,7 +367,9 @@ class Connection(object):
         self.sock.close()
 
         if remote_closed and self.waiting_callback:
-            self.waiting_callback(ConnectionClosed('Connection closed by remote host'))
+            self.waiting_callback(
+            ConnectionClosed('Connection closed by remote host',
+            self.buffer.pop()))
 
     def handle_write(self):
         '''The low-level handler called by the event hub
