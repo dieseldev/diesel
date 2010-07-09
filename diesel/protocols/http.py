@@ -4,7 +4,7 @@
 import urllib
 from collections import defaultdict
 
-from diesel import up, until, until_eol, bytes, ConnectionClosed, catch
+from diesel import until, until_eol, receive, ConnectionClosed, send
 
 status_strings = {
     100 : "Continue",
@@ -185,21 +185,21 @@ class HttpServer(object):
         while True:
             chunks = []
             try:
-                header_line = yield until_eol()
+                header_line = until_eol()
             except ConnectionClosed:
                 break
 
             method, url, version = parse_request_line(header_line)    
             req = HttpRequest(method, url, version, remote_addr=addr)
 
-            header_block = yield until('\r\n\r\n')
+            header_block = until('\r\n\r\n')
 
             heads = HttpHeaders()
             heads.parse(header_block)
             req.headers = heads
 
             if req.version >= '1.1' and heads.get_one('Expect') == '100-continue':
-                yield 'HTTP/1.1 100 Continue\r\n\r\n'
+                send('HTTP/1.1 100 Continue\r\n\r\n')
 
             more_mode = self.check_for_http_body(heads)
 
@@ -207,17 +207,13 @@ class HttpServer(object):
                 req.body = None
 
             elif more_mode is self.BODY_CL:
-                req.body = yield bytes(int(heads.get_one('Content-Length')))
+                req.body = receive(int(heads.get_one('Content-Length')))
 
             elif more_mode is self.BODY_CHUNKED:
                 req.body = handle_chunks(heads)
 
             leave_loop = False
-            try:
-                yield catch(self.request_handler(req), HttpClose)
-            except HttpClose:
-                leave_loop = True
-            if leave_loop:
+            if not self.request_handler(req):
                 break
 
 def http_response(req, code, heads, body):
@@ -234,16 +230,17 @@ def http_response(req, code, heads, body):
     else:
         close = False
         heads.set('Connection', 'keep-alive')
-    yield '''HTTP/%s %s %s\r\n%s\r\n\r\n''' % (
+    send('''HTTP/%s %s %s\r\n%s\r\n\r\n''' % (
     req.version, code, status_strings.get(code, "Unknown Status"), 
-    heads.format())
+    heads.format()))
     if body:
-        yield body
+        send(body)
     if close:
-        raise HttpClose()
+        return False
+    return True
 
 import time
-from diesel import Client, call, response, sleep
+from diesel import Client, call, sleep, first
 
 class HttpRequestTimeout(Exception): pass
 
@@ -271,8 +268,10 @@ def handle_chunks(headers, timeout=None):
 
     chunks = []
     while True:
-        chunk_head, t = yield (until_eol(), sleep(timeout_handler.remaining()))
-        if t: timeout_handler.timeout()
+        ev, val = first(until_eol=True, sleep=timeout_handler.remaining())
+        if ev == 'sleep': timeout_handler.timeout()
+
+        chunk_head = val
 
         if ';' in chunk_head:
             # we don't support any chunk extensions
@@ -281,12 +280,14 @@ def handle_chunks(headers, timeout=None):
         if size == 0:
             break
         else:
-            chunks.append((yield bytes(size)))
-            _ = yield bytes(2) # ignore trailing CRLF
+            chunks.append(receive(size))
+            _ = receive(2) # ignore trailing CRLF
 
     while True:
-        trailer, t = yield (until_eol(), sleep(timeout_handler.remaining()))
-        if t: timeout_handler.timeout()
+        ev, val = first(until_eol=True, sleep=timeout_handler.remaining())
+        if ev == 'sleep': timeout_handler.timeout()
+
+        trailer = val
 
         if trailer.strip():
             headers.add(*tuple(trailer.split(':', 1)))
@@ -294,8 +295,8 @@ def handle_chunks(headers, timeout=None):
             body = ''.join(chunks)
             headers.set('Content-Length', len(body))
             headers.remove('Transfer-Encoding')
-            yield up(body)
             break
+    return body
 
 class HttpClient(Client):
     '''An HttpClient instance that issues 1.1 requests,
@@ -320,41 +321,55 @@ class HttpClient(Client):
         if body:
             headers.set('Content-Length', len(body))
 
-        yield '%s\r\n%s\r\n\r\n' % (req.format(), 
-        headers.format())
+        send('%s\r\n%s\r\n\r\n' % (req.format(), 
+        headers.format()))
 
         if body:    
-            yield body
+            send(body)
 
-        resp_line, t = yield (until_eol(), sleep(timeout_handler.remaining()))
-        if t: timeout_handler.timeout()
+        ev, val = first(until_eol=True, sleep=timeout_handler.remaining())
+        if ev == 'sleep': timeout_handler.timeout()
+
+        resp_line = val
         
         version, code, status = resp_line.split(None, 2)
         code = int(code)
 
-        header_block, t = yield (until('\r\n\r\n'), sleep(timeout_handler.remaining()))
-        if t: timeout_handler.timeout()
+        ev, val = first(until="\r\n\r\n", sleep=timeout_handler.remaining())
+        if ev == 'sleep': timeout_handler.timeout()
 
+        header_block = val
         
         heads = HttpHeaders()
         heads.parse(header_block)
 
         if heads.get_one('Transfer-Encoding') == 'chunked':
-            body = yield handle_chunks(heads, timeout_handler.remaining())
+            body = handle_chunks(heads, timeout_handler.remaining())
+        elif heads.get_one('Connection') == 'close' and 'Content-Length' not in heads:
+            body = ''
+            try:
+                while True:
+                    s = receive(2**16)
+                    body += s
+            except ConnectionClosed, e:
+                if e.buffer:
+                    body += e.buffer
         else:
             cl = int(heads.get_one('Content-Length', 0))
             if cl:
-                body, t = yield (bytes(cl), sleep(timeout_handler.remaining()))
-                if t: timeout_handler.timeout()
+                ev, val = first(receive=cl, sleep=timeout_handler.remaining())
+                if ev == 'sleep': timeout_handler.timeout()
+                body = val
             else:
                 body = None
 
         if version < '1.0' or heads.get_one('Connection') == 'close':
             self.close()
-        yield response((code, heads, body))
+        return code, heads, body
 
 from diesel.security import TLSv1ClientWrapper
 
 class HttpsClient(HttpClient):
-    def __init__(self):
-        HttpClient.__init__(self, security=TLSv1ClientWrapper())
+    def __init__(self, *args, **kw):
+        kw['security'] = TLSv1ClientWrapper()
+        HttpClient.__init__(self, *args, **kw)

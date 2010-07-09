@@ -11,7 +11,7 @@ class TestLoops(DieselTest):
         app, touch, acc = self.prepare_test()
         def loop():
             for x in xrange(TOUCHES):
-                yield sleep(0.1)
+                sleep(0.1)
                 touch()
 
         for x in xrange(NUM):

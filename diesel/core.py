@@ -6,26 +6,26 @@ import socket
 import traceback
 import errno
 import sys
+import itertools
+from greenlet import greenlet
 from types import GeneratorType
 from collections import deque, defaultdict
 
 from diesel import pipeline
 from diesel import buffer
-from diesel.client import call, message, response, connect, _client_wait
 from diesel.security import ssl_async_handshake
+from diesel import runtime
+from diesel import logmod, log
 
 class ConnectionClosed(socket.error): 
     '''Raised if the client closes the connection.
     '''
-    pass
+    def __init__(self, msg, buffer=None):
+        socket.error.__init__(self, msg)
+        self.buffer = buffer
 
 class ClientConnectionError(socket.error): 
     '''Raised if a client cannot connect.
-    '''
-    pass
-
-class ClientConnectionClosed(socket.error): 
-    '''Raised if a remote server closes the connection on a client.
     '''
     pass
 
@@ -38,479 +38,306 @@ class LoopKeepAlive(Exception):
 CRLF = '\r\n'
 BUFSIZ = 2 ** 14
 
-class until(object):
-    '''A yield token that indicates the generator wants
-    a string sent back from the socket stream when a 
-    certain `sentinel` is encountered.
-    '''
-    def __init__(self, sentinel):
-        self.sentinel = sentinel
+def until(*args, **kw):
+    return current_loop.input_op(*args, **kw)
 
 def until_eol():
-    '''Macro for `until("\r\n")`.
-    '''
-    return until(CRLF)
+    return until("\r\n")
 
-class bytes(object):
-    '''A yield token that indicates the generator wants
-    a string sent back from the socket stream when a
-    certain number of bytes are available.
-    '''
-    def __init__(self, sentinel):
-        self.sentinel = sentinel
+def receive(*args, **kw):
+    return current_loop.input_op(*args, **kw)
+    
+def send(*args, **kw):
+    return current_loop.send(*args, **kw)
 
-class sleep(object):
-    '''A yield token that indicates the generator wants
-    a callback in `duration` seconds.
+def wait(*args, **kw):
+    return current_loop.wait(*args, **kw)
+    
+def fire(*args, **kw):
+    return current_loop.fire(*args, **kw)
 
-    If no argument is passed, the generator will be called
-    again during the next iteration of the main loop.  It
-    can act as a way to yield control to other loops, with
-    the intention of taking control back as soon as they've
-    had a pass.
-    '''
-    def __init__(self, duration=0):
-        self.duration = duration
+def sleep(*args, **kw):
+    return current_loop.sleep(*args, **kw)
+    
+def thread(*args, **kw):
+    return current_loop.thread(*args, **kw)
 
-class up(object):
-    '''For nested generators, a yield token that indicates this value is 
-    being passed "up" the stack to the "calling" generator, and isn't intended
-    as a message for diesel itself.
-    '''
-    def __init__(self, value):
-        self.value = value
+def _private_connect(*args, **kw):
+    return current_loop.connect(*args, **kw)
 
-class wait(object):
-    '''A yield token that indicates a generators desire to wait until a
-    certain event is `fire`d.
-    '''
-    def __init__(self, event):
-        self.event = event
+def first(*args, **kw):
+    return current_loop.first(*args, **kw)
 
-class fire(object):
-    '''A yield token that fires an event to any appropriate `wait`ers.
-    '''
-    def __init__(self, event, value=None):
-        self.event = event
-        self.value = value
+def fork(*args, **kw):
+    return current_loop.fork(*args, **kw)
 
-class catch(object):
-    '''A yield token that indicates a "calling" generator's willingness
-    to handle certain types of failures in "called" generators.. must be
-    paired with another generator.
-    '''
-    def __init__(self, call, *exc_types):
-        self.call = call
-        self.exc_types = set(exc_types)
-
-class thread(object):
-    def __init__(self, f, *args, **kw):
+class call(object):
+    def __init__(self, f, inst=None):
         self.f = f
-        self.args = args
-        self.kw = kw
+        self.client = inst
 
-class packet(object):
-    def __init__(self, s, priority=5):
-        self.s = s
-        self.priority = priority
+    def __get__(self, inst, cls):
+        return call(self.f, inst)
 
-class WaitPool(object):
-    '''A structure that manages all `wait`ers, makes sure fired events
-    get to the right places, and that all other waits are canceled when
-    a one event is passed back to a generator.
-    '''
-    def __init__(self):
-        self.waits = defaultdict(set)
-        self.loop_refs = defaultdict(set)
+    def __call__(self, *args, **kw):
+        if not self.client.connected:
+            raise RuntimeError("Client call failed: client is not connected")
+        if self.client.is_closed:
+            raise RuntimeError("Client call failed: client connection was closed")
+        current_loop.connection_stack.append(self.client.conn)
+        try:
+            r = self.f(self.client, *args, **kw)
+        finally:
+            current_loop.connection_stack.pop()
+        return r
 
-    def wait(self, who, what):
-        self.waits[what].add(who)
-        self.loop_refs[who].add(what)
+current_loop = None
 
-    def fire(self, what, value):
-        for handler in self.waits[what].copy():
-            handler.fire(what, value)
+class ContinueNothing(object): pass
 
-    def clear(self, who):
-        for what in self.loop_refs[who]:
-            self.waits[what].remove(who)
-        del self.loop_refs[who]
+def identity(cb): return cb
 
-waits = WaitPool()
-
-class NoPipeline(object):
-    '''Fake pipeline for Loops that aren't managing a connection and have no
-    I/O stream.
-    '''
-    def __getattr__(self, *args, **kw):
-        return ValueError("Cannot write to the outgoing pipeline for socketless Loops (yield string, file)")
-    empty = True
-
-class NoBuffer(object):
-    '''Fake buffer for loops that aren't managing a connection and have no
-    I/O stream.
-    '''
-    def clear_term(*args, **kw):
-        pass
-
-    def __getattr__(self, *args, **kw):
-        raise ValueError("Cannot check incoming buffer on socketless Loops (yield until, bytes, etc)")
-
-def id_gen():
-    x = 1
-    while True:
-        yield x
-        x += 1
-ids = id_gen()
-
-def print_errstack(stack, e=None):
-    eout = lambda s: sys.stderr.write(str(s) + "\n")
-    eout("=== DIESEL ERROR ===")
-    if stack:
-        eout("")
-        eout(" Generator stack at time of error:")
-        eout("")
-        for g, c in stack:
-            eout(g.gi_code,)
-            if c:
-                eout(" .. catches %r" % c.exc_types)
-        eout("")
-    eout("")
-    if e:
-        eout(" Standard Traceback:")
-        eout("")
-        traceback.print_exception(*e)
+ids = itertools.count(1)
 
 class Loop(object):
-    '''A cooperative generator that represents an arbitrary piece of
-    logic.
-    '''
-    RUNNING, ENDED_NORMAL, ENDED_EXCEPTION = range(3)
-    def __init__(self, loop_callable, *callable_args):
+    def __init__(self, loop_callable, *args, **kw):
         self.loop_callable = loop_callable
-        self.callbacks = deque()
-        self.callable_args = callable_args
+        self.args = args
+        self.kw = kw
         self.keep_alive = False
-        from diesel.app import current_app
-        self.hub = current_app.hub
-        self.app = current_app
+        self.hub = runtime.current_app.hub
+        self.app = runtime.current_app
         self.id = ids.next()
         self.reset()
 
     def reset(self):
-        self.g = self.cycle_all(self.loop_callable(*self.callable_args))
-        self.pipeline = NoPipeline()
-        self.buffer = NoBuffer()
         self._wakeup_timer = None
         self.fire_handlers = {}
-        self.stack = []
-        self.inherit_callstack = []
-        self.current = None
-        self.state = self.RUNNING
+        self.connection_stack = []
+        self.coroutine = None
+
+    def run(self):
+        from diesel.app import ApplicationEnd
+        try:
+            self.loop_callable(*self.args, **self.kw)
+        except (SystemExit, KeyboardInterrupt, ApplicationEnd):
+            raise
+        except:
+            log.error("-- Unhandled Exception in local loop --")
+            log.error(traceback.format_exc())
+        finally:
+            if self.connection_stack:
+                assert len(self.connection_stack) == 1
+                self.connection_stack.pop().close()
+        if self.keep_alive:
+            log.warn("(Keep-Alive loop %s died; restarting)" % self)
+            self.reset()
+            self.hub.call_later(0.5, self.wake)
 
     def __hash__(self):
         return self.id
 
     def __str__(self):
         return '<Loop id=%s callable=%s>' % (self.id,
-        str(self.callable_args))
-
-    def __eq__(self, other):
-        return other.id == self.id
-
-    def fire(self, what, value):
-        '''Fire an event back into this generator.
-        '''
-        if what in self.fire_handlers:
-            handler = self.fire_handlers.pop(what)
-            self.fire_handlers = {}
-            handler(value)
-
-    @property
-    def fullstack(self):
-        return self.inherit_callstack + self.stack + [(self.current, None)]
-
-    def cycle_all(self, current, error=None):
-        '''Effectively flattens all iterators, providing the
-        "generator stack" effect.
-        '''
-        self.current = current
-        last = None
-        in_self_call = False
-        stack = self.stack
-        while True:
-            try:
-                if error != None:
-                    item = self.current.throw(*error)
-                elif last != None:
-                    item = self.current.send(last)
-                else:
-                    item = self.current.next()
-            except StopIteration:
-                if stack:
-                    self.current, _ = stack.pop()
-                else:
-                    self.state = self.ENDED_NORMAL
-                    raise
-            except Exception, e:
-                errstack = self.fullstack[:] # freeze!
-                error = None
-                while stack:
-                    self.current, level_catch = stack.pop()
-                    if level_catch and \
-                    filter(None, map(lambda x: isinstance(e, x), 
-                    level_catch.exc_types)):
-
-                        error = tuple(sys.exc_info()[:2])
-                        break
-                    else:
-                        self.current.close()
-                if not error: # no one claims to handle it
-                    if self.callbacks:
-                        while self.callbacks:
-                            c = self.callbacks.pop()
-                            c(e)
-                        raise StopIteration()
-                    else:
-                        print_errstack(errstack, sys.exc_info())
-                        self.state = self.ENDED_EXCEPTION
-                        if self.keep_alive:
-                            raise LoopKeepAlive()
-                        else:
-                            raise StopIteration()
-            else:
-                level_catch = None
-                error = None
-
-                if type(item) is catch:
-                    level_catch = item
-                    item = item.call
-
-                if type(item) is GeneratorType:
-                    stack.append((self.current, level_catch))
-                    self.current = item
-                    last = None
-                elif type(item) is call and item.client.conn == self:
-                    in_self_call = True
-                    stack.append((self.current, level_catch))
-                    self.current = item.gen
-                    last = None
-                else:
-                    if type(item) is response:
-                        assert stack, "Cannot return a response from main handler"
-                        self.current, _ = stack.pop()
-                        if in_self_call:
-                            in_self_call = False
-                            item = up(item.value)
-                    elif type(item) is up:
-                        assert stack, "Cannot return an up from main handler"
-                        self.current, _ = stack.pop()
-                    try:
-                        last = (yield item)
-                    except Exception, e:
-                        error = (e.__class__, str(e))
-
-    def multi_callin(self, pos, tot, real_f=None):
-        '''Provide a callable that will pass `None` in all spots
-        that aren't the event that triggered the rescheduling of the
-        generator.  For yield groups.
-        '''
-        real_f = real_f or self.wake
-        if tot == 1:
-            return real_f
-        def f(res):
-            real_arg = [None] * tot
-            real_arg[pos] = res
-            return real_f(tuple(real_arg))
-        return f
-
-    def iterate(self, n_val=None, inherit_callstack=None):
-        '''The algorithm that represents iterating over all items
-        in the nested generator that represents this Loop or
-        Connection.  Run whenever a generator is (re-)scheduled.
-        Handles all the `yield` tokens.
-        '''
-        if self.inherit_callstack:
-            self.inherit_callstack = inherit_callstack 
-        #print 'iter on', self
-
-        while True:
-            if self.g is None:
-                return 
-            try:
-                if isinstance(n_val, Exception):
-                    rets = self.g.throw(n_val)
-                elif n_val is not None:
-                    rets = self.g.send(n_val)
-                else:
-                    rets = self.g.next()
-            except StopIteration:
-                if hasattr(self, 'sock'):
-                    self.pipeline.close_request()
-                break
-            n_val = None
-            if type(rets) != tuple:
-                rets = (rets,)
-
-            exit = False
-            used_term = False
-            used_sleep = False
-            nrets = len(rets)
-            self.buffer.clear_term()
-            for pos, ret in enumerate(rets):
-                #print 'TOKEN', ret
-                
-                if type(ret) is packet:
-                    assert nrets == 1, "a packet cannot be paired with any other yield token"
-                    if self.closed:
-                        print_errstack(self.fullstack)
-                        self.state = self.ENDED_EXCEPTION
-                        raise ValueError("Associated socket closed; cannot yield outgoing packet")
-                    self.pipeline.add(ret.s, ret.priority)
-                elif type(ret) is str or hasattr(ret, 'seek'):
-                    assert nrets == 1, "a string or file cannot be paired with any other yield token"
-                    if self.closed:
-                        print_errstack(self.fullstack)
-                        self.state = self.ENDED_EXCEPTION
-                        raise ValueError("Associated socket closed; cannot yield outgoing string")
-                    self.pipeline.add(ret)
-                elif type(ret) is until or type(ret) is bytes:
-                    assert used_term == False, "only one terminal specifier (bytes, until) per yield is allowed"
-                    if self.closed:
-                        print_errstack(self.fullstack)
-                        self.state = self.ENDED_EXCEPTION
-                        raise ValueError("Associated socket closed; cannot yield input terminator")
-                    used_term = True
-                    self.buffer.set_term(ret.sentinel)
-                    n_val = self.buffer.check()
-                    if n_val == None:
-                        exit = True
-                        self.new_data = self.multi_callin(pos, nrets)
-                    else:
-                        if nrets > 1:
-                            t = [None] * nrets
-                            t[pos] = n_val
-                            n_val = tuple(t)
-                        self.clear_pending_events()
-                        exit = False
-                        break
-                elif type(ret) is connect:
-                    assert nrets == 1, "connect cannot be paired with any other yield token"
-                    def connect_callback():
-                        self.hub.unregister(ret.sock)
-                        def finish():
-                            ret.callback()
-                            self.multi_callin(pos, nrets)()
-                        if ret.security:
-                            ret.sock = ret.security.wrap(ret.sock)
-                            ssl_async_handshake(ret.sock, self.hub, finish)
-                        else:
-                            finish()
-
-                    def error_callback():
-                        self.hub.unregister(ret.sock)
-                        raise ClientConnectionError("odd error on connect()!")
-
-                    def read_callback():
-                        self.hub.unregister(ret.sock)
-                        try:
-                            s = ret.sock.recv(100)
-                        except socket.error, e:
-                            self.multi_callin(pos, nrets)(ClientConnectionError(str(e)))
-
-                    self.hub.register(ret.sock, read_callback, connect_callback, error_callback)
-                    self.hub.enable_write(ret.sock)
-                    exit = True
-    
-                elif type(ret) is sleep:
-                    assert not used_sleep, "only one sleep token per yield is allowed"
-                    used_sleep = True
-                    self._wakeup_timer = self.hub.call_later(ret.duration, self.multi_callin(pos, nrets), True)
-                    exit = True
-
-                elif type(ret) is up:
-                    assert nrets == 1, "up cannot be paired with any other yield token"
-                    n_val = ret.value
-
-                elif type(ret) is fire:
-                    assert nrets == 1, "fire cannot be paired with any other yield token"
-                    waits.fire(ret.event, ret.value)
-
-                elif type(ret) is wait:
-                    self.fire_handlers[ret.event] = self.multi_callin(pos, nrets, self.schedule)
-                    waits.wait(self, ret.event)
-                    exit = True
-                    
-                elif type(ret) is _client_wait:
-                    exit = True
-
-                elif type(ret) is thread:
-                    assert nrets == 1, "thread cannot be paired with any other yield token"
-                    self.hub.run_in_thread(self.multi_callin(pos, nrets), ret.f, *ret.args, **ret.kw)
-                    exit = True
-
-                elif type(ret) is response:
-                    assert nrets == 1, "response cannot be paired with any other yield token"
-                    c = self.callbacks.popleft()
-                    c(ret.value)
-
-                elif type(ret) is call:
-                    assert nrets == 1, "call cannot be paired with any other yield token"
-                    ret.go(self.iterate, inherit_callstack=self.fullstack)
-                    exit = True
-
-                elif type(ret) is message:
-                    assert nrets == 1, "message cannot be paired with any other yield token"
-                    ret.go(inherit_callstack=self.fullstack)
-
-                elif type(ret) is Loop:
-                    assert nrets == 1, "a Loop cannot be paired with any other yield token"
-                    self.app.add_loop(ret)
-
-                else:
-                    print_errstack(self.fullstack)
-                    self.state = self.ENDED_EXCEPTION
-                    raise ValueError("Unknown yield token %r" % (ret,))
-            if exit: 
-                break
-
-        if not self.pipeline.empty:
-            self.set_writable(True)
-
+        str(self.loop_callable))
+        
     def clear_pending_events(self):
         '''When a loop is rescheduled, cancel any other timers or waits.
         '''
         if self._wakeup_timer and self._wakeup_timer.pending:
             self._wakeup_timer.cancel()
+        if self.connection_stack:
+            self.connection_stack[-1].buffer.clear_term()
+            self.connection_stack[-1].waiting_callback = None
         self.fire_handlers = {}
-        waits.clear(self)
+        self.app.waits.clear(self)
 
-    def schedule(self, value=None, callstack=None):
-        '''Called by another Loop--reschedule this loop so the hub will run
-        it.  Used in `response` and `fire` situations.
-        '''
-        self.hub.schedule(lambda: self.wake(value, callstack))
+    def thread(self, f, *args, **kw):
+        self.hub.run_in_thread(self.wake, f, *args, **kw)
+        return self.dispatch()
 
-    def wake(self, value=None, callstack=None):
+    def fork(self, f, *args, **kw):
+        def wrap():
+            return f(*args, **kw)
+        self.app.add_loop(Loop(wrap))
+
+    def first(self, sleep=None, waits=None,
+            receive=None, until=None, until_eol=None):
+        def marked_cb(kw):
+            def deco(f):
+                def mark(d):
+                    if isinstance(d, Exception):
+                        return f(d)
+                    return f((kw, d))
+                return mark
+            return deco
+
+        f_sent = filter(None, (receive, until, until_eol))
+        assert len(f_sent) <= 1,(
+        "only 1 of (receive, until, until_eol) may be provided")
+        sentinel = None
+        if receive:
+            sentinel = receive
+            tok = 'receive'
+        elif until:
+            sentinel = until
+            tok = 'until'
+        elif until_eol:
+            sentinel = "\r\n"
+            tok = 'until_eol'
+        if sentinel:
+            early_val = self._input_op(sentinel, marked_cb(tok))
+            if early_val:
+                return tok, early_val
+            # othewise.. process others and dispatch
+
+        if sleep is not None:
+            self._sleep(sleep, marked_cb('sleep'))
+
+        if waits:
+            for w in waits:
+                self._wait(w, marked_cb('wait-' + w))
+        return self.dispatch()
+
+    def connect(self, client, ip, sock):
+        def connect_callback():
+            self.hub.unregister(sock)
+            def finish():
+                client.conn = Connection(fsock, ip)
+                client.connected = True
+                self.hub.schedule(
+                lambda: self.wake()
+                )
+                
+            if client.security:
+                fsock = client.security.wrap(sock)
+                ssl_async_handshake(fsock, self.hub, finish)
+            else:
+                fsock = sock
+                finish()
+
+        def error_callback():
+            self.hub.unregister(sock)
+            self.hub.schedule(
+            lambda: self.wake(
+            ClientConnectionError("odd error on connect()!")
+            ))
+
+        def read_callback():
+            self.hub.unregister(sock)
+            try:
+                s = sock.recv(100)
+            except socket.error, e:
+                self.hub.schedule(
+                lambda: self.wake(
+                ClientConnectionError(str(e))
+                ))
+
+        self.hub.register(sock, read_callback, connect_callback, error_callback)
+        self.hub.enable_write(sock)
+        return self.dispatch()
+
+    def sleep(self, v=0):
+        self._sleep(v)
+        return self.dispatch()
+        
+    def _sleep(self, v, cb_maker=identity):
+        cb = lambda: cb_maker(self.wake)(True)
+        assert v >= 0
+            
+        if v > 0:
+            self._wakeup_timer = self.hub.call_later(v, cb)
+        else:
+            self.hub.schedule(cb)
+
+    def fire_in(self, what, value):
+        if what in self.fire_handlers:
+            handler = self.fire_handlers.pop(what)
+            self.fire_handlers = {}
+            handler(value)
+
+    def wait(self, event):
+        self._wait(event)
+        return self.dispatch()
+
+    def _wait(self, event, cb_maker=identity):
+        rcb = cb_maker(self.wake)
+        def cb(d): 
+            def call_in():
+                rcb(d)
+            self.hub.schedule(call_in)
+        self.fire_handlers[event] = cb
+        self.app.waits.wait(self, event)
+
+    def fire(self, event, value=None):
+        self.app.waits.fire(event, value)
+
+    def dispatch(self):
+        r = self.app.runhub.switch()
+        return r
+
+    def wake(self, value=ContinueNothing):
         '''Wake up this loop.  Called by the main hub to resume a loop
         when it is rescheduled.
         '''
+        global current_loop
+        if self.coroutine is None:
+            self.coroutine = greenlet(self.run)
+            assert self.coroutine.parent == runtime.current_app.runhub
         self.clear_pending_events()
-        self.iterate(value, callstack)
+        current_loop = self
+        if isinstance(value, Exception):
+            self.coroutine.throw(value)
+        elif value != ContinueNothing:
+            self.coroutine.switch(value)
+        else:
+            self.coroutine.switch()
 
-class Connection(Loop):
-    '''A `Loop` with an associated socket and I/O stream.
-    '''
-    def __init__(self, sock, addr, connection_handler):
-        Loop.__init__(self, connection_handler, addr)
+    def input_op(self, sentinel_or_receive):
+        v = self._input_op(sentinel_or_receive)
+        if v:
+            return v
+        else:
+            return self.dispatch()
+
+    def _input_op(self, sentinel, cb_maker=identity):
+        conn = self.check_connection()
+        cb = cb_maker(self.wake)
+        res = conn.buffer.set_term(sentinel)
+        return self.check_buffer(conn, cb)
+        
+    def check_buffer(self, conn, cb):
+        res = conn.buffer.check()
+        if res:
+            return res
+        conn.waiting_callback = cb
+        return None
+
+    def check_connection(self):
+        try:
+            conn = self.connection_stack[-1]
+        except IndexError:
+            raise RuntimeError("Cannot complete socket operation: no associated connection")
+        if conn.closed:
+            raise ConnectionClosed("Cannot complete socket operation: associated connection is closed")
+        return conn
+
+    def send(self, o, priority=5):
+        conn = self.check_connection()
+        conn.pipeline.add(o, priority)
+        conn.set_writable(True)
+
+class Connection(object):
+    def __init__(self, sock, addr):
+        self.hub = runtime.current_app.hub
         self.pipeline = pipeline.Pipeline()
         self.buffer = buffer.Buffer()
         self.sock = sock
         self.addr = addr
         self.hub.register(sock, self.handle_read, self.handle_write, self.handle_error)
-        self._wakeup_timer = None
         self._writable = False
         self.closed = False
+        self.waiting_callback = None
 
     def set_writable(self, val):
         '''Set the associated socket writable.  Called when there is
@@ -527,6 +354,10 @@ class Connection(Loop):
             self.hub.disable_write(self.sock)
             self._writable = False
 
+    def close(self):
+        self.set_writable(True)
+        self.pipeline.close_request()
+        
     def shutdown(self, remote_closed=False):
         '''Clean up after a client disconnects or after
         the connection_handler ends (and we disconnect).
@@ -534,8 +365,11 @@ class Connection(Loop):
         self.hub.unregister(self.sock)
         self.closed = True
         self.sock.close()
-        if remote_closed:
-            self.schedule(ConnectionClosed())
+
+        if remote_closed and self.waiting_callback:
+            self.waiting_callback(
+            ConnectionClosed('Connection closed by remote host',
+            self.buffer.pop()))
 
     def handle_write(self):
         '''The low-level handler called by the event hub
@@ -553,15 +387,14 @@ class Connection(Loop):
                     code, s = e
                     if code in (errno.EAGAIN, errno.EINTR):
                         self.pipeline.backup(data)
-                        return True
-                    g = self.g
+                        return 
                     self.shutdown(True)
                 else:
                     if bsent != len(data):
                         self.pipeline.backup(data[bsent:])
 
                     if not self.pipeline.empty:
-                        return True
+                        return 
                     else:
                         self.set_writable(False)
 
@@ -580,12 +413,11 @@ class Connection(Loop):
             data = ''
 
         if not data:
-            g = self.g
             self.shutdown(True)
         else:
             res = self.buffer.feed(data)
             if res:
-                self.new_data(res)
+                self.waiting_callback(res)
 
     def handle_error(self):
         self.shutdown(True)

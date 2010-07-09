@@ -8,8 +8,7 @@ class SecureWrapper(object):
         assert ssl is not None, "SSL module not available"
 
     def wrap(self, sock):
-        raise NotImplementedError
-        yield 0
+        raise NotImplementedError()
 
 class TLSv1ServiceWrapper(SecureWrapper):
     def __init__(self, key_file, cert_file):

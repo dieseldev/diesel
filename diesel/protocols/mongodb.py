@@ -3,7 +3,8 @@
 
 import itertools
 import struct
-from diesel import Client, call, response, bytes, Loop, Application, up, ConnectionClosed
+from collections import deque
+from diesel import Client, call, sleep, send, receive, first, Loop, Application, ConnectionClosed
 from pymongo.bson import BSON, _make_c_string, _to_dicts
 from pymongo.son import SON
 
@@ -33,16 +34,16 @@ class Db(TraversesCollections):
 
 class Collection(TraversesCollections):
     def find(self, spec=None, fields=None, skip=0, limit=0):
-        yield up(MongoCursor(self.name, self.client, spec, fields, skip, limit))
+        return MongoCursor(self.name, self.client, spec, fields, skip, limit)
 
     def update(self, spec, doc, upsert=False, multi=False, safe=True):
-        yield self.client.update(self.name, spec, doc, upsert, multi, safe)
+        self.client.update(self.name, spec, doc, upsert, multi, safe)
 
     def insert(self, doc_or_docs, safe=True):
-        yield self.client.insert(self.name, doc_or_docs, safe)
+        self.client.insert(self.name, doc_or_docs, safe)
 
     def delete(self, spec, safe=True):
-        yield self.client.delete(self.name, spec, safe)
+        self.client.delete(self.name, spec, safe)
 
 class MongoClient(Client):
     collection_class = None
@@ -56,18 +57,18 @@ class MongoClient(Client):
         return self._msg_id_counter.next()
 
     def _put_request_get_response(self, op, data):
-        yield self._put_request(op, data)
-        header = yield bytes(HEADER_SIZE)
+        self._put_request(op, data)
+        header = receive(HEADER_SIZE)
         length, id, to, code = struct.unpack('<4i', header)
-        message = yield bytes(length - HEADER_SIZE)
+        message = receive(length - HEADER_SIZE)
         cutoff = struct.calcsize('<iqii')
         flag, cid, start, numret = struct.unpack('<iqii', message[:cutoff])
         body = _to_dicts(message[cutoff:])
-        yield up((cid, start, numret, body))
+        return (cid, start, numret, body)
 
     def _put_request(self, op, data):
         req = struct.pack('<4i', HEADER_SIZE + len(data), self._msg_id, 0, op)
-        yield "%s%s" % (req, data)
+        send("%s%s" % (req, data))
 
     def _handle_response(self, cursor, resp):
         cid, start, numret, result = resp
@@ -75,15 +76,15 @@ class MongoClient(Client):
         cursor.id = cid
         if not cid or (cursor.retrieved == cursor.limit):
             cursor.finished = True
-        yield response(result)
+        return result
 
     @call
     def query(self, cursor):
         op = Ops.OP_QUERY
         c = cursor
         msg = Ops.query(c.col, c.spec, c.fields, c.skip, c.limit)
-        resp = yield self._put_request_get_response(op, msg)
-        yield self._handle_response(cursor, resp)
+        resp = self._put_request_get_response(op, msg)
+        return self._handle_response(cursor, resp)
 
     @call
     def get_more(self, cursor):
@@ -96,61 +97,58 @@ class MongoClient(Client):
         if not cursor.finished:
             op = Ops.OP_GET_MORE
             msg = Ops.get_more(cursor.col, limit, cursor.id)
-            resp = yield self._put_request_get_response(op, msg)
-            yield self._handle_response(cursor, resp)
+            resp = self._put_request_get_response(op, msg)
+            return self._handle_response(cursor, resp)
         else:
-            yield response([])
+            return []
 
     def _put_gle_command(self):
         msg = Ops.query('admin.$cmd', {'getlasterror' : 1}, 0, 0, -1)
-        res = yield self._put_request_get_response(Ops.OP_QUERY, msg)
+        res = self._put_request_get_response(Ops.OP_QUERY, msg)
         _, _, _, r = res
         doc = r[0]
         if doc.get('err'):
-            raise MongoOperationalError(doc['error'])
+            raise MongoOperationalError(doc['err'])
 
     @call
     def update(self, col, spec, doc, upsert=False, multi=False, safe=True):
         data = Ops.update(col, spec, doc, upsert, multi)
-        yield self._put_request(Ops.OP_UPDATE, data)
+        self._put_request(Ops.OP_UPDATE, data)
         if safe:
-            yield self._put_gle_command()
-        yield response(None)
+            self._put_gle_command()
 
     @call
     def insert(self, col, doc_or_docs, safe=True):
         data = Ops.insert(col, doc_or_docs)
-        yield self._put_request(Ops.OP_INSERT, data)
+        self._put_request(Ops.OP_INSERT, data)
         if safe:
-            yield self._put_gle_command()
-        yield response(None)
+            self._put_gle_command()
 
     @call
     def delete(self, col, spec, safe=True):
         data = Ops.delete(col, spec)
-        yield self._put_request(Ops.OP_DELETE, data)
+        self._put_request(Ops.OP_DELETE, data)
         if safe:
-            yield self._put_gle_command()
-        yield response(None)
+            self._put_gle_command()
 
     @call
     def drop_database(self, name):
-        yield response((yield self._command(name, {'dropDatabase':1})))
+        return self._command(name, {'dropDatabase':1})
 
     @call
     def list_databases(self):
-        result = yield self._command('admin', {'listDatabases':1})
-        yield response([(d['name'], d['sizeOnDisk']) for d in result['databases']])
+        result = self._command('admin', {'listDatabases':1})
+        return [(d['name'], d['sizeOnDisk']) for d in result['databases']]
 
     @call
     def _command(self, dbname, command):
         msg = Ops.query('%s.$cmd' % dbname, command, None, 0, 1)
-        resp = yield self._put_request_get_response(Ops.OP_QUERY, msg)
+        resp = self._put_request_get_response(Ops.OP_QUERY, msg)
         cid, start, numret, result = resp
         if result:
-            yield response(result[0])
+            return result[0]
         else:
-            yield response([])
+            return []
 
     def __getattr__(self, name):
         return Db(name, self)
@@ -213,6 +211,22 @@ class Ops(object):
         colname = _make_c_string(col)
         return "%s%s%s%s" % (_ZERO, colname, _ZERO, BSON.from_dict(spec))
 
+class MongoIter(object):
+    def __init__(self, cursor):
+        self.cursor = cursor
+        self.cache = deque()
+
+    def next(self):
+        try:
+            return self.cache.popleft()
+        except IndexError:
+            more = self.cursor.more()
+            if not more:
+                raise StopIteration()
+            else:
+                self.cache.extend(more)
+                return self.next()
+        
 class MongoCursor(object):
     def __init__(self, col, client, spec, fields, skip, limit):
         self.col = col
@@ -230,19 +244,18 @@ class MongoCursor(object):
         if not self.retrieved:
             self._touch_query()
         if not self.id and not self.finished:
-            yield self.client.query(self)
+            return self.client.query(self)
         elif not self.finished:
-            yield self.client.get_more(self)
+            return self.client.get_more(self)
 
     def all(self):
-        o = []
-        while not self.finished:
-            o.extend( (yield self.more()) )
+        return list(self)
 
-        yield up(o)
+    def __iter__(self):
+        return MongoIter(self)
 
     def one(self):
-        all = yield self.all()
+        all = self.all()
         la = len(all)
         if la == 1:
             res = all[0]
@@ -250,15 +263,15 @@ class MongoCursor(object):
             res = None
         else:
             raise ValueError("Cursor returned more than 1 record")
-        yield up(res)
+        return res
 
     def count(self):
         if self.retrieved:
             raise ValueError("can't count an already started cursor")
         db, col = self.col.split('.', 1)
         command = SON([('count', col), ('query', self.spec)])
-        result = yield self.client._command(db, command)
-        yield up(int(result.get('n', 0)))
+        result = self.client._command(db, command)
+        return int(result.get('n', 0))
 
     def sort(self, name, direction):
         if self.retrieved:
@@ -290,14 +303,14 @@ class RawMongoClient(Client):
     @call
     def send(self, data, respond=False):
         """Send raw mongodb data and optionally yield the server's response."""
-        yield data
+        send(data)
         if not respond:
-            yield response('')
+            return ''
         else:
-            header = yield bytes(HEADER_SIZE)
+            header = receive(HEADER_SIZE)
             length, id, to, opcode = struct.unpack('<4i', header)
-            body = yield bytes(length - HEADER_SIZE)
-            yield response(header + body)
+            body = receive(length - HEADER_SIZE)
+            return header + body
 
 class MongoProxy(object):
     ClientClass = RawMongoClient
@@ -311,21 +324,21 @@ class MongoProxy(object):
         try:
             backend = None
             while True:
-                header = yield bytes(HEADER_SIZE)
+                header = receive(HEADER_SIZE)
                 info = struct.unpack('<4i', header)
                 length, id, to, opcode = info
-                body = yield bytes(length - HEADER_SIZE)
-                resp, info, body = yield self.handle_request(info, body)
+                body = receive(length - HEADER_SIZE)
+                resp, info, body = self.handle_request(info, body)
                 if resp is not None:
                     # our proxy will respond without talking to the backend
-                    yield resp
+                    send(resp)
                 else:
                     # pass the (maybe modified) request on to the backend
                     length, id, to, opcode = info
                     is_query = opcode in [Ops.OP_QUERY, Ops.OP_GET_MORE]
                     payload = header + body
-                    (backend, resp) = yield self.from_backend(payload, is_query, backend)
-                    yield self.handle_response(resp)
+                    (backend, resp) = self.from_backend(payload, is_query, backend)
+                    self.handle_response(resp)
         except ConnectionClosed:
             if backend:
                 backend.close()
@@ -333,17 +346,17 @@ class MongoProxy(object):
     def handle_request(self, info, body):
         length, id, to, opcode = info
         print "saw request with opcode", opcode
-        yield up(None, info, body)
+        return None, info, body
 
     def handle_response(self, response):
-        yield response
+        send(response)
 
     def from_backend(self, data, respond, backend=None):
         if not backend:
             backend = self.ClientClass()
-            yield backend.connect(self.backend_host, self.backend_port)
-        resp = yield backend.send(data, respond)
-        yield up((backend, resp))
+            backend.connect(self.backend_host, self.backend_port)
+        resp = backend.send(data, respond)
+        return (backend, resp)
 
 if __name__ == '__main__':
     import time
@@ -354,100 +367,105 @@ if __name__ == '__main__':
     a = Application()
 
     def mgr():
-        (main, queries) = yield (wait('main.done'), wait('queries.done'))
-        (main, queries) = yield (wait('main.done'), wait('queries.done'))
+        _ = first(waits=['main.done', 'queries.done'])
+        _ = first(waits=['main.done', 'queries.done'])
         a.halt()
 
     def query_20_times():
-        d = MongoClient()
-        yield d.connect(HOST, PORT)
+        d = MongoClient(HOST, PORT)
         counts = []
+        wait('deleted')
         for i in range(20):
-            with (yield d.diesel.test.find({'type':'test'}, limit=500)) as cursor:
+            with d.diesel.test.find({'type':'test'}, limit=500) as cursor:
                 while not cursor.finished:
-                    counts.append(len((yield cursor.more())))
+                    counts.append(len(cursor.more()))
             if not i:
-                yield wait('main.done')
+                wait('main.done')
         assert 0 in counts, counts
         assert 500 in counts, counts
         print "20 concurrent queries - passed"
-        yield fire('queries.done', True)
+        fire('queries.done', True)
 
     def pure_db_action():
-        d = MongoClient()
-        yield d.connect(HOST, PORT)
-        print (yield d.list_databases())
-        print (yield d.drop_database('diesel'))
-        yield d.diesel.test.insert({'name':'dowski', 'state':'OH'})
-        yield d.diesel.test.insert({'name':'jamwt', 'state':'CA'})
-        yield d.diesel.test.insert({'name':'mrshoe', 'state':'CA'})
-        with (yield d.diesel.test.find({'state':'OH'})) as cursor:
+        d = MongoClient(HOST, PORT)
+        print d.list_databases()
+        print d.drop_database('diesel')
+        fire('deleted')
+        d.diesel.test.insert({'name':'dowski', 'state':'OH'})
+        d.diesel.test.insert({'name':'jamwt', 'state':'CA'})
+        d.diesel.test.insert({'name':'mrshoe', 'state':'CA'})
+        with (d.diesel.test.find({'state':'OH'})) as cursor:
             while not cursor.finished:
-                res = yield cursor.more()
+                res = cursor.more()
                 assert res[0]['name'] == 'dowski', res
                 assert res[0]['state'] == 'OH', res
                 print "query1 (simple where) passed"
-        with (yield d.diesel.test.find({'state':'CA'})) as cursor:
+        with d.diesel.test.find({'state':'CA'}) as cursor:
             while not cursor.finished:
-                res = yield cursor.more()
+                res = cursor.more()
                 assert len(res) == 2, res
                 assert res[0]['name'] == 'jamwt', res
                 assert res[1]['name'] == 'mrshoe', res
                 print "query2 (simple where) passed"
-        with (yield d.diesel.test.find()) as cursor:
+        with (d.diesel.test.find()) as cursor:
             while not cursor.finished:
-                res = yield cursor.more()
+                res = cursor.more()
                 assert len(res) == 3, res
                 assert [r['state'] for r in res] == ['OH', 'CA', 'CA'], res
                 print "query3 (query all) passed"
         print "updating"
-        yield d.diesel.test.update({'name':'dowski'}, {'$set':{'kids':2}})
-        with (yield d.diesel.test.find()) as cursor:
+        d.diesel.test.update({'name':'dowski'}, {'$set':{'kids':2}})
+        with d.diesel.test.find() as cursor:
             while not cursor.finished:
-                res = yield cursor.more()
+                res = cursor.more()
                 assert [r['kids'] for r in res if 'kids' in r] == [2], res
                 print "query4 (verify update) passed"
         print "inserting"
-        yield d.diesel.test.insert({'name':'mr t', 'state':'??'})
-        with (yield d.diesel.test.find({'name':'mr t'}, ['state'])) as cursor:
+        d.diesel.test.insert({'name':'mr t', 'state':'??'})
+        with d.diesel.test.find({'name':'mr t'}, ['state']) as cursor:
             while not cursor.finished:
-                res = yield cursor.more()
+                res = cursor.more()
                 assert len(res) == 1, res
                 assert 'name' not in res[0], res
                 assert res[0]['state'] == '??', res
                 print "query5 (verify insert) passed"
         print "deleting"
-        yield d.diesel.test.delete({'name':'mr t'})
-        with (yield d.diesel.test.find({'name':'mr t'}, ['state'])) as cursor:
+        d.diesel.test.delete({'name':'mr t'})
+        with d.diesel.test.find({'name':'mr t'}, ['state']) as cursor:
             while not cursor.finished:
-                res = yield cursor.more()
+                res = cursor.more()
                 assert res == [], res
                 print "query6 (verify delete) passed"
         print "inserting 10000"
-        yield d.diesel.test.insert([{'code':i, 'type':'test'} for i in xrange(10000)])
+        d.diesel.test.insert([{'code':i, 'type':'test'} for i in xrange(10000)])
         count = 0
         passes = 0
-        with (yield d.diesel.test.find({'type':'test'})) as cursor:
+        with d.diesel.test.find({'type':'test'}) as cursor:
             while not cursor.finished:
-                count += len((yield cursor.more()))
+                count += len(cursor.more())
                 passes += 1
         assert count == 10000, count
         assert passes == 2, passes
         print "query7 (get_more) passed"
         print "inserting"
-        yield (d.diesel.test.insert([{'letter':'m'}, {'letter':'b'}, {'letter':'k'}]))
-        with (yield d.diesel.test.find({'letter': {'$exists':True}})) as cursor:
+        d.diesel.test.insert([{'letter':'m'}, {'letter':'b'}, {'letter':'k'}])
+        with d.diesel.test.find({'letter': {'$exists':True}}) as cursor:
             cursor.sort('letter', Ops.DESCENDING)
             while not cursor.finished:
-                res = yield cursor.more()
+                res = cursor.more()
                 assert len(res) == 3, res
                 assert [r['letter'] for r in res] == ['m', 'k', 'b'], res
                 print "query8 (sorting) passed"
-        with (yield d.diesel.test.find({'type':'test'})) as cursor:
-            n = yield cursor.count()
+        with d.diesel.test.find({'type':'test'}) as cursor:
+            n = cursor.count()
             assert n == 10000, n
             print "query9 (count) passed"
-        yield fire('main.done', True)
+        n = 0
+        for rec in  d.diesel.test.find({'type':'test'}):
+            n += 1
+        assert n == 10000, n
+        print "query10 (cursor iteration) passed"
+        fire('main.done', True)
 
     a.add_loop(Loop(mgr))
     a.add_loop(Loop(pure_db_action))

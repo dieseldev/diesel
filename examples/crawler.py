@@ -16,7 +16,7 @@ if not base_dir.endswith('/'):
 
 assert schema == 'http', 'http only'
 
-from diesel import Application, Loop, log, up
+from diesel import Application, Loop, log, ConnectionClosed
 from diesel.protocols.http import HttpClient, HttpHeaders
 
 CONCURRENCY = 10 # go easy on those apache instances!
@@ -36,11 +36,10 @@ def get_links(s):
                 yield urljoin(base_dir, lpath)
 
 def get_client():
-    client = HttpClient()
-    yield client.connect(host, 80)
+    client = HttpClient(host, 80)
     heads = HttpHeaders()
     heads.set('Host', host)
-    yield up( (client, heads) )
+    return client, heads
 
 def ensure_dirs(lpath):
     def g(lpath):
@@ -61,7 +60,7 @@ def follow_loop():
     global count
     global files
     count += 1
-    client, heads = yield get_client()
+    client, heads = get_client()
     while True:
         try:
             lpath = links.next()
@@ -71,17 +70,23 @@ def follow_loop():
                 stop()
             break
         log.info(" -> %s" % lpath )
-        if client.is_closed:
-            client, heads = yield get_client()
-        code, heads, body = yield client.request('GET', lpath, heads)
-        write_file(lpath, body)
-        files +=1
+        for x in xrange(2):
+            try:
+                if client.is_closed:
+                    client, heads = get_client()
+                code, heads, body = client.request('GET', lpath, heads)
+            except ConnectionClosed:
+                pass
+            else:
+                write_file(lpath, body)
+                files +=1
+                break
     
 def req_loop():
     global links
-    client, heads = yield get_client()
+    client, heads = get_client()
     log.info(path)
-    code, heads, body = yield client.request('GET', path, heads)
+    code, heads, body = client.request('GET', path, heads)
     write_file(path, body)
     links = get_links(body)
     for x in xrange(CONCURRENCY):

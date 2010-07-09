@@ -4,7 +4,7 @@ a cache.
 
 import time
 import socket
-from diesel import up, catch, thread
+from diesel import thread
 
 DNS_CACHE_TIME = 60 * 5 # five minutes
 
@@ -25,10 +25,10 @@ def resolve_dns_name(name):
             cache[name]
     except KeyError:
         try:
-            ip = yield catch(thread(socket.gethostbyname, name), socket.gaierror)
+            ip = thread(socket.gethostbyname, name)
         except socket.gaierror:
             raise DNSResolutionError("could not resolve A record for %s" % name)
         cache[name] = ip, time.time()
-        yield up((yield resolve_dns_name(name)))
+        return resolve_dns_name(name)
     else:
-        yield up(ip)
+        return ip

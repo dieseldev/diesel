@@ -8,14 +8,14 @@ from diesel import Application, Loop, sleep, fire, wait, log
 def gunner():
     x = 1
     while True:
-        yield fire('bam', x)
+        fire('bam', x)
         x += 1
-        yield sleep()
+        sleep()
 
 def sieged():
     t = time.time()
     while True:
-        n = yield wait('bam')
+        n = wait('bam')
         if n % 10000 == 0:
             log.info(n)
             if n == 50000:

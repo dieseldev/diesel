@@ -4,7 +4,7 @@ assert sys.version_info >= (2, 6), \
 
 from setuptools import setup
 
-VERSION = "0.9.2b"
+VERSION = "1.9.7b"
 
 setup(name="diesel",
     version=VERSION,
@@ -25,4 +25,5 @@ for building web applications.
     download_url="http://download.dieselweb.org/diesel-%s.tar.gz" % VERSION, 
     packages=["diesel", "diesel.protocols", "diesel.util"],
     scripts=["examples/dhttpd"],
+    install_requires=["greenlet"],
     )

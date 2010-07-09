@@ -54,3 +54,8 @@ class Buffer(object):
         self._atinbuf = self._atinbuf[ind:]
 
         return use
+
+    def pop(self):
+        b = self._atinbuf
+        self._atinbuf = ""
+        return b

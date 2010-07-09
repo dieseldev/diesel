@@ -9,7 +9,7 @@ def blocker():
     while True:
         def f():
             time.sleep(1)
-        yield thread(f)
+        thread(f)
         print 'yo!', time.time()
 
 a = Application()

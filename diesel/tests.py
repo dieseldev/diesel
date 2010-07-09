@@ -24,7 +24,7 @@ class TestAccumulator(dict):
 
     def __setitem__(self, k, v):
         if type(v) is dict:
-            v = UC(v)
+            v = TestAccumulator(v)
         dict.__setitem__(self, k, v)
 
     def update(self, d):

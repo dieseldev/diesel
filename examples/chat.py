@@ -4,17 +4,17 @@
 telnet, type your name, hit enter, then chat.  Invite
 a friend to do the same.
 '''
-from diesel import Application, Service, until_eol, fire, wait
+from diesel import Application, Service, until_eol, fire, wait, first, send
 
 def chat_server(addr):
-    my_nick = (yield until_eol()).strip()
+    my_nick = until_eol().strip()
     while True:
-        my_message, other_message = yield (until_eol(), wait('chat_message'))
-        if my_message:
-            yield fire('chat_message', (my_nick, my_message.strip()))
+        ev, val = first(until_eol=True, waits=['chat_message'])
+        if ev == 'until_eol':
+            fire('chat_message', (my_nick, val.strip()))
         else:
-            nick, message = other_message
-            yield "<%s> %s\r\n"  % (nick, message)
+            nick, message = val
+            send("<%s> %s\r\n"  % (nick, message))
 
 app = Application()
 app.add_service(Service(chat_server, 8000))

@@ -4,13 +4,15 @@
 import socket
 import traceback
 import errno
+from greenlet import greenlet
 
 from diesel.hub import EventHub
-from diesel import logmod, log
-from diesel import Connection, LoopKeepAlive
+from diesel import logmod, log, Connection, Loop
 from diesel.security import ssl_async_handshake
+from diesel import runtime
+from diesel.events import WaitPool
 
-current_app = None
+class ApplicationEnd(Exception): pass
 
 class Application(object):
     '''The Application represents diesel's main loop--
@@ -18,10 +20,10 @@ class Application(object):
     Client protocol work, etc.
     '''
     def __init__(self, logger=None, allow_app_replacement=False):
-        global current_app
-        assert (allow_app_replacement or current_app is None), "Only one Application instance per program allowed"
-        current_app = self
+        assert (allow_app_replacement or runtime.current_app is None), "Only one Application instance per program allowed"
+        runtime.current_app = self
         self.hub = EventHub()
+        self.waits = WaitPool()
         self._run = False
         if logger is None:
             logger = logmod.Logger()
@@ -40,7 +42,6 @@ class Application(object):
         '''Start up an Application--blocks until the program ends
         or .halt() is called.
         '''
-        global current_app
         self._run = True
         log.info('Starting diesel application')
 
@@ -50,30 +51,30 @@ class Application(object):
                 self.global_bail("low-level socket error on bound service"))
 
         for l in self._loops:
-            self.hub.schedule(l.iterate)
+            self.hub.schedule(l.wake)
 
         self.setup()
-        while self._run:
-            try:
-                self.hub.handle_events()
-            except SystemExit:
-                log.warn("-- SystemExit raised.. exiting main loop --")
-                break
-            except KeyboardInterrupt:
-                log.warn("-- KeyboardInterrupt raised.. exiting main loop --")
-                break
-            except Exception, e:
-                if type(e) != LoopKeepAlive:
+        def main():
+            while self._run:
+                try:
+                    self.hub.handle_events()
+                except SystemExit:
+                    log.warn("-- SystemExit raised.. exiting main loop --")
+                    break
+                except KeyboardInterrupt:
+                    log.warn("-- KeyboardInterrupt raised.. exiting main loop --")
+                    break
+                except ApplicationEnd:
+                    log.warn("-- ApplicationEnd raised.. exiting main loop --")
+                    break
+                except Exception, e:
                     log.error("-- Unhandled Exception rose to main loop --")
                     log.error(traceback.format_exc())
-                for l in self._loops:
-                    if l.keep_alive and l.state == l.ENDED_EXCEPTION:
-                        log.error("-- Keep-Alive loop %s being restarted --" % l)
-                        l.reset()
-                        self.hub.call_later(0.2, l.iterate)
 
-        log.info('Ending diesel application')
-        current_app = None
+            log.info('Ending diesel application')
+            runtime.current_app = None
+        self.runhub = greenlet(main)
+        self.runhub.switch()
 
     def add_service(self, service):
         '''Add a Service instance to this Application.
@@ -103,7 +104,7 @@ class Application(object):
             loop.keep_alive = True
 
         if self._run:
-            self.hub.schedule(loop.iterate)
+            self.hub.schedule(loop.wake)
         else:
             if front:
                 self._loops.insert(0, loop)
@@ -114,10 +115,9 @@ class Application(object):
         '''Stop this application from running--the initial run() call
         will return.
         '''
-        self.hub.run = False
-        self._run = False
         for s in self._services:
             s.sock.close()
+        raise ApplicationEnd()
 
     def setup(self):
         '''Do some initialization right before the main loop is entered.
@@ -176,7 +176,10 @@ class Service(object):
             raise
         sock.setblocking(0)
         def make_connection():
-            Connection(sock, addr, self.connection_handler).iterate()
+            c = Connection(sock, addr)
+            l = Loop(self.connection_handler, addr)
+            l.connection_stack.append(c)
+            runtime.current_app.add_loop(l)
         if self.security:
             sock = self.security.wrap(sock)
             ssl_async_handshake(sock, self.application.hub, make_connection)
