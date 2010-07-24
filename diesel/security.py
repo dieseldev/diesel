@@ -46,6 +46,9 @@ def ssl_async_handshake(sock, hub, next):
             else:
                 hub.unregister(sock)
                 raise
+        except:
+            hub.unregister(sock)
+            raise
         else:
             hub.unregister(sock)
             next()
