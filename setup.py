@@ -25,5 +25,5 @@ for building web applications.
     download_url="http://download.dieselweb.org/diesel-%s.tar.gz" % VERSION, 
     packages=["diesel", "diesel.protocols", "diesel.util"],
     scripts=["examples/dhttpd"],
-    install_requires=["greenlet"],
+    install_requires=["greenlet", "pyopenssl"],
     )

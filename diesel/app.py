@@ -1,6 +1,7 @@
 # vim:ts=4:sw=4:expandtab
 '''The main Application and Service classes
 '''
+from OpenSSL import SSL
 import socket
 import traceback
 import errno
@@ -131,7 +132,7 @@ class Service(object):
     implemented by a passed connection handler.
     '''
     LQUEUE_SIZ = 500
-    def __init__(self, connection_handler, port, iface='', security=None):
+    def __init__(self, connection_handler, port, iface='', ssl_ctx=None):
         '''Given a generator definition `connection_handler`, handle
         connections on port `port`.
 
@@ -142,7 +143,7 @@ class Service(object):
         self.sock = None
         self.connection_handler = connection_handler
         self.application = None
-        self.security = security
+        self.ssl_ctx = ssl_ctx
 
     def handle_cannot_bind(self, reason):
         log.critical("service at %s:%s cannot bind: %s" % (self.iface or '*', 
@@ -180,8 +181,10 @@ class Service(object):
             l = Loop(self.connection_handler, addr)
             l.connection_stack.append(c)
             runtime.current_app.add_loop(l)
-        if self.security:
-            sock = self.security.wrap(sock)
+        if self.ssl_ctx:
+            sock = SSL.Connection(self.ssl_ctx, sock)
+            sock.set_accept_state()
+            sock.setblocking(0)
             ssl_async_handshake(sock, self.application.hub, make_connection)
         else:
             make_connection()

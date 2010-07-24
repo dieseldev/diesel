@@ -7,6 +7,7 @@ import traceback
 import errno
 import sys
 import itertools
+from OpenSSL import SSL
 from greenlet import greenlet
 from types import GeneratorType
 from collections import deque, defaultdict
@@ -209,8 +210,10 @@ class Loop(object):
                 lambda: self.wake()
                 )
                 
-            if client.security:
-                fsock = client.security.wrap(sock)
+            if client.ssl_ctx:
+                fsock = SSL.Connection(client.ssl_ctx, sock)
+                fsock.setblocking(0)
+                fsock.set_connect_state()
                 ssl_async_handshake(fsock, self.hub, finish)
             else:
                 fsock = sock
@@ -383,12 +386,18 @@ class Connection(object):
             else:
                 try:
                     bsent = self.sock.send(data)
-                except socket.error, s:
+                except socket.error, e:
                     code, s = e
                     if code in (errno.EAGAIN, errno.EINTR):
                         self.pipeline.backup(data)
                         return 
                     self.shutdown(True)
+                except (SSL.WantReadError, SSL.WantWriteError, SSL.WantX509LookupError):
+                    self.pipeline.backup(data)
+                    return
+                except SSL.ZeroReturnError:
+                    self.shutdown(True)
+
                 else:
                     if bsent != len(data):
                         self.pipeline.backup(data[bsent:])
@@ -410,6 +419,10 @@ class Connection(object):
             code, s = e
             if code in (errno.EAGAIN, errno.EINTR):
                 return
+            data = ''
+        except (SSL.WantReadError, SSL.WantWriteError, SSL.WantX509LookupError):
+            return
+        except SSL.ZeroReturnError:
             data = ''
 
         if not data:

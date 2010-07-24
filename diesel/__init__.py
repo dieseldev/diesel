@@ -7,5 +7,4 @@ from core import sleep, Loop, wait, fire, thread, until, Connection, ConnectionC
 from core import until_eol, send, receive, call, first, fork, ClientConnectionError
 from app import Application, Service 
 from client import Client
-from security import TLSv1ServiceWrapper, TLSv1ClientWrapper
 from resolver import resolve_dns_name, DNSResolutionError

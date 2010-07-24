@@ -1,6 +1,8 @@
 # vim:ts=4:sw=4:expandtab
 import socket
 import errno
+from OpenSSL import SSL
+
 from uuid import uuid4
 from collections import deque
 
@@ -8,8 +10,8 @@ class Client(object):
     '''An agent that connects to an external host and provides an API to
     return data based on a protocol across that host.
     '''
-    def __init__(self, addr, port, security=None):
-        self.security = security
+    def __init__(self, addr, port, ssl_ctx=None):
+        self.ssl_ctx = ssl_ctx
         self.connected = False
         self.conn = None
         self.addr = addr

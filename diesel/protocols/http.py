@@ -3,6 +3,7 @@
 '''
 import urllib
 from collections import defaultdict
+from OpenSSL import SSL
 
 from diesel import until, until_eol, receive, ConnectionClosed, send
 
@@ -367,9 +368,7 @@ class HttpClient(Client):
             self.close()
         return code, heads, body
 
-from diesel.security import TLSv1ClientWrapper
-
 class HttpsClient(HttpClient):
     def __init__(self, *args, **kw):
-        kw['security'] = TLSv1ClientWrapper()
+        kw['ssl_ctx'] = SSL.Context(SSL.SSLv23_METHOD)
         HttpClient.__init__(self, *args, **kw)
