@@ -397,6 +397,8 @@ class Connection(object):
                     return
                 except SSL.ZeroReturnError:
                     self.shutdown(True)
+                except SSL.SysCallError:
+                    self.shutdown(True)
 
                 else:
                     if bsent != len(data):
@@ -423,6 +425,8 @@ class Connection(object):
         except (SSL.WantReadError, SSL.WantWriteError, SSL.WantX509LookupError):
             return
         except SSL.ZeroReturnError:
+            data = ''
+        except SSL.SysCallError:
             data = ''
 
         if not data:
