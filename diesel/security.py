@@ -12,6 +12,8 @@ def ssl_async_handshake(sock, hub, next):
             pass
         except SSL.ZeroReturnError:
             hub.unregister(sock) # and ignore
+        except SSL.SysCallError:
+            hub.unregister(sock) # and ignore
         except:
             hub.unregister(sock)
             raise
