@@ -28,7 +28,7 @@ class Client(object):
         try:
             sock.connect(remote_addr)
         except socket.error, e:
-            if e[0] == errno.EINPROGRESS:
+            if e.args[0] == errno.EINPROGRESS:
                 _private_connect(self, ip, sock)
             else:
                 raise
