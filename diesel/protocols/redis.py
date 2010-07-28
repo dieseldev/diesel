@@ -30,6 +30,12 @@ class RedisClient(Client):
         return bool(resp)
 
     @call
+    def delete(self, k):
+        self._send('DEL', k)
+        resp = self._get_response()
+        return bool(resp)
+
+    @call
     def type(self, k):
         self._send('TYPE', k)
         resp = self._get_response()
@@ -552,6 +558,11 @@ if __name__ == '__main__':
 
     def do_set():
         r = RedisClient()
+
+        r.set('foo3', 'bar')
+        assert r.exists('foo3')
+        r.delete('foo3')
+        assert not r.exists('foo3')
 
         for x in xrange(5000):
             r.set('foo', 'bar')
