@@ -67,5 +67,5 @@ WebSocket-Protocol: diesel-generic\r
                             send('\x00%s\xff' % data)
 
             except ConnectionClosed:
-                inq.put(WebSocketDisconnect)
+                inq.put(WebSocketDisconnect())
                 raise ConnectionClosed("remote disconnected")
