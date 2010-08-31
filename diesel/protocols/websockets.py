@@ -2,6 +2,7 @@ from .http import HttpServer, HttpHeaders
 from diesel.util.queue import Queue
 from diesel import fork, until, receive, first, ConnectionClosed, send
 from simplejson import dumps, loads
+import cgi
 
 class WebSocketDisconnect(object): pass
 class WebSocketData(dict): pass
@@ -50,7 +51,7 @@ WebSocket-Protocol: diesel-generic\r
                     if val == '':
                         inq.put(WebSocketDisconnect())
                     else:
-                        data = loads(val)
+                        data = dict((k, v[0]) if len(v) == 1 else (k, v) for k, v in cgi.parse_qs(val).iteritems())
                         inq.put(WebSocketData(data))
                 else:
                     try:
