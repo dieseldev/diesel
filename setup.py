@@ -7,7 +7,6 @@ from setuptools import setup
 additional_requires = []
 if sys.version_info <= (2, 6):
 	additional_requires.append('select26')
-	print 'additional:', additional_requires
 
 VERSION = "1.9.7b"
 
