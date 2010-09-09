@@ -1,8 +1,13 @@
 import sys 
-assert sys.version_info >= (2, 6), \
-"Diesel requires python 2.6 (or greater 2.X release)"
+assert sys.version_info >= (2, 5), \
+"Diesel requires python 2.5 (or greater 2.X release)"
 
 from setuptools import setup
+
+additional_requires = []
+if sys.version_info <= (2, 6):
+	additional_requires.append('select26')
+	print 'additional:', additional_requires
 
 VERSION = "1.9.7b"
 
@@ -25,5 +30,5 @@ for building web applications.
     download_url="http://download.dieselweb.org/diesel-%s.tar.gz" % VERSION, 
     packages=["diesel", "diesel.protocols", "diesel.util"],
     scripts=["examples/dhttpd"],
-    install_requires=["greenlet", "pyopenssl"],
+    install_requires=(["greenlet", "pyopenssl"] + additional_requires),
     )
