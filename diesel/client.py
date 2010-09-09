@@ -10,7 +10,7 @@ class Client(object):
     '''An agent that connects to an external host and provides an API to
     return data based on a protocol across that host.
     '''
-    def __init__(self, addr, port, ssl_ctx=None):
+    def __init__(self, addr, port, ssl_ctx=None, timeout=None):
         self.ssl_ctx = ssl_ctx
         self.connected = False
         self.conn = None
@@ -29,7 +29,7 @@ class Client(object):
             sock.connect(remote_addr)
         except socket.error, e:
             if e.args[0] == errno.EINPROGRESS:
-                _private_connect(self, ip, sock)
+                _private_connect(self, ip, sock, timeout=timeout)
             else:
                 raise
 
