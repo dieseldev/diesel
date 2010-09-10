@@ -399,6 +399,10 @@ class Connection(object):
                     self.shutdown(True)
                 except SSL.SysCallError:
                     self.shutdown(True)
+                except:
+                    sys.stderr.write("Unknown Error on send():\n%s"
+                    % traceback.format_exc())
+                    self.shutdown(True)
 
                 else:
                     if bsent != len(data):
@@ -427,6 +431,10 @@ class Connection(object):
         except SSL.ZeroReturnError:
             data = ''
         except SSL.SysCallError:
+            data = ''
+        except:
+            sys.stderr.write("Unknown Error on recv():\n%s"
+            % traceback.format_exc())
             data = ''
 
         if not data:
