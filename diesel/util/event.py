@@ -1,8 +1,9 @@
+from diesel import fire
 from queue import Queue
 
 class Event(Queue):
     def isSet(self):
-        return not self.is_empty()
+        return not self.is_empty
 
     def set(self):
         if not self.inp:
