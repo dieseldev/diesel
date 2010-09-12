@@ -1,4 +1,6 @@
 from OpenSSL import SSL
+import traceback
+import sys
 
 def ssl_async_handshake(sock, hub, next):
     def shake():
@@ -16,7 +18,8 @@ def ssl_async_handshake(sock, hub, next):
             hub.unregister(sock) # and ignore
         except:
             hub.unregister(sock)
-            raise
+            sys.stderr.write("Unknown Error on connect():\n%s"
+            % traceback.format_exc())
         else:
             hub.unregister(sock)
             next()
