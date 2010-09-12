@@ -213,7 +213,6 @@ class HttpServer(object):
             elif more_mode is self.BODY_CHUNKED:
                 req.body = handle_chunks(heads)
 
-            leave_loop = False
             if not self.request_handler(req):
                 break
 
