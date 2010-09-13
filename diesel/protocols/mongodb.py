@@ -37,13 +37,13 @@ class Collection(TraversesCollections):
         return MongoCursor(self.name, self.client, spec, fields, skip, limit)
 
     def update(self, spec, doc, upsert=False, multi=False, safe=True):
-        self.client.update(self.name, spec, doc, upsert, multi, safe)
+        return self.client.update(self.name, spec, doc, upsert, multi, safe)
 
     def insert(self, doc_or_docs, safe=True):
-        self.client.insert(self.name, doc_or_docs, safe)
+        return self.client.insert(self.name, doc_or_docs, safe)
 
     def delete(self, spec, safe=True):
-        self.client.delete(self.name, spec, safe)
+        return self.client.delete(self.name, spec, safe)
 
 class MongoClient(Client):
     collection_class = None
