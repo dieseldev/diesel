@@ -109,27 +109,28 @@ class MongoClient(Client):
         doc = r[0]
         if doc.get('err'):
             raise MongoOperationalError(doc['err'])
+        return doc
 
     @call
     def update(self, col, spec, doc, upsert=False, multi=False, safe=True):
         data = Ops.update(col, spec, doc, upsert, multi)
         self._put_request(Ops.OP_UPDATE, data)
         if safe:
-            self._put_gle_command()
+            return self._put_gle_command()
 
     @call
     def insert(self, col, doc_or_docs, safe=True):
         data = Ops.insert(col, doc_or_docs)
         self._put_request(Ops.OP_INSERT, data)
         if safe:
-            self._put_gle_command()
+            return self._put_gle_command()
 
     @call
     def delete(self, col, spec, safe=True):
         data = Ops.delete(col, spec)
         self._put_request(Ops.OP_DELETE, data)
         if safe:
-            self._put_gle_command()
+            return self._put_gle_command()
 
     @call
     def drop_database(self, name):
