@@ -36,6 +36,11 @@ class LoopKeepAlive(Exception):
     '''
     pass
 
+class ParentDiedException(Exception):
+    '''Raised when the parent (assigned via fork_child) has died.
+    '''
+    pass
+
 CRLF = '\r\n'
 BUFSIZ = 2 ** 14
 
@@ -70,7 +75,10 @@ def first(*args, **kw):
     return current_loop.first(*args, **kw)
 
 def fork(*args, **kw):
-    return current_loop.fork(*args, **kw)
+    return current_loop.fork(False, *args, **kw)
+
+def fork_child(*args, **kw):
+    return current_loop.fork(True, *args, **kw)
 
 class call(object):
     def __init__(self, f, inst=None):
@@ -109,9 +117,11 @@ class Loop(object):
         self.hub = runtime.current_app.hub
         self.app = runtime.current_app
         self.id = ids.next()
+        self.children = set()
         self.reset()
 
     def reset(self):
+        self.running = False
         self._wakeup_timer = None
         self.fire_handlers = {}
         self.connection_stack = []
@@ -119,6 +129,7 @@ class Loop(object):
 
     def run(self):
         from diesel.app import ApplicationEnd
+        self.running = True
         try:
             self.loop_callable(*self.args, **self.kw)
         except (SystemExit, KeyboardInterrupt, ApplicationEnd):
@@ -130,10 +141,15 @@ class Loop(object):
             if self.connection_stack:
                 assert len(self.connection_stack) == 1
                 self.connection_stack.pop().close()
+        self.notify_children()
         if self.keep_alive:
             log.warn("(Keep-Alive loop %s died; restarting)" % self)
             self.reset()
             self.hub.call_later(0.5, self.wake)
+
+    def notify_children(self):
+        for c in self.children:
+            c.parent_died()
 
     def __hash__(self):
         return self.id
@@ -157,10 +173,17 @@ class Loop(object):
         self.hub.run_in_thread(self.wake, f, *args, **kw)
         return self.dispatch()
 
-    def fork(self, f, *args, **kw):
+    def fork(self, make_child, f, *args, **kw):
         def wrap():
             return f(*args, **kw)
-        self.app.add_loop(Loop(wrap))
+        l = Loop(wrap)
+        if make_child:
+            self.children.add(l)
+        self.app.add_loop(l)
+        return l
+
+    def parent_died(self):
+        self.hub.schedule(lambda: self.wake(ParentDiedException()))
 
     def first(self, sleep=None, waits=None,
             receive=None, until=None, until_eol=None):
