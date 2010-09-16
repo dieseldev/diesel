@@ -188,3 +188,18 @@ class Service(object):
             ssl_async_handshake(sock, self.application.hub, make_connection)
         else:
             make_connection()
+
+def quickstart(*args):
+    app = Application()
+    for a in args:
+        if isinstance(a, Service):
+            app.add_service(a)
+        elif isinstance(a, Loop):
+            app.add_loop(a)
+        elif callable(a):
+            app.add_loop(Loop(a))
+    app.run()
+
+def quickstop():
+    from runtime import current_app
+    current_app.halt()

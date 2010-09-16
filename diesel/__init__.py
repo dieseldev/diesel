@@ -6,6 +6,6 @@ import events
 from core import sleep, Loop, wait, fire, thread, until, Connection, ConnectionClosed
 from core import until_eol, send, receive, call, first, fork, fork_child
 from core import ParentDiedException, ClientConnectionError
-from app import Application, Service 
+from app import Application, Service, quickstart, quickstop
 from client import Client
 from resolver import resolve_dns_name, DNSResolutionError
