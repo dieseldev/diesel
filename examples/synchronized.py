@@ -13,7 +13,6 @@ def free_loop():
 
 def sync_loop():
     global sync
-    id = random.random()
     with synchronized():
         sync += 1
         sleep(random.random())
