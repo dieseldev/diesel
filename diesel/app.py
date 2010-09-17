@@ -191,8 +191,11 @@ class Service(object):
 
 def quickstart(*args):
     app = Application()
+    args = list(args)
     for a in args:
-        if isinstance(a, Service):
+        if isinstance(a, list):
+            args.extend(a)
+        elif isinstance(a, Service):
             app.add_service(a)
         elif isinstance(a, Loop):
             app.add_loop(a)
