@@ -3,40 +3,45 @@ from uuid import uuid4
 from collections import deque
 
 from diesel import wait, fire, sleep, first
+from diesel.events import Waiter, StopWaitDispatch
 
 class QueueEmpty(Exception): pass
 class QueueTimeout(Exception): pass
 
-class Queue(object):
+class Queue(Waiter):
     def __init__(self):
-        self.wait_id = uuid4().hex
         self.inp = deque()
 
     def put(self, i=None):
         self.inp.append(i)
-        fire(self.wait_id)
+        fire(self)
 
     def get(self, waiting=True, timeout=None):
-        start = time()
-        while not self.inp and waiting:
-            if timeout:
-                remaining = timeout - (time() - start)
-                if remaining <= 0:
-                    raise QueueTimeout()
-                else:
-                    first(waits=[self.wait_id], sleep=remaining)
-            else:
-                wait(self.wait_id)
-
         if self.inp:
             return self.inp.popleft()
-        elif not waiting:
-            raise QueueEmpty()
+        mark = None
 
+        if waiting:
+            kw = dict(waits=[self])
+            if timeout:
+                kw['sleep'] = timeout
+            mark, val = first(**kw)
+            if mark == self:
+                return val
+            else:
+                raise QueueTimeout()
+
+        raise QueueEmpty()
 
     @property
     def is_empty(self):
         return not bool(self.inp)
+
+    def process_fire(self, value):
+        if self.inp:
+            return self.inp.popleft()
+        else:
+            raise StopWaitDispatch()
 
 if __name__ == '__main__':
     from diesel import Application, Loop, sleep

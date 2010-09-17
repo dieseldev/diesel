@@ -220,7 +220,7 @@ class Loop(object):
 
         if waits:
             for w in waits:
-                self._wait(w, marked_cb('wait-' + w))
+                self._wait(w, marked_cb(w))
         return self.dispatch()
 
     def connect(self, client, ip, sock):
@@ -278,7 +278,7 @@ class Loop(object):
 
     def fire_in(self, what, value):
         if what in self.fire_handlers:
-            handler = self.fire_handlers.pop(what)
+            handler = self.fire_handlers[what]
             self.fire_handlers = {}
             handler(value)
 
@@ -292,8 +292,8 @@ class Loop(object):
             def call_in():
                 rcb(d)
             self.hub.schedule(call_in)
-        self.fire_handlers[event] = cb
-        self.app.waits.wait(self, event)
+        wid = self.app.waits.wait(self, event)
+        self.fire_handlers[wid] = cb
 
     def fire(self, event, value=None):
         self.app.waits.fire(event, value)
