@@ -30,6 +30,11 @@ class ClientConnectionError(socket.error):
     '''
     pass
 
+class ClientConnectionTimeout(socket.error): 
+    '''Raised if the client connection timed out before succeeding.
+    '''
+    pass
+
 class LoopKeepAlive(Exception):
     '''Raised when an exception occurs that causes a loop to terminate;
     allows the app to re-schedule keep_alive loops.
@@ -223,8 +228,17 @@ class Loop(object):
                 self._wait(w, marked_cb('wait-' + w))
         return self.dispatch()
 
-    def connect(self, client, ip, sock):
+    def connect(self, client, ip, sock, timeout=None):
+        def cancel_callback(sock):
+            self.hub.unregister(sock)
+            sock.close()
+            self.hub.schedule(lambda: self.wake(
+                ClientConnectionTimeout("connection timeout")
+                ))
+
         def connect_callback():
+            if cancel_timer is not None:
+                cancel_timer.cancel()
             self.hub.unregister(sock)
             def finish():
                 client.conn = Connection(fsock, ip)
@@ -243,6 +257,8 @@ class Loop(object):
                 finish()
 
         def error_callback():
+            if cancel_timer is not None:
+                cancel_timer.cancel()
             self.hub.unregister(sock)
             self.hub.schedule(
             lambda: self.wake(
@@ -259,9 +275,19 @@ class Loop(object):
                 ClientConnectionError(str(e))
                 ))
 
+
+        cancel_timer = None
+        if timeout is not None:
+            cancel_timer = self.hub.call_later(timeout, cancel_callback, sock)
+
         self.hub.register(sock, read_callback, connect_callback, error_callback)
         self.hub.enable_write(sock)
-        return self.dispatch()
+        try:
+            return self.dispatch()
+        except ClientConnectionError:
+            if cancel_timer is not None:
+                cancel_timer.cancel()
+            raise
 
     def sleep(self, v=0):
         self._sleep(v)
