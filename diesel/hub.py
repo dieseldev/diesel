@@ -2,7 +2,10 @@
 '''An event hub that supports sockets and timers, based
 on Python 2.6's select & epoll support.
 '''
-import select
+try:
+    import select26 as select
+except ImportError:
+    import select
 
 from collections import deque
 from time import time

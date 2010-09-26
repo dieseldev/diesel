@@ -1,6 +1,9 @@
 # vim:ts=4:sw=4:expandtab
 """A mongodb client library for Diesel"""
 
+# needed to make diesel work with python 2.5
+from __future__ import with_statement
+
 import itertools
 import struct
 from collections import deque
