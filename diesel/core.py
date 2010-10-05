@@ -134,6 +134,8 @@ class Loop(object):
             self.loop_callable(*self.args, **self.kw)
         except (SystemExit, KeyboardInterrupt, ApplicationEnd):
             raise
+        except ParentDiedException:
+            pass
         except:
             log.error("-- Unhandled Exception in local loop --")
             log.error(traceback.format_exc())
