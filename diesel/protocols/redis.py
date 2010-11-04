@@ -399,6 +399,81 @@ class RedisClient(Client):
         resp = self._get_response()
         return float(resp)
 
+
+    ##################################################
+    ### HASH OPERATIONS
+    @call
+    def hset(self, key, field, value):
+        self._send_bulk_multi('HSET', str(key), str(field), str(value))
+        resp = self._get_response()
+        return bool(resp)
+
+    @call
+    def hget(self, key, field):
+        self._send_bulk_multi('HGET', key, field)
+        resp = self._get_response()
+        return resp
+
+
+    @call
+    def hmset(self, key, d):
+        args = [str(key)]
+        for i in d.iteritems():
+            args.extend(map(str, i))
+
+        self._send_bulk_multi('HMSET', list=args)
+        resp = self._get_response()
+        return bool(resp)
+
+    @call
+    def hmget(self, key, l):
+        args = [key] + l
+        self._send_bulk_multi('HMGET', list=args)
+        resp = self._get_response()
+        return dict(zip(l, resp))
+
+    @call
+    def hincrby(self, key, field, amt):
+        self._send_bulk_multi('HINCRBY', str(key), str(field), str(amt))
+        resp = self._get_response()
+        return resp
+
+    @call
+    def hexists(self, key, field):
+        self._send_bulk_multi('HEXISTS', key, field)
+        resp = self._get_response()
+        return bool(resp)
+
+    @call
+    def hdel(self, key, field):
+        self._send_bulk_multi('HDEL', key, field)
+        resp = self._get_response()
+        return bool(resp)
+
+    @call
+    def hlen(self, key):
+        self._send_bulk_multi('HLEN', key)
+        resp = self._get_response()
+        return resp
+
+    @call
+    def hkeys(self, key):
+        self._send_bulk_multi('HKEYS', key)
+        resp = self._get_response()
+        return resp
+
+    @call
+    def hvals(self, key):
+        self._send_bulk_multi('HVALS', key)
+        resp = self._get_response()
+        return resp
+
+    @call
+    def hgetall(self, key):
+        self._send_bulk_multi('HGETALL', key)
+        resp = self._get_response()
+        return dict(resp[x:x+2] for x in xrange(0, len(resp), 2))
+
     ##################################################
     ### Sorting...
     @call
@@ -684,6 +759,30 @@ if __name__ == '__main__':
         print (r.zrem("z1", (r.zrange("z1", 0, 0))[0]))
         print (r.zrange("z1", 0, -1))
         print (r.zcard("z1"))
+
+        print '-- HASHES --'
+        print r.hset("h1", "bah bah", "black sheep")
+        print r.hget("h1", "bah bah")
+
+        print r.hmset("h1", {"foo" : "bar", "baz" : "bosh"})
+        print r.hmget("h1", ["foo", "bah bah", "baz"])
+
+        print r.hincrby("h1", "count", 3)
+        print r.hincrby("h1", "count", 4)
+
+        print r.hmget("h1", ["foo", "count"])
+
+        print r.hexists("h1", "bah bah")
+        print r.hexists("h1", "nope")
+
+        print r.hdel("h1", "bah bah")
+        print r.hexists("h1", "bah bah")
+        print r.hlen("h1")
+
+        print '--'
+        print r.hkeys("h1")
+        print r.hvals("h1")
+        print r.hgetall("h1")
 
         print 'done!'
 
