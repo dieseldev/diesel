@@ -123,6 +123,7 @@ class Loop(object):
         self.app = runtime.current_app
         self.id = ids.next()
         self.children = set()
+        self.parent = None
         self.reset()
 
     def reset(self):
@@ -146,7 +147,12 @@ class Loop(object):
             if self.connection_stack:
                 assert len(self.connection_stack) == 1
                 self.connection_stack.pop().close()
+        self.running = False
         self.notify_children()
+        if self.parent and self in self.parent.children:
+            self.parent.children.remove(self)
+            self.parent = None
+
         if self.keep_alive:
             log.warn("(Keep-Alive loop %s died; restarting)" % self)
             self.reset()
@@ -184,11 +190,13 @@ class Loop(object):
         l = Loop(wrap)
         if make_child:
             self.children.add(l)
+            l.parent = self
         self.app.add_loop(l)
         return l
 
     def parent_died(self):
-        self.hub.schedule(lambda: self.wake(ParentDiedException()))
+        if self.running:
+            self.hub.schedule(lambda: self.wake(ParentDiedException()))
 
     def first(self, sleep=None, waits=None,
             receive=None, until=None, until_eol=None):
