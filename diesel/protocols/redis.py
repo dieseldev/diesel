@@ -417,10 +417,12 @@ class RedisClient(Client):
 
     @call
     def hmset(self, key, d):
+        if not d:
+            return True
         args = [str(key)]
         for i in d.iteritems():
             args.extend(map(str, i))
-
+        
         self._send_bulk_multi('HMSET', list=args)
         resp = self._get_response()
         return bool(resp)
