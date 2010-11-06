@@ -427,6 +427,8 @@ class RedisClient(Client):
 
     @call
     def hmget(self, key, l):
+        if not l:
+            return {}
         args = [key] + l
         self._send_bulk_multi('HMGET', list=args)
         resp = self._get_response()
