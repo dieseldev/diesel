@@ -7,115 +7,115 @@ import hashlib
 PGSQL_PORT = 5432
 
 def log(*args):
-	if True:
-		print ' '.join(map(str,args))
+    if True:
+        print ' '.join(map(str,args))
 
 # TODO: convert more types!
 type_functions = {
-	1043: str,
-	23: int,
+    1043: str,
+    23: int,
 }
 
 class PostgresClient(Client):
-	def __init__(self, host='localhost', port=PGSQL_PORT, **kw):
-		Client.__init__(self, host, port, **kw)
-	
-	@call
-	def connect(self, user='', password='', database=''):
-		StartupMessage(user=user, database=database).send()
-		response = receive(1)
-		msg = MessageTypes[response]()
-		msg.receive()
-		if msg.authtype == 'md5':
-			pmsg = PasswordMessage(user=user, password=password, salt=msg.salt)
-			pmsg.send()
-			response = receive(1)
-			msg = MessageTypes[response]()
-			msg.receive()
-			if msg.authtype != 'ok':
-				raise Exception('Authentication failed')
-		for msg in self._fetch_until_ready():
-			pass
-	
-	@call
-	def simplequery(self, sqlstring):
-		QueryMessage(sqlstring=sqlstring).send()
-		return self._recv_results(False)
+    def __init__(self, host='localhost', port=PGSQL_PORT, **kw):
+        Client.__init__(self, host, port, **kw)
+    
+    @call
+    def connect(self, user='', password='', database=''):
+        StartupMessage(user=user, database=database).send()
+        response = receive(1)
+        msg = MessageTypes[response]()
+        msg.receive()
+        if msg.authtype == 'md5':
+            pmsg = PasswordMessage(user=user, password=password, salt=msg.salt)
+            pmsg.send()
+            response = receive(1)
+            msg = MessageTypes[response]()
+            msg.receive()
+            if msg.authtype != 'ok':
+                raise Exception('Authentication failed')
+        for msg in self._fetch_until_ready():
+            pass
+    
+    @call
+    def simplequery(self, sqlstring):
+        QueryMessage(sqlstring=sqlstring).send()
+        return self._recv_results(False)
 
-	@call
-	def simplequery_dict(self, sqlstring):
-		QueryMessage(sqlstring=sqlstring).send()
-		return self._recv_results(True)
-	
-	@call
-	def extquery_prepare(self, sqlstring, name=''):
-		ParseMessage(name=name, sqlstring=sqlstring).send()
-	
-	def _extquery(self, params, name):
-		BindMessage(statement_name=name, params=params).send()
-		DescribeMessage().send()
-		ExecuteMessage().send()
-		SyncMessage().send()
+    @call
+    def simplequery_dict(self, sqlstring):
+        QueryMessage(sqlstring=sqlstring).send()
+        return self._recv_results(True)
+    
+    @call
+    def extquery_prepare(self, sqlstring, name=''):
+        ParseMessage(name=name, sqlstring=sqlstring).send()
+    
+    def _extquery(self, params, name):
+        BindMessage(statement_name=name, params=params).send()
+        DescribeMessage().send()
+        ExecuteMessage().send()
+        SyncMessage().send()
 
-	@call
-	def extquery(self, params, name=''):
-		self._extquery(params, name)
-		return self._recv_results(False)
+    @call
+    def extquery(self, params, name=''):
+        self._extquery(params, name)
+        return self._recv_results(False)
 
-	@call
-	def extquery_dict(self, params, name=''):
-		self._extquery(params, name)
-		return self._recv_results(True)
+    @call
+    def extquery_dict(self, params, name=''):
+        self._extquery(params, name)
+        return self._recv_results(True)
 
-	def _fetch_until_ready(self):
-		while True:
-			response = receive(1)
-			msg = MessageTypes[response]()
-			msg.receive()
-			yield msg
-			if isinstance(msg, ReadyForQueryMessage):
-				break
+    def _fetch_until_ready(self):
+        while True:
+            response = receive(1)
+            msg = MessageTypes[response]()
+            msg.receive()
+            yield msg
+            if isinstance(msg, ReadyForQueryMessage):
+                break
 
-	def _convert_types(self, cols, row, result_dict):
-		if result_dict:
-			return dict((c[0], type_functions[c[3]](v)) for c,v in zip(cols, row))
-		return tuple(type_functions[c[3]](v) for c,v in zip(cols, row))
+    def _convert_types(self, cols, row, result_dict):
+        if result_dict:
+            return dict((c[0], type_functions[c[3]](v)) for c,v in zip(cols, row))
+        return tuple(type_functions[c[3]](v) for c,v in zip(cols, row))
 
-	def _recv_results(self, result_dict):
-		rows = []
-		col_descriptions = None
-		for msg in self._fetch_until_ready():
-			if isinstance(msg, RowDescriptionMessage):
-				col_descriptions = msg.fielddescriptions
-			elif isinstance(msg, DataRowMessage):
-				rows.append(self._convert_types(col_descriptions, msg.row, result_dict))
-		return rows
-	
+    def _recv_results(self, result_dict):
+        rows = []
+        col_descriptions = None
+        for msg in self._fetch_until_ready():
+            if isinstance(msg, RowDescriptionMessage):
+                col_descriptions = msg.fielddescriptions
+            elif isinstance(msg, DataRowMessage):
+                rows.append(self._convert_types(col_descriptions, msg.row, result_dict))
+        return rows
+    
 class PostgresMessage(object):
-	idbyte = ''
-	frontend_only = False
-	def __init__(self, **kwargs):
-		for k,v in kwargs.iteritems():
-			setattr(self, k, v)
-	
-	def receive(self):
-		length, = struct.unpack('!I', receive(4))
-		if length > 4:
-			allbytes = receive(length-4)
-		else:
-			allbytes = ''
-		self.unpack(allbytes)
-	
-	def send(self):
-		allbytes = self.pack()
-		tosend = self.idbyte + struct.pack('!I', len(allbytes)+4) + allbytes
-		send(tosend)
-	
-	def pack(self):
-		raise NotImplementedError(type(self))
+    idbyte = ''
+    frontend_only = False
+    def __init__(self, **kwargs):
+        for k,v in kwargs.iteritems():
+            setattr(self, k, v)
+    
+    def receive(self):
+        length, = struct.unpack('!I', receive(4))
+        if length > 4:
+            allbytes = receive(length-4)
+        else:
+            allbytes = ''
+        self.unpack(allbytes)
+    
+    def send(self):
+        allbytes = self.pack()
+        tosend = self.idbyte + struct.pack('!I', len(allbytes)+4) + allbytes
+        send(tosend)
+    
+    def pack(self):
+        raise NotImplementedError(type(self))
 
-	def unpack(self, allbytes):
-		raise NotImplementedError(type(self))
+    def unpack(self, allbytes):
+        raise NotImplementedError(type(self))
 
 # AuthenticationOk (B)
 # Byte1('R')
@@ -204,16 +204,16 @@ class PostgresMessage(object):
 # GSSAPI or SSPI authentication data.
 # 
 class AuthenticationMessage(PostgresMessage):
-	idbyte = 'R'
-	def unpack(self, allbytes):
-		authtype, = struct.unpack('!I', allbytes[:4])
-		if authtype == 5:
-			self.authtype = 'md5'
-			self.salt = allbytes[4:]
-		elif authtype == 0:
-			self.authtype = 'ok'
-		else:
-			raise Exception('we only support md5, trust, and ident at the moment')
+    idbyte = 'R'
+    def unpack(self, allbytes):
+        authtype, = struct.unpack('!I', allbytes[:4])
+        if authtype == 5:
+            self.authtype = 'md5'
+            self.salt = allbytes[4:]
+        elif authtype == 0:
+            self.authtype = 'ok'
+        else:
+            raise Exception('we only support md5, trust, and ident at the moment')
 # BackendKeyData (B)
 # Byte1('K')
 # Identifies the message as cancellation key data. The frontend must save these values if it wishes to be able to issue CancelRequest messages later.
@@ -228,9 +228,9 @@ class AuthenticationMessage(PostgresMessage):
 # The secret key of this backend.
 # 
 class BackendKeyDataMessage(PostgresMessage):
-	idbyte = 'K'
-	def unpack(self, allbytes):
-		log('BackendKeyDataMessage:', allbytes)
+    idbyte = 'K'
+    def unpack(self, allbytes):
+        log('BackendKeyDataMessage:', allbytes)
 # Bind (F)
 # Byte1('B')
 # Identifies the message as a Bind command.
@@ -270,11 +270,11 @@ class BackendKeyDataMessage(PostgresMessage):
 # The result-column format codes. Each must presently be zero (text) or one (binary).
 # 
 class BindMessage(PostgresMessage):
-	idbyte = 'B'
-	def pack(self): # TODO: named destination portal?
-		header = struct.pack('!B%ssBHH' % len(self.statement_name), 0, self.statement_name, 0, 0, len(self.params))
-		params = ''.join(struct.pack('!I%ss' % len(p), len(p), p) for p in self.params)
-		return header + params + struct.pack('!H', 0)
+    idbyte = 'B'
+    def pack(self): # TODO: named destination portal?
+        header = struct.pack('!B%ssBHH' % len(self.statement_name), 0, self.statement_name, 0, 0, len(self.params))
+        params = ''.join(struct.pack('!I%ss' % len(p), len(p), p) for p in self.params)
+        return header + params + struct.pack('!H', 0)
 # BindComplete (B)
 # Byte1('2')
 # Identifies the message as a Bind-complete indicator.
@@ -283,9 +283,9 @@ class BindMessage(PostgresMessage):
 # Length of message contents in bytes, including self.
 # 
 class BindCompleteMessage(PostgresMessage):
-	idbyte = '2'
-	def unpack(self, allbytes):
-		log('BindCompleteMessage')
+    idbyte = '2'
+    def unpack(self, allbytes):
+        log('BindCompleteMessage')
 # CancelRequest (F)
 # Int32(16)
 # Length of message contents in bytes, including self.
@@ -344,9 +344,9 @@ class BindCompleteMessage(PostgresMessage):
 # For a COPY command, the tag is COPY rows where rows is the number of rows copied. (Note: the row count appears only in PostgreSQL 8.2 and later.)
 # 
 class CommandCompleteMessage(PostgresMessage):
-	idbyte = 'C'
-	def unpack(self, allbytes):
-		log('CommandCompleteMessage:', allbytes[:-1])
+    idbyte = 'C'
+    def unpack(self, allbytes):
+        log('CommandCompleteMessage:', allbytes[:-1])
 # CopyData (F & B)
 # Byte1('d')
 # Identifies the message as COPY data.
@@ -425,21 +425,21 @@ class CommandCompleteMessage(PostgresMessage):
 # The value of the column, in the format indicated by the associated format code. n is the above length.
 # 
 class DataRowMessage(PostgresMessage):
-	idbyte = 'D'
-	def unpack(self, allbytes):
-		numcolumns, = struct.unpack('!H', allbytes[:2])
-		coldata = allbytes[2:]
-		self.row = []
-		for x in xrange(numcolumns):
-			collen, = struct.unpack('!i', coldata[:4])
-			coldata = coldata[4:]
-			if collen == -1:
-				self.row.append(None)
-			else:
-				colval, = struct.unpack('!%ss' % collen, coldata[:collen])
-				coldata = coldata[collen:]
-				self.row.append(colval)
-		log('DataRowMessage:', self.row)
+    idbyte = 'D'
+    def unpack(self, allbytes):
+        numcolumns, = struct.unpack('!H', allbytes[:2])
+        coldata = allbytes[2:]
+        self.row = []
+        for x in xrange(numcolumns):
+            collen, = struct.unpack('!i', coldata[:4])
+            coldata = coldata[4:]
+            if collen == -1:
+                self.row.append(None)
+            else:
+                colval, = struct.unpack('!%ss' % collen, coldata[:collen])
+                coldata = coldata[collen:]
+                self.row.append(colval)
+        log('DataRowMessage:', self.row)
 # Describe (F)
 # Byte1('D')
 # Identifies the message as a Describe command.
@@ -454,10 +454,10 @@ class DataRowMessage(PostgresMessage):
 # The name of the prepared statement or portal to describe (an empty string selects the unnamed prepared statement or portal).
 # 
 class DescribeMessage(PostgresMessage):
-	idbyte = 'D'
-	frontend_only = True
-	def pack(self):
-		return 'P\x00' #TODO: support named portals? (this line assumes the empty string portal)
+    idbyte = 'D'
+    frontend_only = True
+    def pack(self):
+        return 'P\x00' #TODO: support named portals? (this line assumes the empty string portal)
 # EmptyQueryResponse (B)
 # Byte1('I')
 # Identifies the message as a response to an empty query string. (This substitutes for CommandComplete.)
@@ -481,9 +481,9 @@ class DescribeMessage(PostgresMessage):
 # The field value.
 # 
 class ErrorResponseMessage(PostgresMessage):
-	idbyte = 'E'
-	def unpack(self, allbytes):
-		raise Exception(allbytes)
+    idbyte = 'E'
+    def unpack(self, allbytes):
+        raise Exception(allbytes)
 # Execute (F)
 # Byte1('E')
 # Identifies the message as an Execute command.
@@ -498,10 +498,10 @@ class ErrorResponseMessage(PostgresMessage):
 # Maximum number of rows to return, if portal contains a query that returns rows (ignored otherwise). Zero denotes "no limit".
 # 
 class ExecuteMessage(PostgresMessage):
-	idbyte = 'E'
-	frontend_only = True
-	def pack(self):
-		return struct.pack('!BI', 0, 0)
+    idbyte = 'E'
+    frontend_only = True
+    def pack(self):
+        return struct.pack('!BI', 0, 0)
 # Flush (F)
 # Byte1('H')
 # Identifies the message as a Flush command.
@@ -510,10 +510,10 @@ class ExecuteMessage(PostgresMessage):
 # Length of message contents in bytes, including self.
 # 
 class FlushMessage(PostgresMessage):
-	idbyte = 'H'
-	frontend_only = True
-	def pack(self):
-		return ''
+    idbyte = 'H'
+    frontend_only = True
+    def pack(self):
+        return ''
 # FunctionCall (F)
 # Byte1('F')
 # Identifies the message as a function call.
@@ -582,9 +582,9 @@ class FlushMessage(PostgresMessage):
 # The field value.
 # 
 class NoticeResponseMessage(PostgresMessage):
-	idbyte = 'N'
-	def unpack(self, allbytes):
-		log('NoticeResponseMessage:', allbytes)
+    idbyte = 'N'
+    def unpack(self, allbytes):
+        log('NoticeResponseMessage:', allbytes)
 # NotificationResponse (B)
 # Byte1('A')
 # Identifies the message as a notification response.
@@ -630,9 +630,9 @@ class NoticeResponseMessage(PostgresMessage):
 # The current value of the parameter.
 # 
 class ParameterStatusMessage(PostgresMessage):
-	idbyte = 'S'
-	def unpack(self, allbytes):
-		log('ParameterStatusMessage:', allbytes)
+    idbyte = 'S'
+    def unpack(self, allbytes):
+        log('ParameterStatusMessage:', allbytes)
 # Parse (F)
 # Byte1('P')
 # Identifies the message as a Parse command.
@@ -655,9 +655,9 @@ class ParameterStatusMessage(PostgresMessage):
 # Specifies the object ID of the parameter data type. Placing a zero here is equivalent to leaving the type unspecified.
 # 
 class ParseMessage(PostgresMessage):
-	idbyte = 'P'
-	def pack(self):
-		return struct.pack('!%ssB%ssBH' % (len(self.name), len(self.sqlstring)), self.name, 0, self.sqlstring, 0, 0)
+    idbyte = 'P'
+    def pack(self):
+        return struct.pack('!%ssB%ssBH' % (len(self.name), len(self.sqlstring)), self.name, 0, self.sqlstring, 0, 0)
 # ParseComplete (B)
 # Byte1('1')
 # Identifies the message as a Parse-complete indicator.
@@ -666,9 +666,9 @@ class ParseMessage(PostgresMessage):
 # Length of message contents in bytes, including self.
 # 
 class ParseCompleteMessage(PostgresMessage):
-	idbyte = '1'
-	def unpack(self, allbytes):
-		log('ParseCompleteMessage')
+    idbyte = '1'
+    def unpack(self, allbytes):
+        log('ParseCompleteMessage')
 # PasswordMessage (F)
 # Byte1('p')
 # Identifies the message as a password response. Note that this is also used for GSSAPI and SSPI response messages (which is really a design error, since the contained data is not a null-terminated string in that case, but can be arbitrary binary data).
@@ -680,15 +680,15 @@ class ParseCompleteMessage(PostgresMessage):
 # The password (encrypted, if requested).
 # 
 class PasswordMessage(PostgresMessage):
-	idbyte = 'p'
-	def pack(self):
-		pword = hashlib.md5()
-		pword.update(self.password)
-		pword.update(self.user)
-		pwordsalt = hashlib.md5()
-		pwordsalt.update(pword.hexdigest())
-		pwordsalt.update(self.salt)
-		return 'md5' + pwordsalt.hexdigest() + '\x00'
+    idbyte = 'p'
+    def pack(self):
+        pword = hashlib.md5()
+        pword.update(self.password)
+        pword.update(self.user)
+        pwordsalt = hashlib.md5()
+        pwordsalt.update(pword.hexdigest())
+        pwordsalt.update(self.salt)
+        return 'md5' + pwordsalt.hexdigest() + '\x00'
 # PortalSuspended (B)
 # Byte1('s')
 # Identifies the message as a portal-suspended indicator. Note this only appears if an Execute message's row-count limit was reached.
@@ -707,9 +707,9 @@ class PasswordMessage(PostgresMessage):
 # The query string itself.
 # 
 class QueryMessage(PostgresMessage):
-	idbyte = 'Q'
-	def pack(self):
-		return self.sqlstring + '\x00'
+    idbyte = 'Q'
+    def pack(self):
+        return self.sqlstring + '\x00'
 # ReadyForQuery (B)
 # Byte1('Z')
 # Identifies the message type. ReadyForQuery is sent whenever the backend is ready for a new query cycle.
@@ -721,9 +721,9 @@ class QueryMessage(PostgresMessage):
 # Current backend transaction status indicator. Possible values are 'I' if idle (not in a transaction block); 'T' if in a transaction block; or 'E' if in a failed transaction block (queries will be rejected until block is ended).
 # 
 class ReadyForQueryMessage(PostgresMessage):
-	idbyte = 'Z'
-	def unpack(self, allbytes):
-		log('ReadyForQueryMessage, transaction status', allbytes)
+    idbyte = 'Z'
+    def unpack(self, allbytes):
+        log('ReadyForQueryMessage, transaction status', allbytes)
 # RowDescription (B)
 # Byte1('T')
 # Identifies the message as a row description.
@@ -758,17 +758,17 @@ class ReadyForQueryMessage(PostgresMessage):
 # The format code being used for the field. Currently will be zero (text) or one (binary). In a RowDescription returned from the statement variant of Describe, the format code is not yet known and will always be zero.
 # 
 class RowDescriptionMessage(PostgresMessage):
-	idbyte = 'T'
-	def unpack(self, allbytes):
-		numfields, = struct.unpack('!H', allbytes[:2])
-		fields = allbytes[2:]
-		self.fielddescriptions = []
-		for x in xrange(numfields):
-			fieldname, fields = fields.split('\x00', 1)
-			table_oid, col_attr, type_oid, type_size, type_modifier, format_code = struct.unpack('!IHIHIH', fields[:18])
-			fields = fields[18:]
-			self.fielddescriptions.append((fieldname, table_oid, col_attr, type_oid, type_size, type_modifier, format_code))
-		log('RowDescriptionMessage:', self.fielddescriptions)
+    idbyte = 'T'
+    def unpack(self, allbytes):
+        numfields, = struct.unpack('!H', allbytes[:2])
+        fields = allbytes[2:]
+        self.fielddescriptions = []
+        for x in xrange(numfields):
+            fieldname, fields = fields.split('\x00', 1)
+            table_oid, col_attr, type_oid, type_size, type_modifier, format_code = struct.unpack('!IHIHIH', fields[:18])
+            fields = fields[18:]
+            self.fielddescriptions.append((fieldname, table_oid, col_attr, type_oid, type_size, type_modifier, format_code))
+        log('RowDescriptionMessage:', self.fielddescriptions)
 # SSLRequest (F)
 # Int32(8)
 # Length of message contents in bytes, including self.
@@ -803,14 +803,14 @@ class RowDescriptionMessage(PostgresMessage):
 # The parameter value.
 # 
 class StartupMessage(PostgresMessage):
-	idbyte = ''
-	def pack(self):
-		options = ''
-		for option in ['user', 'database']: # TODO: support more options
-			if hasattr(self, option):
-				options += struct.pack('!%ssB%ssB' % (len(option), len(getattr(self, option))), option, 0, getattr(self, option), 0)
-		options += struct.pack('!B', 0)
-		return struct.pack('!I', 3<<16) + options 
+    idbyte = ''
+    def pack(self):
+        options = ''
+        for option in ['user', 'database']: # TODO: support more options
+            if hasattr(self, option):
+                options += struct.pack('!%ssB%ssB' % (len(option), len(getattr(self, option))), option, 0, getattr(self, option), 0)
+        options += struct.pack('!B', 0)
+        return struct.pack('!I', 3<<16) + options 
 # Sync (F)
 # Byte1('S')
 # Identifies the message as a Sync command.
@@ -819,10 +819,10 @@ class StartupMessage(PostgresMessage):
 # Length of message contents in bytes, including self.
 # 
 class SyncMessage(PostgresMessage):
-	idbyte = 'S'
-	frontend_only = True
-	def pack(self):
-		return ''
+    idbyte = 'S'
+    frontend_only = True
+    def pack(self):
+        return ''
 # Terminate (F)
 # Byte1('X')
 # Identifies the message as a termination.
@@ -832,56 +832,56 @@ class SyncMessage(PostgresMessage):
 # 
 
 def is_backend_message(cls):
-	try:
-		return issubclass(cls, PostgresMessage) and not cls.frontend_only
-	except:
-		return False
+    try:
+        return issubclass(cls, PostgresMessage) and not cls.frontend_only
+    except:
+        return False
 
 MessageTypes = dict((c.idbyte, c) for k,c in locals().iteritems() if is_backend_message(c))
 
 if __name__ == '__main__':
-	from diesel import Application, Loop
-	import time
+    from diesel import Application, Loop
+    import time
 
-	a = Application()
+    a = Application()
 
-	def exttest_time():
-		db = PostgresClient()
-		db.connect(user='user', password='pass', database='test')
-		db.extquery_prepare('select userid, fakenum from testtable where groupid=$1 limit 5', 'foobar')
-		t = time.time()
-		for x in xrange(5000):
-			db.extquery(('pgtest',), 'foobar')
-		print time.time() - t
+    def exttest_time():
+        db = PostgresClient()
+        db.connect(user='user', password='pass', database='test')
+        db.extquery_prepare('select userid, fakenum from testtable where groupid=$1 limit 5', 'foobar')
+        t = time.time()
+        for x in xrange(5000):
+            db.extquery(('pgtest',), 'foobar')
+        print time.time() - t
 
-	def simpletest_time():
-		db = PostgresClient()
-		db.connect(user='user', password='pass', database='test')
-		t = time.time()
-		for x in xrange(5000):
-			db.simplequery("select userid, fakenum from testtable where groupid='pgtest' limit 5")
-		print time.time() - t
+    def simpletest_time():
+        db = PostgresClient()
+        db.connect(user='user', password='pass', database='test')
+        t = time.time()
+        for x in xrange(5000):
+            db.simplequery("select userid, fakenum from testtable where groupid='pgtest' limit 5")
+        print time.time() - t
 
-	def pgtest():
-		db = PostgresClient()
-		db.connect(user='user', password='pass', database='test')
-		db.simplequery('select * from testtable limit 2')
-		db.simplequery("insert into testtable values ('pgtest', 'pgtest', 5500)")
-		db.simplequery("insert into testtable values ('10', 'pgtest', 5500)")
-		print db.simplequery("select * from testtable where groupid='10'")
-		db.simplequery("update testtable set fakenum=8800 where groupid='pgtest'")
-		db.simplequery("select userid, fakenum from testtable where groupid='pgtest' limit 5")
-		db.extquery_prepare('select userid, fakenum from testtable where groupid=$1 limit 5', 'foobar')
-		print db.extquery(('pgtest',), 'foobar')
-		print db.extquery_dict(('pgtest',), 'foobar')
-		print db.simplequery("select userid, fakenum from testtable where groupid='pgtest' limit 5")
-		print db.simplequery_dict("select userid, fakenum from testtable where groupid='pgtest' limit 5")
-	
-	a.add_loop(Loop(pgtest))
-#	a.add_loop(Loop(exttest_time))
-#	a.add_loop(Loop(exttest_time))
-#	a.add_loop(Loop(exttest_time))
-#	a.add_loop(Loop(exttest_time))
-#	a.add_loop(Loop(exttest_time))
-#	a.add_loop(Loop(exttest_time))
-	a.run()
+    def pgtest():
+        db = PostgresClient()
+        db.connect(user='user', password='pass', database='test')
+        db.simplequery('select * from testtable limit 2')
+        db.simplequery("insert into testtable values ('pgtest', 'pgtest', 5500)")
+        db.simplequery("insert into testtable values ('10', 'pgtest', 5500)")
+        print db.simplequery("select * from testtable where groupid='10'")
+        db.simplequery("update testtable set fakenum=8800 where groupid='pgtest'")
+        db.simplequery("select userid, fakenum from testtable where groupid='pgtest' limit 5")
+        db.extquery_prepare('select userid, fakenum from testtable where groupid=$1 limit 5', 'foobar')
+        print db.extquery(('pgtest',), 'foobar')
+        print db.extquery_dict(('pgtest',), 'foobar')
+        print db.simplequery("select userid, fakenum from testtable where groupid='pgtest' limit 5")
+        print db.simplequery_dict("select userid, fakenum from testtable where groupid='pgtest' limit 5")
+    
+    a.add_loop(Loop(pgtest))
+#    a.add_loop(Loop(exttest_time))
+#    a.add_loop(Loop(exttest_time))
+#    a.add_loop(Loop(exttest_time))
+#    a.add_loop(Loop(exttest_time))
+#    a.add_loop(Loop(exttest_time))
+#    a.add_loop(Loop(exttest_time))
+    a.run()
