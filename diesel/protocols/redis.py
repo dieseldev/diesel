@@ -117,7 +117,7 @@ class RedisClient(Client):
     ### STRING OPERATIONS
     @call
     def set(self, k, v):
-        self._send_bulk('SET', str(v), k)
+        self._send('SET', k, str(v))
         resp = self._get_response()
         return resp
 
@@ -129,7 +129,7 @@ class RedisClient(Client):
 
     @call
     def getset(self, k, v):
-        self._send_bulk('GETSET', str(v), k)
+        self._send('GETSET', k, str(v))
         resp = self._get_response()
         return resp
 
@@ -141,19 +141,19 @@ class RedisClient(Client):
 
     @call
     def setnx(self, k, v):
-        self._send_bulk('SETNX', str(v), k)
+        self._send('SETNX', k, str(v))
         resp = self._get_response()
         return resp
 
     @call
     def mset(self, d):
-        self._send_bulk_multi('MSET', list=flatten_arg_pairs(d.iteritems()))
+        self._send('MSET', list=flatten_arg_pairs(d.iteritems()))
         resp = self._get_response()
         return resp
 
     @call
     def msetnx(self, d):
-        self._send_bulk_multi('MSETNX', list=flatten_arg_pairs(d.iteritems()))
+        self._send('MSETNX', list=flatten_arg_pairs(d.iteritems()))
         resp = self._get_response()
         return resp
 
@@ -185,13 +185,13 @@ class RedisClient(Client):
     ### LIST OPERATIONS
     @call
     def rpush(self, k, v):
-        self._send_bulk('RPUSH', str(v), k)
+        self._send('RPUSH', k, str(v))
         resp = self._get_response()
         return resp
 
     @call
     def lpush(self, k, v):
-        self._send_bulk('LPUSH', str(v), k)
+        self._send('LPUSH', k, str(v))
         resp = self._get_response()
         return resp
 
@@ -221,13 +221,13 @@ class RedisClient(Client):
 
     @call
     def lset(self, k, idx, v):
-        self._send_bulk('LSET', str(v), k, str(idx))
+        self._send('LSET', k, str(v), str(idx))
         resp = self._get_response()
         return resp
 
     @call
     def lrem(self, k, v, count=0):
-        self._send_bulk('LREM', str(v), k, str(count))
+        self._send('LREM', k, str(v), str(count))
         resp = self._get_response()
         return resp
 
@@ -275,13 +275,13 @@ class RedisClient(Client):
     ### SET OPERATIONS
     @call
     def sadd(self, k, v):
-        self._send_bulk('SADD', str(v), k)
+        self._send('SADD', k, str(v))
         resp = self._get_response()
         return resp
 
     @call
     def srem(self, k, v):
-        self._send_bulk('SREM', str(v), k)
+        self._send('SREM', k, str(v))
         resp = self._get_response()
         return bool(resp)
 
@@ -293,7 +293,7 @@ class RedisClient(Client):
 
     @call
     def smove(self, src, dst, v):
-        self._send_bulk('SMOVE', str(v), src, dst)
+        self._send('SMOVE', src, dst, str(v))
         resp = self._get_response()
         return resp
 
@@ -305,7 +305,7 @@ class RedisClient(Client):
 
     @call
     def sismember(self, k, v):
-        self._send_bulk('SISMEMBER', str(v), k)
+        self._send('SISMEMBER', k, str(v))
         resp = self._get_response()
         return bool(resp)
 
@@ -365,13 +365,13 @@ class RedisClient(Client):
 
     @call
     def zadd(self, key, score, member):
-        self._send_bulk('ZADD', str(member), key, str(score))
+        self._send('ZADD', key, str(score), str(member))
         resp = self._get_response()
         return resp
 
     @call
     def zrem(self, key, member):
-        self._send_bulk('ZREM', str(member), key)
+        self._send('ZREM', key, str(member))
         resp = self._get_response()
         return bool(resp)
 
@@ -395,7 +395,7 @@ class RedisClient(Client):
 
     @call
     def zscore(self, key, member):
-        self._send_bulk('ZSCORE', str(member), key)
+        self._send('ZSCORE', key, str(member))
         resp = self._get_response()
         return float(resp)
 
@@ -404,13 +404,13 @@ class RedisClient(Client):
     ### HASH OPERATIONS
     @call
     def hset(self, key, field, value):
-        self._send_bulk_multi('HSET', str(key), str(field), str(value))
+        self._send('HSET', str(key), str(field), str(value))
         resp = self._get_response()
         return bool(resp)
 
     @call
     def hget(self, key, field):
-        self._send_bulk_multi('HGET', key, field)
+        self._send('HGET', key, field)
         resp = self._get_response()
         return resp
 
@@ -422,8 +422,8 @@ class RedisClient(Client):
         args = [str(key)]
         for i in d.iteritems():
             args.extend(map(str, i))
-        
-        self._send_bulk_multi('HMSET', list=args)
+
+        self._send('HMSET', list=args)
         resp = self._get_response()
         return bool(resp)
 
@@ -432,49 +432,49 @@ class RedisClient(Client):
         if not l:
             return {}
         args = [key] + l
-        self._send_bulk_multi('HMGET', list=args)
+        self._send('HMGET', list=args)
         resp = self._get_response()
         return dict(zip(l, resp))
 
     @call
     def hincrby(self, key, field, amt):
-        self._send_bulk_multi('HINCRBY', str(key), str(field), str(amt))
+        self._send('HINCRBY', str(key), str(field), str(amt))
         resp = self._get_response()
         return resp
 
     @call
     def hexists(self, key, field):
-        self._send_bulk_multi('HEXISTS', key, field)
+        self._send('HEXISTS', key, field)
         resp = self._get_response()
         return bool(resp)
 
     @call
     def hdel(self, key, field):
-        self._send_bulk_multi('HDEL', key, field)
+        self._send('HDEL', key, field)
         resp = self._get_response()
         return bool(resp)
 
     @call
     def hlen(self, key):
-        self._send_bulk_multi('HLEN', key)
+        self._send('HLEN', key)
         resp = self._get_response()
         return resp
 
     @call
     def hkeys(self, key):
-        self._send_bulk_multi('HKEYS', key)
+        self._send('HKEYS', key)
         resp = self._get_response()
         return resp
 
     @call
     def hvals(self, key):
-        self._send_bulk_multi('HVALS', key)
+        self._send('HVALS', key)
         resp = self._get_response()
         return resp
 
     @call
     def hgetall(self, key):
-        self._send_bulk_multi('HGETALL', key)
+        self._send('HGETALL', key)
         resp = self._get_response()
         return dict(resp[x:x+2] for x in xrange(0, len(resp), 2))
 
@@ -556,31 +556,17 @@ class RedisClient(Client):
         
         Returns the number of clients that received the message.
         '''
-        self._send_bulk_multi('PUBLISH', channel, str(message))
+        self._send('PUBLISH', channel, str(message))
         resp = self._get_response()
         return resp
 
-
-    def _send_bulk(self, cmd, data, *args, **kwargs):
-        if 'list' in kwargs:
-            args = kwargs['list']
-        send(('%s %s%s\r\n' % (cmd, 
-             (' '.join(args) + ' ') if args else '', len(data))) 
-               + data + '\r\n')
-
-    def _send_bulk_multi(self, cmd, *args, **kwargs):
+    def _send(self, cmd, *args, **kwargs):
         if 'list' in kwargs:
             args = kwargs['list']
         all = (cmd,) + tuple(args)
         send('*%s\r\n' % len(all))
         for i in all:
-            send(('$%s\r\n' % len(i)) + i + '\r\n')
-
-    def _send(self, cmd, *args, **kwargs):
-        if 'list' in kwargs:
-            args = kwargs['list']
-        send( '%s%s\r\n' % (cmd, 
-        (' ' + ' '.join(args)) if args else ''))
+            send(('$%s\r\n' % len(i)) + str(i) + '\r\n')
 
     def _get_response(self, wake_sig=None):
         if wake_sig:
