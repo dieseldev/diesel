@@ -536,7 +536,7 @@ class RedisClient(Client):
     def hkeys(self, key):
         self._send('HKEYS', key)
         resp = self._get_response()
-        return resp
+        return set(resp)
 
     @call
     def hvals(self, key):
