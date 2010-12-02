@@ -45,7 +45,7 @@ class RedisClient(Client):
     def keys(self, pat):
         self._send('KEYS', pat)
         resp = self._get_response()
-        return resp
+        return set(resp)
 
     @call
     def randomkey(self):
