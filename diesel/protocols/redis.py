@@ -632,6 +632,31 @@ class RedisClient(Client):
         resp = self._get_response()
         return resp
 
+    @call
+    def send_raw_command(self, arguments):
+        cmd, rest = arguments[0], arguments[1:]
+        self._send(cmd, list=rest)
+
+        line_one = until_eol()
+        if line_one[0] in ('+', '-', ':'):
+            return line_one
+
+        if line_one[0] == '$':
+            amt = int(line_one[1:])
+            if amt == -1:
+                return line_one
+            return line_one + receive(amt) + until_eol()
+        if line_one[0] == '*':
+            nargs = int(line_one[1:])
+            if nargs == -1:
+                return line_one
+            out = line_one
+            for x in xrange(nargs):
+                head = until_eol()
+                out += head
+                out += receive(int(head[1:])) + until_eol()
+            return out
+
     def _send(self, cmd, *args, **kwargs):
         if 'list' in kwargs:
             args = kwargs['list']
