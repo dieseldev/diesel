@@ -888,7 +888,7 @@ if __name__ == '__main__':
         assert r.hlen("h1") == 3
 
         assert r.hkeys("h1") == set(['foo', 'baz', 'count'])
-        assert r.hvals("h1") == set(['bar', 'bosh', '7'])
+        assert set(r.hvals("h1")) == set(['bar', 'bosh', '7'])
         assert r.hgetall("h1") == {'foo' : 'bar', 'baz' : 'bosh', 'count' : '7'}
         print 'all tests pass.'
 
