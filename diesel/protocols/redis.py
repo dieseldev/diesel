@@ -146,6 +146,12 @@ class RedisClient(Client):
         return resp
 
     @call
+    def setex(self, k, tm, v):
+        self._send('SETEX', k, str(tm), str(v))
+        resp = self._get_response()
+        return resp
+
+    @call
     def mset(self, d):
         self._send('MSET', list=flatten_arg_pairs(d.iteritems()))
         resp = self._get_response()
@@ -180,6 +186,19 @@ class RedisClient(Client):
         self._send('DECRBY', k, str(amt))
         resp = self._get_response()
         return resp
+
+    @call
+    def append(self, k, value):
+        self._send('APPEND', k, str(value))
+        resp = self._get_response()
+        return resp
+
+    @call
+    def substr(self, k, start, end):
+        self._send('SUBSTR', k, str(start), str(end))
+        resp = self._get_response()
+        return resp
+
 
     ##################################################
     ### LIST OPERATIONS
@@ -399,6 +418,59 @@ class RedisClient(Client):
         resp = self._get_response()
         return float(resp)
 
+    @call
+    def zincrby(self, key, increment, member):
+        self._send('ZINCRBY', key, str(increment), str(member))
+        resp = self._get_response()
+        return float(resp)
+
+    @call
+    def zrank(self, key, member):
+        self._send('ZRANK', key, str(member))
+        resp = self._get_response()
+        return resp
+
+    @call
+    def zrevrank(self, key, member):
+        self._send('ZREVRANK', key, str(member))
+        resp = self._get_response()
+        return resp
+
+    @call
+    def zrangebyscore(self, key, min, max, offset=None, count=None, with_scores=False):
+        args = 'ZRANGEBYSCORE', key, str(min), str(max)
+        if offset:
+            assert count is not None, "if offset specified, count must be as well"
+            args += 'LIMIT', str(offset), str(count)
+        if with_scores:
+            args += 'WITHSCORES',
+
+        self._send(*args)
+        resp = self._get_response()
+
+        if with_scores:
+            return [(resp[x], float(resp[x+1])) 
+            for x in xrange(0, len(resp), 2)]
+
+        return resp 
+
+    @call
+    def zcount(self, key, min, max):
+        self._send('ZCOUNT', key, str(min), str(max))
+        resp = self._get_response()
+        return resp
+
+    @call
+    def zremrangebyrank(self, key, min, max):
+        self._send('ZREMRANGEBYRANK', key, str(min), str(max))
+        resp = self._get_response()
+        return resp
+
+    @call
+    def zremrangebyscore(self, key, min, max):
+        self._send('ZREMRANGEBYSCORE', key, str(min), str(max))
+        resp = self._get_response()
+        return resp
 
     ##################################################
     ### HASH OPERATIONS
