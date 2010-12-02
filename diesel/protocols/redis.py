@@ -690,6 +690,13 @@ if __name__ == '__main__':
     def do_set():
         r = RedisClient()
 
+        r.select(11)
+        r.flushdb()
+
+        print '--BASIC--'
+        assert r.get('newdb') == None
+        r.set('newdb', '1')
+
         r.set('foo3', 'bar')
         assert r.exists('foo3')
         r.delete('foo3')
@@ -698,155 +705,192 @@ if __name__ == '__main__':
         for x in xrange(5000):
             r.set('foo', 'bar')
 
-        print (r.get('foo'))
-        print (r.get('foo2'))
-        print (r.exists('foo'))
-        print (r.exists('foo2'))
-        print (r.type('foo'))
-        print (r.type('foo2'))
-        print (r.keys('fo*'))
-        print (r.keys('bo*'))
-        print (r.randomkey())
-        print (r.rename('foo', 'bar'))
-        print (r.rename('bar', 'foo'))
-        print (r.dbsize())
-        print (r.ttl('foo'))
+        assert r.get('foo') == 'bar'
+        assert r.get('foo2') == None
+
+        assert r.exists('foo') == True
+        assert r.exists('foo2') == False
+
+        assert r.type('foo') == 'string'
+        assert r.type('foo2') == 'none'
+        assert r.keys('fo*') == set(['foo'])
+        assert r.keys('bo*') == set()
+
+        assert r.randomkey()
+
+        r.rename('foo', 'bar')
+        assert r.get('foo') == None
+        assert r.get('bar') == 'bar'
+
+        r.rename('bar', 'foo')
+        assert r.get('foo') == 'bar'
+        assert r.get('bar') == None
+        assert r.dbsize()
+
+        assert r.ttl('foo') == None
+
+        r.setex("gonesoon", 3, "whatever")
+        assert 0 < r.ttl("gonesoon") <= 3.0
+
+        r.set("phrase", "to be or ")
+        r.append("phrase", "not to be")
+        assert r.get("phrase") == "to be or not to be"
+        assert r.substr('phrase', 3, 11) == 'be or not'
+
         r.set("one", "two")
-        print 'sets!'
-        print (r.mget(["one", "foo"]))
-        print (r.mset({"one" : "three", "foo":  "four"}))
-        print (r.mget(["one", "foo"]))
+        assert r.mget(["one", "foo"]) == ['two', 'bar']
+        r.mset({"one" : "three", "foo":  "four"})
+        assert r.mget(["one", "foo"]) == ['three', 'four']
 
         print '--INCR--'
-        print (r.incr("counter"))
-        print (r.get('counter'))
-        print (r.incr("counter"))
-        print (r.get('counter'))
-        print (r.incrby("counter", 2))
-        print (r.get('counter'))
+        assert r.incr("counter") == 1
+        assert r.get('counter') == '1'
+        assert r.incr("counter") == 2
+        assert r.get('counter') == '2'
+        assert r.incrby("counter", 2) == 4
+        assert r.get('counter') == '4'
 
         print '--DECR--'
-        print (r.decr("counter"))
-        print (r.get('counter'))
-        print (r.decr("counter"))
-        print (r.get('counter'))
-        print (r.decrby("counter", 2))
-        print (r.get('counter'))
+        assert r.decr("counter") == 3
+        assert r.decr("counter") == 2
+        assert r.decrby("counter", 2) == 0
 
         print '--LISTS--'
-        print (r.rpush("ml", 5))
-        print (r.lpush("ml", 1))
-        print (r.lrange("ml", 0, 500))
-        print (r.llen("ml"))
+        r.rpush("ml", 5)
+        r.lpush("ml", 1)
+        assert r.lrange("ml", 0, 500) == ['1', '5']
+        assert r.llen("ml") == 2
 
-        print (r.ltrim("ml", 1, 3))
+        r.ltrim("ml", 1, 3)
 
-        print (r.lrange("ml", 0, 500))
-        print (r.lset("ml", 0, 'nifty!'))
+        assert r.lrange("ml", 0, 500) == ['5']
 
-        print (r.lindex("ml", 0))
+        r.lset("ml", 0, 'nifty!')
+        assert r.lrange("ml", 0, 500) == ['nifty!']
+        assert r.lindex("ml", 0) == 'nifty!'
 
-        print (r.lrem("ml", 'nifty!'))
+        r.lrem("ml", 'nifty!')
 
-        print (r.lrange("ml", 0, 500))
+        assert r.lrange("ml", 0, 500) == []
 
-        print (r.rpush("ml", 'yes!'))
-        print (r.rpush("ml", 'no!'))
-        print (r.lrange("ml", 0, 500))
+        r.rpush("ml", 'yes!')
+        r.rpush("ml", 'no!')
+        assert r.lrange("ml", 0, 500) == ["yes!", "no!"]
 
-        print (r.lpop("ml"))
-        print (r.rpop("ml"))
+        assert r.lpop("ml") == 'yes!'
+        assert r.rpop("ml") == 'no!'
 
-        print (r.lrange("ml", 0, 500))
-        print (r.blpop(['ml'], 3))
-        print (r.rpush("ml", 'yes!'))
-        print (r.rpush("ml", 'no!'))
-        print (r.blpop(['ml'], 3))
-        print (r.blpop(['ml'], 3))
+        t = time.time()
+        r.blpop(['ml'], 3)
+        delt = time.time() - t
+        assert 2.5 < delt < 10
 
-        print '-- rotation --'
-        print (r.rpush("ml", 'yes!'))
-        print (r.rpush("ml", 'no!'))
-        print (r.rpush("ml2", 'one!'))
-        print (r.rpush("ml2", 'two!'))
-        print '-- before --'
-        print (r.lrange("ml", 0, 500))
-        print (r.lrange("ml2", 0, 500))
-        print (r.rpoplpush("ml", "ml2"))
-        print '-- after --'
-        print (r.lrange("ml", 0, 500))
-        print (r.lrange("ml2", 0, 500))
+        r.rpush("ml", 'yes!')
+        r.rpush("ml", 'no!')
+        assert r.blpop(['ml'], 3) == ('ml', 'yes!')
+        assert r.blpop(['ml'], 3) == ('ml', 'no!')
 
-        print (r.sort("ml2"))
+        r.rpush("ml", 'yes!')
+        r.rpush("ml", 'no!')
+        r.rpush("ml2", 'one!')
+        r.rpush("ml2", 'two!')
+
+        r.rpoplpush("ml", "ml2")
+        assert r.lrange("ml", 0, 500) == ['yes!']
+        assert r.lrange("ml2", 0, 500) == ['no!', 'one!', 'two!']
 
         print '-- SETS --'
 
-        print (r.sadd("s1", "one"))
-        print (r.sadd("s1", "two"))
-        print (r.sadd("s1", "three"))
-        print (r.srem("s1", "three"))
-        print (r.srem("s1", "three"))
+        r.sadd("s1", "one")
+        r.sadd("s1", "two")
+        r.sadd("s1", "three")
 
-        print (r.smove("s1", "s2", "one"))
-        print (r.spop("s2"))
-        print (r.scard("s1"))
+        assert r.smembers("s1") == set(["one", "two", "three"])
 
-        print (r.sismember("s1", "two"))
-        print (r.sismember("s1", "one"))
+        r.srem("s1", "three")
+
+        assert r.smembers("s1") == set(["one", "two"])
+
+        r.smove("s1", "s2", "one")
+        assert r.spop("s2") == 'one'
+        assert r.scard("s1") == 1
+
+        assert r.sismember("s1", "two") == True
+        assert r.sismember("s1", "one") == False
 
         r.sadd("s1", "four")
         r.sadd("s2", "four")
-        print (r.sinter(["s1", "s2"]))
-        print (r.sinterstore("s3", ["s1", "s2"]))
 
-        print (r.sunion(["s1", "s2"]))
-        print (r.sunionstore("s3", ["s1", "s2"]))
+        assert r.sinter(["s1", "s2"]) == set(['four'])
+        r.sinterstore("s3", ["s1", "s2"])
+        assert r.smembers('s3') == r.sinter(["s1", "s2"])
+        assert r.sunion(["s1", "s2"]) == set(['two', 'four'])
+        r.sunionstore("s3", ["s1", "s2"])
+        assert r.smembers('s3') == r.sunion(["s1", "s2"])
 
-        print (r.smembers("s3"))
-        print (r.srandmember("s3"))
+        assert r.srandmember("s3") in r.smembers("s3")
 
         print '-- ZSETS --'
 
-        print (r.zadd("z1", 10, "ten"))
-        print (r.zadd("z1", 1, "one"))
-        print (r.zadd("z1", 2, "two"))
-        print (r.zadd("z1", 0, "zero"))
+        r.zadd("z1", 10, "ten")
+        r.zadd("z1", 1, "one")
+        r.zadd("z1", 2, "two")
+        r.zadd("z1", 0, "zero")
 
 
-        print (r.zrange("z1", 0, -1))
-        print (r.zrem("z1", "two"))
-        print (r.zrange("z1", 0, -1))
-        print (r.zrevrange("z1", 0, -1))
+        assert r.zrange("z1", 0, -1) == ['zero', 'one', 'two', 'ten']
+        r.zrem("z1", "two")
+        assert r.zrange("z1", 0, -1) == ['zero', 'one', 'ten']
+        assert r.zrevrange("z1", 0, -1) == list(reversed(r.zrange("z1", 0, -1)))
 
-        print (r.zrem("z1", (r.zrange("z1", 0, 0))[0]))
-        print (r.zrange("z1", 0, -1))
-        print (r.zcard("z1"))
+        r.zrem("z1", (r.zrange("z1", 0, 0))[0]) # remove 'zero'?
+        assert r.zrange("z1", 0, -1) == ['one', 'ten']
+        assert r.zcard("z1") == 2
+
+        assert r.zscore("z1", "one") == 1.0
+
+        r.zincrby("z1", -2, "one")
+
+        assert r.zscore("z1", "one") == -1.0
+
+        r.zadd("z1", 2, "two")
+        r.zadd("z1", 3, "three")
+        assert r.zrangebyscore("z1", -5, 15) == ['one', 'two', 'three', 'ten']
+        assert r.zrangebyscore("z1", 2, 15) == ['two', 'three', 'ten']
+        assert r.zrangebyscore("z1", 2, 15, 1, 50) == ['three', 'ten']
+        assert r.zrangebyscore("z1", 2, 15, 1, 1) == ['three']
+        assert r.zrangebyscore("z1", 2, 15, 1, 50, with_scores=True) == [('three', 3.0), ('ten', 10.0)]
+
+        assert r.zcount("z1", 2, 15) == 3
+
+        assert r.zremrangebyrank('z1', 1, 1)
+        assert r.zrangebyscore("z1", -5, 15) == ['one', 'three', 'ten']
+        assert r.zremrangebyscore('z1', 2, 4)
+        assert r.zrangebyscore("z1", -5, 15) == ['one', 'ten']
 
         print '-- HASHES --'
-        print r.hset("h1", "bah bah", "black sheep")
-        print r.hget("h1", "bah bah")
+        r.hset("h1", "bahbah", "black sheep")
+        assert r.hget("h1", "bahbah") == "black sheep"
 
-        print r.hmset("h1", {"foo" : "bar", "baz" : "bosh"})
-        print r.hmget("h1", ["foo", "bah bah", "baz"])
+        r.hmset("h1", {"foo" : "bar", "baz" : "bosh"})
+        assert r.hmget("h1", ["foo", "bahbah", "baz"]) == {'foo' : 'bar', 'baz' : 'bosh', 'bahbah' : 'black sheep'}
 
-        print r.hincrby("h1", "count", 3)
-        print r.hincrby("h1", "count", 4)
+        assert r.hincrby("h1", "count", 3) == 3
+        assert r.hincrby("h1", "count", 4) == 7
 
-        print r.hmget("h1", ["foo", "count"])
+        assert r.hmget("h1", ["foo", "count"]) == {'foo' : 'bar', 'count' : '7'}
 
-        print r.hexists("h1", "bah bah")
-        print r.hexists("h1", "nope")
+        assert r.hexists("h1", "bahbah") == True
+        assert r.hexists("h1", "nope") == False
 
-        print r.hdel("h1", "bah bah")
-        print r.hexists("h1", "bah bah")
-        print r.hlen("h1")
+        r.hdel("h1", "bahbah")
+        assert r.hexists("h1", "bahbah") == False
+        assert r.hlen("h1") == 3
 
-        print '--'
-        print r.hkeys("h1")
-        print r.hvals("h1")
-        print r.hgetall("h1")
-
-        print 'done!'
+        assert r.hkeys("h1") == set(['foo', 'baz', 'count'])
+        assert r.hvals("h1") == set(['bar', 'bosh', '7'])
+        assert r.hgetall("h1") == {'foo' : 'bar', 'baz' : 'bosh', 'count' : '7'}
+        print 'all tests pass.'
 
         a.halt()
 
