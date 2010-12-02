@@ -240,13 +240,13 @@ class RedisClient(Client):
 
     @call
     def lset(self, k, idx, v):
-        self._send('LSET', k, str(v), str(idx))
+        self._send('LSET', k, str(idx),  str(v))
         resp = self._get_response()
         return resp
 
     @call
     def lrem(self, k, v, count=0):
-        self._send('LREM', k, str(v), str(count))
+        self._send('LREM', k, str(count), str(v))
         resp = self._get_response()
         return resp
 
