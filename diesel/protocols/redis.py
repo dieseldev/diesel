@@ -663,6 +663,8 @@ class RedisClient(Client):
         elif c == '*':
             count = int(fl[1:])
             resp = []
+            if count == -1:
+                return resp
             for x in xrange(count):
                 hl = until_eol()
                 assert hl[0] in ['$', ':']
