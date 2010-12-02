@@ -11,7 +11,7 @@ def flatten_arg_pairs(l):
     o = []
     for i in l:
         o.extend(i)
-    return map(str, o)
+    return o
 
 REDIS_PORT = 6379
 
@@ -73,14 +73,14 @@ class RedisClient(Client):
 
     @call
     def expire(self, key, seconds):
-        self._send('EXPIRE', key, str(seconds))
+        self._send('EXPIRE', key, seconds)
         resp = self._get_response()
         return resp
 
     @call
     def expireat(self, key, when):
         unix_time = time.mktime(when.timetuple())
-        self._send('EXPIREAT', key, str(unix_time))
+        self._send('EXPIREAT', key, unix_time)
         resp = self._get_response()
         return resp
 
@@ -93,13 +93,13 @@ class RedisClient(Client):
 
     @call
     def select(self, idx):
-        self._send('SELECT', str(idx))
+        self._send('SELECT', idx)
         resp = self._get_response()
         return resp
 
     @call
     def move(self, key, idx):
-        self._send('MOVE', key, str(idx))
+        self._send('MOVE', key, idx)
 
     @call
     def flushdb(self):
@@ -117,7 +117,7 @@ class RedisClient(Client):
     ### STRING OPERATIONS
     @call
     def set(self, k, v):
-        self._send('SET', k, str(v))
+        self._send('SET', k, v)
         resp = self._get_response()
         return resp
 
@@ -129,7 +129,7 @@ class RedisClient(Client):
 
     @call
     def getset(self, k, v):
-        self._send('GETSET', k, str(v))
+        self._send('GETSET', k, v)
         resp = self._get_response()
         return resp
 
@@ -141,13 +141,13 @@ class RedisClient(Client):
 
     @call
     def setnx(self, k, v):
-        self._send('SETNX', k, str(v))
+        self._send('SETNX', k, v)
         resp = self._get_response()
         return resp
 
     @call
     def setex(self, k, tm, v):
-        self._send('SETEX', k, str(tm), str(v))
+        self._send('SETEX', k, tm, v)
         resp = self._get_response()
         return resp
 
@@ -171,7 +171,7 @@ class RedisClient(Client):
 
     @call
     def incrby(self, k, amt):
-        self._send('INCRBY', k, str(amt))
+        self._send('INCRBY', k, amt)
         resp = self._get_response()
         return resp
 
@@ -183,19 +183,19 @@ class RedisClient(Client):
 
     @call
     def decrby(self, k, amt):
-        self._send('DECRBY', k, str(amt))
+        self._send('DECRBY', k, amt)
         resp = self._get_response()
         return resp
 
     @call
     def append(self, k, value):
-        self._send('APPEND', k, str(value))
+        self._send('APPEND', k, value)
         resp = self._get_response()
         return resp
 
     @call
     def substr(self, k, start, end):
-        self._send('SUBSTR', k, str(start), str(end))
+        self._send('SUBSTR', k, start, end)
         resp = self._get_response()
         return resp
 
@@ -204,13 +204,13 @@ class RedisClient(Client):
     ### LIST OPERATIONS
     @call
     def rpush(self, k, v):
-        self._send('RPUSH', k, str(v))
+        self._send('RPUSH', k, v)
         resp = self._get_response()
         return resp
 
     @call
     def lpush(self, k, v):
-        self._send('LPUSH', k, str(v))
+        self._send('LPUSH', k, v)
         resp = self._get_response()
         return resp
 
@@ -222,31 +222,31 @@ class RedisClient(Client):
 
     @call
     def lrange(self, k, start, end):
-        self._send('LRANGE', k, str(start), str(end))
+        self._send('LRANGE', k, start, end)
         resp = self._get_response()
         return resp
 
     @call
     def ltrim(self, k, start, end):
-        self._send('LTRIM', k, str(start), str(end))
+        self._send('LTRIM', k, start, end)
         resp = self._get_response()
         return resp
 
     @call
     def lindex(self, k, idx):
-        self._send('LINDEX', k, str(idx))
+        self._send('LINDEX', k, idx)
         resp = self._get_response()
         return resp
 
     @call
     def lset(self, k, idx, v):
-        self._send('LSET', k, str(idx),  str(v))
+        self._send('LSET', k, idx,  v)
         resp = self._get_response()
         return resp
 
     @call
     def lrem(self, k, v, count=0):
-        self._send('LREM', k, str(count), str(v))
+        self._send('LREM', k, count, v)
         resp = self._get_response()
         return resp
 
@@ -264,7 +264,7 @@ class RedisClient(Client):
 
     @call
     def blpop(self, keylist, timeout=0):
-        self._send('BLPOP', list=list(keylist) + [str(timeout)])
+        self._send('BLPOP', list=list(keylist) + [timeout])
         resp = self._get_response()
         if resp:
             assert len(resp) == 2
@@ -275,7 +275,7 @@ class RedisClient(Client):
 
     @call
     def brpop(self, keylist, timeout=0):
-        self._send('BRPOP', list=list(keylist) + [str(timeout)])
+        self._send('BRPOP', list=list(keylist) + [timeout])
         resp = self._get_response()
         if resp:
             assert len(resp) == 2
@@ -294,13 +294,13 @@ class RedisClient(Client):
     ### SET OPERATIONS
     @call
     def sadd(self, k, v):
-        self._send('SADD', k, str(v))
+        self._send('SADD', k, v)
         resp = self._get_response()
         return resp
 
     @call
     def srem(self, k, v):
-        self._send('SREM', k, str(v))
+        self._send('SREM', k, v)
         resp = self._get_response()
         return bool(resp)
 
@@ -312,7 +312,7 @@ class RedisClient(Client):
 
     @call
     def smove(self, src, dst, v):
-        self._send('SMOVE', src, dst, str(v))
+        self._send('SMOVE', src, dst, v)
         resp = self._get_response()
         return resp
 
@@ -324,7 +324,7 @@ class RedisClient(Client):
 
     @call
     def sismember(self, k, v):
-        self._send('SISMEMBER', k, str(v))
+        self._send('SISMEMBER', k, v)
         resp = self._get_response()
         return bool(resp)
 
@@ -384,25 +384,25 @@ class RedisClient(Client):
 
     @call
     def zadd(self, key, score, member):
-        self._send('ZADD', key, str(score), str(member))
+        self._send('ZADD', key, score, member)
         resp = self._get_response()
         return resp
 
     @call
     def zrem(self, key, member):
-        self._send('ZREM', key, str(member))
+        self._send('ZREM', key, member)
         resp = self._get_response()
         return bool(resp)
 
     @call
     def zrange(self, key, start, end):
-        self._send('ZRANGE', key, str(start), str(end))
+        self._send('ZRANGE', key, start, end)
         resp = self._get_response()
         return resp
 
     @call
     def zrevrange(self, key, start, end):
-        self._send('ZREVRANGE', key, str(start), str(end))
+        self._send('ZREVRANGE', key, start, end)
         resp = self._get_response()
         return resp
 
@@ -414,34 +414,34 @@ class RedisClient(Client):
 
     @call
     def zscore(self, key, member):
-        self._send('ZSCORE', key, str(member))
+        self._send('ZSCORE', key, member)
         resp = self._get_response()
         return float(resp)
 
     @call
     def zincrby(self, key, increment, member):
-        self._send('ZINCRBY', key, str(increment), str(member))
+        self._send('ZINCRBY', key, increment, member)
         resp = self._get_response()
         return float(resp)
 
     @call
     def zrank(self, key, member):
-        self._send('ZRANK', key, str(member))
+        self._send('ZRANK', key, member)
         resp = self._get_response()
         return resp
 
     @call
     def zrevrank(self, key, member):
-        self._send('ZREVRANK', key, str(member))
+        self._send('ZREVRANK', key, member)
         resp = self._get_response()
         return resp
 
     @call
     def zrangebyscore(self, key, min, max, offset=None, count=None, with_scores=False):
-        args = 'ZRANGEBYSCORE', key, str(min), str(max)
+        args = 'ZRANGEBYSCORE', key, min, max
         if offset:
             assert count is not None, "if offset specified, count must be as well"
-            args += 'LIMIT', str(offset), str(count)
+            args += 'LIMIT', offset, count
         if with_scores:
             args += 'WITHSCORES',
 
@@ -456,19 +456,19 @@ class RedisClient(Client):
 
     @call
     def zcount(self, key, min, max):
-        self._send('ZCOUNT', key, str(min), str(max))
+        self._send('ZCOUNT', key, min, max)
         resp = self._get_response()
         return resp
 
     @call
     def zremrangebyrank(self, key, min, max):
-        self._send('ZREMRANGEBYRANK', key, str(min), str(max))
+        self._send('ZREMRANGEBYRANK', key, min, max)
         resp = self._get_response()
         return resp
 
     @call
     def zremrangebyscore(self, key, min, max):
-        self._send('ZREMRANGEBYSCORE', key, str(min), str(max))
+        self._send('ZREMRANGEBYSCORE', key, min, max)
         resp = self._get_response()
         return resp
 
@@ -476,7 +476,7 @@ class RedisClient(Client):
     ### HASH OPERATIONS
     @call
     def hset(self, key, field, value):
-        self._send('HSET', str(key), str(field), str(value))
+        self._send('HSET', key, field, value)
         resp = self._get_response()
         return bool(resp)
 
@@ -491,9 +491,7 @@ class RedisClient(Client):
     def hmset(self, key, d):
         if not d:
             return True
-        args = [str(key)]
-        for i in d.iteritems():
-            args.extend(map(str, i))
+        args = [key] + flatten_arg_pairs(d.iteritems())
 
         self._send('HMSET', list=args)
         resp = self._get_response()
@@ -510,7 +508,7 @@ class RedisClient(Client):
 
     @call
     def hincrby(self, key, field, amt):
-        self._send('HINCRBY', str(key), str(field), str(amt))
+        self._send('HINCRBY', key, field, amt)
         resp = self._get_response()
         return resp
 
@@ -628,7 +626,7 @@ class RedisClient(Client):
         
         Returns the number of clients that received the message.
         '''
-        self._send('PUBLISH', channel, str(message))
+        self._send('PUBLISH', channel, message)
         resp = self._get_response()
         return resp
 
@@ -660,10 +658,10 @@ class RedisClient(Client):
     def _send(self, cmd, *args, **kwargs):
         if 'list' in kwargs:
             args = kwargs['list']
-        all = (cmd,) + tuple(args)
+        all = (cmd,) + tuple(str(s) for s in args)
         send('*%s\r\n' % len(all))
         for i in all:
-            send(('$%s\r\n' % len(i)) + str(i) + '\r\n')
+            send(('$%s\r\n' % len(i)) + i + '\r\n')
 
     def _get_response(self, wake_sig=None):
         if wake_sig:
