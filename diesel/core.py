@@ -46,6 +46,12 @@ class ParentDiedException(Exception):
     '''
     pass
 
+class TerminateLoop(Exception):
+    '''Raised to terminate the current loop, closing the socket if there
+    is one associated with the loop.
+    '''
+    pass
+
 CRLF = '\r\n'
 BUFSIZ = 2 ** 14
 
@@ -138,6 +144,8 @@ class Loop(object):
         self.running = True
         try:
             self.loop_callable(*self.args, **self.kw)
+        except TerminateLoop:
+            pass
         except (SystemExit, KeyboardInterrupt, ApplicationEnd):
             raise
         except:
