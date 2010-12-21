@@ -85,6 +85,9 @@ def _private_connect(*args, **kw):
 def first(*args, **kw):
     return current_loop.first(*args, **kw)
 
+def label(*args, **kw):
+    return current_loop.label(*args, **kw)
+
 def fork(*args, **kw):
     return current_loop.fork(False, *args, **kw)
 
@@ -122,6 +125,7 @@ ids = itertools.count(1)
 class Loop(object):
     def __init__(self, loop_callable, *args, **kw):
         self.loop_callable = loop_callable
+        self.loop_label = str(self.loop_callable)
         self.args = args
         self.kw = kw
         self.keep_alive = False
@@ -149,6 +153,7 @@ class Loop(object):
         except (SystemExit, KeyboardInterrupt, ApplicationEnd):
             raise
         except:
+            log.error("-- Unhandled Exception in local loop <%s> --" % self.loop_label)
             log.error("-- Unhandled Exception in local loop --")
             log.error(traceback.format_exc())
         finally:
@@ -205,6 +210,9 @@ class Loop(object):
     def parent_died(self):
         if self.running:
             self.hub.schedule(lambda: self.wake(ParentDiedException()))
+
+    def label(self, label):
+        self.loop_label = label
 
     def first(self, sleep=None, waits=None,
             receive=None, until=None, until_eol=None):
