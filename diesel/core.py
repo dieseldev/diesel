@@ -146,6 +146,7 @@ class Loop(object):
     def run(self):
         from diesel.app import ApplicationEnd
         self.running = True
+        self.app.running.add(self)
         try:
             self.loop_callable(*self.args, **self.kw)
         except TerminateLoop:
@@ -154,13 +155,13 @@ class Loop(object):
             raise
         except:
             log.error("-- Unhandled Exception in local loop <%s> --" % self.loop_label)
-            log.error("-- Unhandled Exception in local loop --")
             log.error(traceback.format_exc())
         finally:
             if self.connection_stack:
                 assert len(self.connection_stack) == 1
                 self.connection_stack.pop().close()
         self.running = False
+        self.app.running.remove(self)
         self.notify_children()
         if self.parent and self in self.parent.children:
             self.parent.children.remove(self)

@@ -33,6 +33,8 @@ class Application(object):
         self._services = []
         self._loops = []
 
+        self.running = set()
+
     def global_bail(self, msg):
         def bail():
             self.logger.critical("ABORTING: %s" % msg)
