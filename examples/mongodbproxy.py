@@ -17,7 +17,7 @@ Author: Christian Wyglendowski <christian@dowski.com>
 """
 import collections
 import struct
-from pymongo.bson import _make_c_string, BSON, _bson_to_dict
+from bson import _make_c_string, BSON, _bson_to_dict
 from diesel import wait, fire, call, response, up, bytes
 from diesel.protocols.mongodb import (
     MongoProxy, Ops, MongoClient, Collection,
@@ -57,7 +57,7 @@ class SubscribingClient(MongoClient):
             "\x00\x00\x00\x00",
             _make_c_string("%s@%s" % (self._pubsub_id, col)), 
             struct.pack('<ii', 0, 0),
-            BSON.from_dict(spec),
+            BSON.encode(spec),
         ]
         msg = "".join(data)
         yield self._put_request(OP_SUBSCRIBE, msg)
@@ -168,7 +168,7 @@ class SubscriptionProxy(MongoProxy):
     def add_subscription(self, subscriber, collection, payload):
         """Add a subscription to a document in a collection for subscriber."""
         sl, raw_bson = payload[:8], payload[8:]
-        spec = BSON(raw_bson).to_dict()
+        spec = BSON(raw_bson).decode()
         chan = (collection, str(spec))
         self.channels[chan].subscribe(subscriber)
         self.subscribers[subscriber].add(chan)

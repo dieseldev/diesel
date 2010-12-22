@@ -8,7 +8,7 @@ import itertools
 import struct
 from collections import deque
 from diesel import Client, call, sleep, send, receive, first, Loop, Application, ConnectionClosed
-from pymongo.bson import BSON, _make_c_string, _to_dicts
+from bson import BSON, _make_c_string, decode_all
 from pymongo.son import SON
 
 _ZERO = "\x00\x00\x00\x00"
@@ -66,7 +66,7 @@ class MongoClient(Client):
         message = receive(length - HEADER_SIZE)
         cutoff = struct.calcsize('<iqii')
         flag, cid, start, numret = struct.unpack('<iqii', message[:cutoff])
-        body = _to_dicts(message[cutoff:])
+        body = decode_all(message[cutoff:])
         return (cid, start, numret, body)
 
     def _put_request(self, op, data):
@@ -174,10 +174,10 @@ class Ops(object):
             _ZERO, 
             _make_c_string(col), 
             struct.pack('<ii', skip, limit),
-            BSON.from_dict(spec or {}),
+            BSON.encode(spec or {}),
         ]
         if fields:
-            data.append(BSON.from_dict(dict.fromkeys(fields, 1)))
+            data.append(BSON.encode(dict.fromkeys(fields, 1)))
         return "".join(data)
 
     @staticmethod
@@ -197,7 +197,7 @@ class Ops(object):
             flags |= 1 << 1
         fmt = '<i%dsi' % len(colname)
         part = struct.pack(fmt, 0, colname, flags)
-        return "%s%s%s" % (part, BSON.from_dict(spec), BSON.from_dict(doc))
+        return "%s%s%s" % (part, BSON.encode(spec), BSON.encode(doc))
 
     @staticmethod
     def insert(col, doc_or_docs):
@@ -206,14 +206,14 @@ class Ops(object):
             doc_or_docs = [doc_or_docs]
         except AttributeError:
             pass
-        doc_data = "".join(BSON.from_dict(doc) for doc in doc_or_docs)
+        doc_data = "".join(BSON.encode(doc) for doc in doc_or_docs)
         colname = _make_c_string(col)
         return "%s%s%s" % (_ZERO, colname, doc_data)
 
     @staticmethod
     def delete(col, spec):
         colname = _make_c_string(col)
-        return "%s%s%s%s" % (_ZERO, colname, _ZERO, BSON.from_dict(spec))
+        return "%s%s%s%s" % (_ZERO, colname, _ZERO, BSON.encode(spec))
 
 class MongoIter(object):
     def __init__(self, cursor):
