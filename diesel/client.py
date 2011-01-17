@@ -1,10 +1,6 @@
 # vim:ts=4:sw=4:expandtab
 import socket
 import errno
-from OpenSSL import SSL
-
-from uuid import uuid4
-from collections import deque
 
 class Client(object):
     '''An agent that connects to an external host and provides an API to

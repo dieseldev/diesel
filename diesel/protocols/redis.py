@@ -1,6 +1,6 @@
 from contextlib import contextmanager
-from diesel import (Client, call, until, until_eol, receive, 
-                    fire, wait, ConnectionClosed, send, first)
+from diesel import (Client, call, until_eol, receive,
+                    fire, send, first)
 from diesel.util.queue import Queue, QueueTimeout
 import time
 import operator as op

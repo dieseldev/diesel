@@ -9,48 +9,41 @@ import sys
 import itertools
 from OpenSSL import SSL
 from greenlet import greenlet
-from types import GeneratorType
-from collections import deque, defaultdict
 
 from diesel import pipeline
 from diesel import buffer
 from diesel.security import ssl_async_handshake
 from diesel import runtime
-from diesel import logmod, log
+from diesel import log
 
-class ConnectionClosed(socket.error): 
+class ConnectionClosed(socket.error):
     '''Raised if the client closes the connection.
     '''
     def __init__(self, msg, buffer=None):
         socket.error.__init__(self, msg)
         self.buffer = buffer
 
-class ClientConnectionError(socket.error): 
+class ClientConnectionError(socket.error):
     '''Raised if a client cannot connect.
     '''
-    pass
 
-class ClientConnectionTimeout(socket.error): 
+class ClientConnectionTimeout(socket.error):
     '''Raised if the client connection timed out before succeeding.
     '''
-    pass
 
 class LoopKeepAlive(Exception):
     '''Raised when an exception occurs that causes a loop to terminate;
     allows the app to re-schedule keep_alive loops.
     '''
-    pass
 
 class ParentDiedException(Exception):
     '''Raised when the parent (assigned via fork_child) has died.
     '''
-    pass
 
 class TerminateLoop(Exception):
     '''Raised to terminate the current loop, closing the socket if there
     is one associated with the loop.
     '''
-    pass
 
 CRLF = '\r\n'
 BUFSIZ = 2 ** 14
@@ -63,19 +56,19 @@ def until_eol():
 
 def receive(*args, **kw):
     return current_loop.input_op(*args, **kw)
-    
+
 def send(*args, **kw):
     return current_loop.send(*args, **kw)
 
 def wait(*args, **kw):
     return current_loop.wait(*args, **kw)
-    
+
 def fire(*args, **kw):
     return current_loop.fire(*args, **kw)
 
 def sleep(*args, **kw):
     return current_loop.sleep(*args, **kw)
-    
+
 def thread(*args, **kw):
     return current_loop.thread(*args, **kw)
 
@@ -271,7 +264,7 @@ class Loop(object):
                 self.hub.schedule(
                 lambda: self.wake()
                 )
-                
+
             if client.ssl_ctx:
                 fsock = SSL.Connection(client.ssl_ctx, sock)
                 fsock.setblocking(0)
@@ -287,8 +280,8 @@ class Loop(object):
             self.hub.unregister(sock)
             self.hub.schedule(
             lambda: self.wake(
-            ClientConnectionError("odd error on connect()!")
-            ))
+                    ClientConnectionError("odd error on connect()!")
+                ))
 
         def read_callback():
             self.hub.unregister(sock)
@@ -296,9 +289,9 @@ class Loop(object):
                 s = sock.recv(100)
             except socket.error, e:
                 self.hub.schedule(
-                lambda: self.wake(
-                ClientConnectionError(str(e))
-                ))
+                    lambda: self.wake(
+                        ClientConnectionError(str(e))
+                    ))
 
 
         cancel_timer = None
@@ -317,11 +310,11 @@ class Loop(object):
     def sleep(self, v=0):
         self._sleep(v)
         return self.dispatch()
-        
+
     def _sleep(self, v, cb_maker=identity):
         cb = lambda: cb_maker(self.wake)(True)
         assert v >= 0
-            
+
         if v > 0:
             self._wakeup_timer = self.hub.call_later(v, cb)
         else:
@@ -382,7 +375,7 @@ class Loop(object):
         cb = cb_maker(self.wake)
         res = conn.buffer.set_term(sentinel)
         return self.check_buffer(conn, cb)
-        
+
     def check_buffer(self, conn, cb):
         res = conn.buffer.check()
         if res:
