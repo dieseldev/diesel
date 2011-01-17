@@ -21,4 +21,6 @@ def parent():
     sleep(4)
     print "parent: okay, I'm outta here"
 
-quickstart(parent)
+
+if __name__ == '__main__':
+    quickstart(parent)
