@@ -4,6 +4,7 @@ levels and component-specific subloggers.
 '''
 import sys
 import time
+import traceback
 
 _current_application = None
 (
@@ -74,6 +75,15 @@ class Logger(object):
 
     def critical(self, message):
         return self._writelogline(LOGLVL_CRITICAL, message)
+
+    def exception(self, message=None):
+        """Like error() except `message` is optional and exception is logged
+        """
+        if message:
+            return self._writelogline(LOGLVL_ERR, "%s\n%s" % (
+                message, traceback.format_exc()))
+        else:
+            return self._writelogline(LOGLVL_ERR, traceback.format_exc())
 
     def sublog(self, component, verbosity=None):
         '''Clone this logger and create a sublogger within the context
