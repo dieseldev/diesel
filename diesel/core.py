@@ -111,7 +111,7 @@ class call(object):
 
 current_loop = None
 
-class ContinueNothing(object): pass
+ContinueNothing = object()
 
 def identity(cb): return cb
 
@@ -334,7 +334,7 @@ class Loop(object):
 
     def _wait(self, event, cb_maker=identity):
         rcb = cb_maker(self.wake)
-        def cb(d): 
+        def cb(d):
             def call_in():
                 rcb(d)
             self.hub.schedule(call_in)
@@ -360,7 +360,7 @@ class Loop(object):
         current_loop = self
         if isinstance(value, Exception):
             self.coroutine.throw(value)
-        elif value != ContinueNothing:
+        elif value is not ContinueNothing:
             self.coroutine.switch(value)
         else:
             self.coroutine.switch()
