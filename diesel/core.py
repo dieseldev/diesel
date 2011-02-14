@@ -97,9 +97,11 @@ class call(object):
 
     def __call__(self, *args, **kw):
         if not self.client.connected:
-            raise RuntimeError("Client call failed: client is not connected")
+            raise ConnectionClosed(
+                    "ClientNotConnected: client is not connected")
         if self.client.is_closed:
-            raise RuntimeError("Client call failed: client connection was closed")
+            raise ConnectionClosed(
+                    "Client call failed: client connection was closed")
         current_loop.connection_stack.append(self.client.conn)
         try:
             r = self.f(self.client, *args, **kw)
