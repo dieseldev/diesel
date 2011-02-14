@@ -2,7 +2,26 @@
 Beanstalkd client implementation stolen from
 https://github.com/earl/beanstalkc.git v0.2.0 and lightly adapted for diesel.
 """
+
+__license__ = '''
+Copyright (C) 2008, 2009 Andreas Bolka
+Copyright (C) 2010, 2011 Michael Schurter
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+'''
+
 import diesel
+import yaml
 
 
 BEANSTALK_PORT = 11300
@@ -61,7 +80,7 @@ class BeanstalkClient(diesel.Client):
     def _interact_yaml(self, command, expected_ok, expected_err=None):
         size, = self._interact(command, expected_ok, expected_err)
         body = self._read_body(int(size))
-        return self._parse_yaml(body)
+        return yaml.load(body)
 
     def _interact_peek(self, command):
         try:
