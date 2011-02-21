@@ -256,9 +256,8 @@ class SelectEventHub(AbstractEventHub):
 class EPollEventHub(AbstractEventHub):
     '''A epoll-based hub.
     '''
-    SIZE_HINT = 50000
     def __init__(self):
-        self.epoll = select.epoll(self.SIZE_HINT)
+        self.epoll = select.epoll()
         super(EPollEventHub, self).__init__()
 
     def handle_events(self):
