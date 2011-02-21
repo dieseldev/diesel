@@ -1,16 +1,17 @@
-from diesel.tests import DieselTest
-from diesel import Loop, sleep, Service, until_eol, until, count, send
 import thread, socket, time
 from uuid import uuid4
 
+from diesel.tests import DieselTest
+from diesel import Service, until_eol, until, receive, send
+
 class TestEchoService(DieselTest):
     def test_basic_echo(self):
-        PORT = 51372 
+        PORT = 51372
         NUM = 5
         app, touch, acc = self.prepare_test()
         def handle_echo(conn):
             said = until_eol()
-            send( 'YS:' + said )
+            send('YS:' + said)
             touch()
 
         def b_client():
@@ -33,7 +34,7 @@ class TestEchoService(DieselTest):
             assert cl == ''
 
     def test_back_and_forth(self):
-        PORT = 51372 
+        PORT = 51372
         NUM = 5
         app, touch, acc = self.prepare_test()
         def handle_echo(conn):
@@ -67,15 +68,15 @@ class TestEchoService(DieselTest):
             assert cl == ''
 
     def test_byte_boundaries(self):
-        PORT = 51372 
+        PORT = 51372
         NUM = 5
         app, touch, acc = self.prepare_test()
         def handle_echo(conn):
             size = int((until('|'))[:-1])
-            said = count(size)
+            said = receive(size)
             out = 'YS:' + said
 
-            send( out )
+            send(out)
 
             touch()
 
@@ -97,5 +98,5 @@ class TestEchoService(DieselTest):
         self.run_test(NUM)
 
         for key, (back, cl) in acc.iteritems():
-            assert back == ('YS:%s\r\n' % key) * 2
+            assert back == 'YS:%s' % key
             assert cl == ''

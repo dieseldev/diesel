@@ -1,3 +1,5 @@
+import time
+
 from diesel.tests import DieselTest
 from diesel import Loop, sleep
 
@@ -5,9 +7,8 @@ class TestSleep(DieselTest):
     def test_basic_sleep(self):
         app, touch, acc = self.prepare_test()
         def loop():
-            import time
             t = time.time()
-            yield sleep(1)
+            sleep(1)
             acc.duration = time.time() - t
             touch()
 
@@ -18,9 +19,8 @@ class TestSleep(DieselTest):
     def test_multiple_sleep(self):
         app, touch, acc = self.prepare_test()
         def loop():
-            import time
             t = time.time()
-            yield sleep(1)
+            sleep(1)
             acc.durations.append(time.time() - t)
             touch()
 
