@@ -8,7 +8,7 @@ additional_requires = []
 if sys.version_info <= (2, 6):
 	additional_requires.append('select26')
 
-VERSION = "1.9.7b"
+VERSION = "2.0.0"
 
 setup(name="diesel",
     version=VERSION,
