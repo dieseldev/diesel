@@ -177,7 +177,10 @@ class Ops(object):
             BSON.encode(spec or {}),
         ]
         if fields:
-            data.append(BSON.encode(dict.fromkeys(fields, 1)))
+            if type(fields) == dict:
+                data.append(BSON.encode(fields))
+            else:
+                data.append(BSON.encode(dict.fromkeys(fields, 1)))
         return "".join(data)
 
     @staticmethod
