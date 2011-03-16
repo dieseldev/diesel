@@ -51,8 +51,8 @@ class Collection(TraversesCollections):
 class MongoClient(Client):
     collection_class = None
 
-    def __init__(self, *args, **params):
-        Client.__init__(self, *args, **params)
+    def __init__(self, host='localhost', port=27017, **kw):
+        Client.__init__(self, host, port, **kw)
         self._msg_id_counter = itertools.count(1)
 
     @property
