@@ -4,15 +4,16 @@
 from diesel import Application, Loop, log, thread
 import time
 
-def blocker():
-    x = 1
-    while True:
-        def f():
-            time.sleep(1)
-        thread(f)
-        print 'yo!', time.time()
+def blocker(taskid, sleep_time):
+    def task():
+        while True:
+            def f():
+                time.sleep(sleep_time)
+            thread(f)
+            print 'yo!', time.time(), 'from %s task' % taskid
+    return task
 
 a = Application()
-a.add_loop(Loop(blocker))
-a.add_loop(Loop(blocker))
+a.add_loop(Loop(blocker('fast', 1)))
+a.add_loop(Loop(blocker('slow', 10)))
 a.run()
