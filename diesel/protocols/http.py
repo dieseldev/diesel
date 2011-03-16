@@ -99,7 +99,7 @@ class HttpHeaders(object):
 
     def parse(self, rawInput):
         ws = ' \t'
-        heads = {}
+        heads = defaultdict(list)
         curhead = None
         curbuf = []
         for line in rawInput.splitlines():
@@ -109,12 +109,12 @@ class HttpHeaders(object):
                 curbuf.append(line.strip())
             else:
                 if curhead:
-                    heads.setdefault(curhead, []).append(' '.join(curbuf))
+                    heads[curhead].append(' '.join(curbuf))
                 name, body = map(str.strip, line.split(':', 1))
                 curhead = name.lower()
                 curbuf = [body]
         if curhead:
-            heads.setdefault(curhead, []).append(' '.join(curbuf))
+            heads[curhead].append(' '.join(curbuf))
         self._headers = heads
         self.link()
 
