@@ -416,7 +416,7 @@ class RedisClient(Client):
     def zscore(self, key, member):
         self._send('ZSCORE', key, member)
         resp = self._get_response()
-        return float(resp)
+        return float(resp) if resp is not None else None
 
     @call
     def zincrby(self, key, increment, member):
