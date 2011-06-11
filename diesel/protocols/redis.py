@@ -1012,5 +1012,7 @@ class RedisSubHub(object):
                     hb.sub_rms.append((cls, q))
 
         pl = Poller()
-        yield pl
-        pl.close()
+        try:
+            yield pl
+        finally:
+            pl.close()
