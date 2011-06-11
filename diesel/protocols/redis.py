@@ -382,6 +382,10 @@ class RedisClient(Client):
     ##################################################
     ### ZSET OPERATIONS
 
+    def __pair_with_scores(self, resp):
+        return [(resp[x], float(resp[x+1]))
+                for x in xrange(0, len(resp), 2)]
+
     @call
     def zadd(self, key, score, member):
         self._send('ZADD', key, score, member)
@@ -401,9 +405,14 @@ class RedisClient(Client):
         return resp
 
     @call
-    def zrevrange(self, key, start, end):
-        self._send('ZREVRANGE', key, start, end)
+    def zrevrange(self, key, start, end, with_scores=False):
+        args = 'ZREVRANGE', key, start, end
+        if with_scores:
+            args += 'WITHSCORES',
+        self._send(*args)
         resp = self._get_response()
+        if with_scores:
+            return self.__pair_with_scores(resp)
         return resp
 
     @call
@@ -449,10 +458,9 @@ class RedisClient(Client):
         resp = self._get_response()
 
         if with_scores:
-            return [(resp[x], float(resp[x+1])) 
-            for x in xrange(0, len(resp), 2)]
+            return self.__pair_with_scores(resp)
 
-        return resp 
+        return resp
 
     @call
     def zcount(self, key, min, max):
