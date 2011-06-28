@@ -114,6 +114,41 @@ class RedisClient(Client):
         return resp
 
     ##################################################
+    ### TRANSACTION OPERATIONS
+    ### http://redis.io/topics/transactions
+    @call
+    def multi(self):
+        """Starts a transaction."""
+        self._send('MULTI')
+        return self._get_response()
+
+    @call
+    def exec_(self):
+        """Atomically executes queued commands in a transaction."""
+        self._send('EXEC')
+        return self._get_response()
+
+    @call
+    def discard(self):
+        """Discards any queued commands and aborts a transaction."""
+        self._send('DISCARD')
+        return self._get_response()
+
+    def transaction(self):
+        """Returns a RedisTransaction context manager.
+
+        It can be invoked with Python's ``with`` statement for atomically
+        executing a series of commands.
+
+        >>> with client.transaction() as t:
+        ...     t.incr('dependent_var_1')
+        ...     t.incr('dependent_var_2')
+        >>> print t.value
+
+        """
+        return RedisTransaction(self)
+
+    ##################################################
     ### STRING OPERATIONS
     @call
     def set(self, k, v):
@@ -715,6 +750,46 @@ class RedisClient(Client):
             e_message = fl[1:]
             raise RedisError(e_message)
 
+class RedisTransaction(object):
+    """A context manager for doing transactions with a RedisClient."""
+
+    def __init__(self, client):
+        """Returns a new RedisTransaction instance.
+
+        Handles calling the Redis MULTI, EXEC and DISCARD commands to manage
+        transactions. Calls MULTI to start the transaction, EXEC to complete
+        it or DISCARD to abort if there was an exception.
+
+        Instances proxy method calls to the client instance. If the transaction
+        is successful, the value attribute will contain the results.
+
+        See http://redis.io/topics/transactions for more details.
+
+        """
+        self.client = client
+        self.value = None
+
+    def __getattr__(self, name):
+        return getattr(self.client, name)
+
+    def __enter__(self):
+        # Begin the transaction.
+        self.client.multi()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if any([exc_type, exc_val, exc_tb]):
+            # There was an error. Abort the transaction.
+            self.client.discard()
+        else:
+            # Commands completed successfully. Executed the body of the
+            # transaction and store the results.
+            self.value = self.client.exec_()
+
+        # Instruct Python not to swallow exceptions generated in the
+        # transaction block.
+        return False
+
 if __name__ == '__main__':
     from diesel import Application, Loop
 
@@ -923,6 +998,26 @@ if __name__ == '__main__':
         assert r.hkeys("h1") == set(['foo', 'baz', 'count'])
         assert set(r.hvals("h1")) == set(['bar', 'bosh', '7'])
         assert r.hgetall("h1") == {'foo' : 'bar', 'baz' : 'bosh', 'count' : '7'}
+
+        print '-- TRANSACTIONS --'
+        r.set('t2', 1)
+        # Try a successful transaction.
+        with r.transaction() as t:
+            t.incr('t1')
+            t.incr('t2')
+        assert r.get('t1') == '1'
+        assert r.get('t2') == '2'
+
+        # Try a failing transaction.
+        try:
+            with r.transaction() as t:
+                t.incr('t1')
+                t.icnr('t2') # typo!
+        except AttributeError:
+            # t1 should not get incremented since the transaction body
+            # raised an exception.
+            assert r.get('t1') == '1'
+
         print 'all tests pass.'
 
         a.halt()
