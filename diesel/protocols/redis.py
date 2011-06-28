@@ -790,6 +790,93 @@ class RedisTransaction(object):
         # transaction block.
         return False
 
+#########################################
+## Hub, an abstraction of sub behavior, etc
+class RedisSubHub(object):
+    def __init__(self, host='127.0.0.1', port=REDIS_PORT):
+        self.host = host
+        self.port = port
+        self.sub_wake_signal = uuid.uuid4().hex
+        self.sub_adds = []
+        self.sub_rms = []
+        self.subs = {}
+
+    def make_client(self):
+        client = RedisClient(self.host, self.port)
+        return  client 
+
+    def __call__(self):
+        conn = self.make_client()
+        subs = self.subs
+        if subs:
+            conn.subscribe(*subs)
+        while True:
+            new = rm = None
+            if self.sub_adds:
+                sa = self.sub_adds[:]
+                self.sub_adds = []
+                new = set()
+                for k, q in sa:
+                    if k not in subs:
+                        new.add(k)
+                        subs[k] = set([q])
+                    else:
+                        subs[k].add(q)
+                if new:
+                    conn.subscribe(*new)
+
+            if self.sub_rms:
+                sr = self.sub_rms[:]
+                self.sub_rms = []
+                rm = set()
+                for k, q in sr:
+                    subs[k].remove(q)
+                    if not subs[k]:
+                        del subs[k]
+                        rm.add(k)
+                if rm:
+                    conn.unsubscribe(*rm)
+
+            if not self.sub_rms and not self.sub_adds:
+                r = conn.get_from_subscriptions(self.sub_wake_signal)
+                if r:
+                    cls, msg = r
+                    if cls in subs:
+                        for q in subs[cls]:
+                            q.put((cls, msg))
+
+    @contextmanager
+    def sub(self, classes):
+        if type(classes) not in (set, list, tuple):
+            classes = [classes]
+
+        hb = self
+        q = Queue()
+        class Poller(object):
+            def __init__(self):
+                for cls in classes:
+                    hb.sub_adds.append((cls, q))
+
+                fire(hb.sub_wake_signal)
+        
+            def fetch(self, timeout=None):
+                try:
+                    qn, msg = q.get(timeout=timeout)
+                except QueueTimeout:
+                    return (None, None)
+                else:
+                    return (qn, msg)
+
+            def close(self):
+                for cls in classes:
+                    hb.sub_rms.append((cls, q))
+
+        pl = Poller()
+        try:
+            yield pl
+        finally:
+            pl.close()
+
 if __name__ == '__main__':
     from diesel import Application, Loop
 
@@ -1025,89 +1112,3 @@ if __name__ == '__main__':
     a.add_loop(Loop(do_set))
     a.run()
 
-#########################################
-## Hub, an abstraction of sub behavior, etc
-class RedisSubHub(object):
-    def __init__(self, host='127.0.0.1', port=REDIS_PORT):
-        self.host = host
-        self.port = port
-        self.sub_wake_signal = uuid.uuid4().hex
-        self.sub_adds = []
-        self.sub_rms = []
-        self.subs = {}
-
-    def make_client(self):
-        client = RedisClient(self.host, self.port)
-        return  client 
-
-    def __call__(self):
-        conn = self.make_client()
-        subs = self.subs
-        if subs:
-            conn.subscribe(*subs)
-        while True:
-            new = rm = None
-            if self.sub_adds:
-                sa = self.sub_adds[:]
-                self.sub_adds = []
-                new = set()
-                for k, q in sa:
-                    if k not in subs:
-                        new.add(k)
-                        subs[k] = set([q])
-                    else:
-                        subs[k].add(q)
-                if new:
-                    conn.subscribe(*new)
-
-            if self.sub_rms:
-                sr = self.sub_rms[:]
-                self.sub_rms = []
-                rm = set()
-                for k, q in sr:
-                    subs[k].remove(q)
-                    if not subs[k]:
-                        del subs[k]
-                        rm.add(k)
-                if rm:
-                    conn.unsubscribe(*rm)
-
-            if not self.sub_rms and not self.sub_adds:
-                r = conn.get_from_subscriptions(self.sub_wake_signal)
-                if r:
-                    cls, msg = r
-                    if cls in subs:
-                        for q in subs[cls]:
-                            q.put((cls, msg))
-
-    @contextmanager
-    def sub(self, classes):
-        if type(classes) not in (set, list, tuple):
-            classes = [classes]
-
-        hb = self
-        q = Queue()
-        class Poller(object):
-            def __init__(self):
-                for cls in classes:
-                    hb.sub_adds.append((cls, q))
-
-                fire(hb.sub_wake_signal)
-        
-            def fetch(self, timeout=None):
-                try:
-                    qn, msg = q.get(timeout=timeout)
-                except QueueTimeout:
-                    return (None, None)
-                else:
-                    return (qn, msg)
-
-            def close(self):
-                for cls in classes:
-                    hb.sub_rms.append((cls, q))
-
-        pl = Poller()
-        try:
-            yield pl
-        finally:
-            pl.close()
