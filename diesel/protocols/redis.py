@@ -134,19 +134,31 @@ class RedisClient(Client):
         self._send('DISCARD')
         return self._get_response()
 
-    def transaction(self):
+    @call
+    def watch(self, keys):
+        """Sets up keys to be watched in preparation for a transaction."""
+        self._send('WATCH', list=keys)
+        return self._get_response()
+
+    def transaction(self, watch=None):
         """Returns a RedisTransaction context manager.
 
-        It can be invoked with Python's ``with`` statement for atomically
-        executing a series of commands.
+        If watch is supplied, it should be a list of keys to be watched for
+        changes. The transaction will be aborted if the value of any of the
+        keys is changed outside of the transaction.
 
-        >>> with client.transaction() as t:
-        ...     t.incr('dependent_var_1')
-        ...     t.incr('dependent_var_2')
+        A transaction can be invoked with Python's ``with`` statement for
+        atomically executing a series of commands.
+
+        >>> transaction = client.transaction(watch=['dependent_var_1'])
+        >>> dv1 = client.get('dependent_var_1')
+        >>> with transaction as t:
+        ...     composite_val = compute(dv1)
+        ...     t.set('dependent_var_2', composite_val)
         >>> print t.value
 
         """
-        return RedisTransaction(self)
+        return RedisTransaction(self, watch or [])
 
     ##################################################
     ### STRING OPERATIONS
@@ -733,7 +745,7 @@ class RedisClient(Client):
                 return resp
             for x in xrange(count):
                 hl = until_eol()
-                assert hl[0] in ['$', ':']
+                assert hl[0] in ['$', ':', '+']
                 if hl[0] == '$':
                     l = int(hl[1:])
                     if l == -1:
@@ -743,6 +755,8 @@ class RedisClient(Client):
                         until_eol() # noop
                 elif hl[0] == ':':
                     resp.append(int(hl[1:]))
+                elif hl[0] == '+':
+                    resp.append(hl[1:].strip())
             return resp
         elif c == ':':
             return int(fl[1:])
@@ -753,12 +767,16 @@ class RedisClient(Client):
 class RedisTransaction(object):
     """A context manager for doing transactions with a RedisClient."""
 
-    def __init__(self, client):
+    def __init__(self, client, watch_keys):
         """Returns a new RedisTransaction instance.
 
-        Handles calling the Redis MULTI, EXEC and DISCARD commands to manage
-        transactions. Calls MULTI to start the transaction, EXEC to complete
-        it or DISCARD to abort if there was an exception.
+        The client argument should be a RedisClient instance and watch_keys
+        should be a list of keys to watch.
+
+        Handles calling the Redis WATCH, MULTI, EXEC and DISCARD commands to
+        manage transactions. Calls WATCH to watch keys for changes, MULTI to
+        start the transaction, EXEC to complete it or DISCARD to abort if there
+        was an exception.
 
         Instances proxy method calls to the client instance. If the transaction
         is successful, the value attribute will contain the results.
@@ -768,6 +786,10 @@ class RedisTransaction(object):
         """
         self.client = client
         self.value = None
+        self.watching = watch_keys
+        self.aborted = False
+        if watch_keys:
+            self.client.watch(watch_keys)
 
     def __getattr__(self, name):
         return getattr(self.client, name)
@@ -781,14 +803,20 @@ class RedisTransaction(object):
         if any([exc_type, exc_val, exc_tb]):
             # There was an error. Abort the transaction.
             self.client.discard()
+            self.aborted = True
         else:
-            # Commands completed successfully. Executed the body of the
-            # transaction and store the results.
+            # Try and execute the transaction.
             self.value = self.client.exec_()
+            if not self.value:
+                self.aborted = True
+                msg = 'A watched key changed before the transaction completed.'
+                raise RedisTransactionError(msg)
 
         # Instruct Python not to swallow exceptions generated in the
         # transaction block.
         return False
+
+class RedisTransactionError(Exception): pass
 
 #########################################
 ## Hub, an abstraction of sub behavior, etc
@@ -1104,6 +1132,31 @@ if __name__ == '__main__':
             # t1 should not get incremented since the transaction body
             # raised an exception.
             assert r.get('t1') == '1'
+            assert t.aborted
+        else:
+            assert 0, "DID NOT RAISE"
+
+        # Try watching keys in a transaction.
+        r.set('w1', 'watch me')
+        transaction = r.transaction(watch=['w1'])
+        w1 = r.get('w1')
+        with transaction:
+            transaction.set('w2', w1 + ' if you can!')
+        assert transaction.value == ['OK']
+        assert r.get('w2') == 'watch me if you can!'
+
+        # Try changing watched keys.
+        r.set('w1', 'watch me')
+        transaction = r.transaction(watch=['w1'])
+        r.set('w1', 'changed!')
+        w1 = r.get('w1')
+        try:
+            with transaction:
+                transaction.set('w2', w1 + ' if you can!')
+        except RedisTransactionError:
+            assert transaction.aborted
+        else:
+            assert 0, "DID NOT RAISE"
 
         print 'all tests pass.'
 
