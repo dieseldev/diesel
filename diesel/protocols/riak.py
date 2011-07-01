@@ -52,13 +52,14 @@ class RiakClient(diesel.Client):
         diesel.send(struct.pack(fmt, total_size, message_code, message))
 
     def _receive(self):
-        response_size, = struct.unpack('i', diesel.receive(4))
+        response_size, = struct.unpack('!i', diesel.receive(4))
+        #import pdb;pdb.set_trace()
         if response_size:
-            message_size = response_size - 1
-            raw_response = diesel.receive( message_size - 1) # minus 1 mc byte
-            message_code, = struct.unpack('!B',raw_response[0])
+            raw_response = diesel.receive(response_size) # minus 1 mc byte
+            message_code, = struct.unpack('B',raw_response[0])
             response = raw_response[1:]
-            pb = MESSAGE_CODE_TO_PB[message_code].ParseFromString(response)
+            pb = MESSAGE_CODE_TO_PB[message_code]()
+            pb.ParseFromString(response)
             return pb
 
     @diesel.call
@@ -72,13 +73,14 @@ class RiakClient(diesel.Client):
     def put(self, bucket, key, value):
         content = riak_pb2.RpbContent(value=value)
         pb = riak_pb2.RpbPutReq(bucket=bucket, key=key, content=content)
-        return self._send(pb)
+        self._send(pb)
+        return self._receive()
 
     @diesel.call
     def info(self):
         message_code = 7
         total_size = 1
-        fmt = "!ib"
+        fmt = "!iB"
         diesel.send(struct.pack(fmt, total_size, message_code))
         return self._receive()
 
@@ -88,4 +90,5 @@ if __name__ == '__main__':
         c.put('testing', 'foo', '1')
         resp = c.get('testing', 'foo')
         print resp
+        diesel.quickstop()
     diesel.quickstart(test_client)
