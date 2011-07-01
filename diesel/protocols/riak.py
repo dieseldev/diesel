@@ -16,6 +16,7 @@ import struct
 import diesel
 
 from diesel.protocols import riak_pb2
+from contextlib import contextmanager
 
 
 # The commented-out message codes and types below are for requests and/or
@@ -65,7 +66,7 @@ class Bucket(object):
     are tracked on the Bucket instances.
 
     """
-    def __init__(self, name, client, resolver=None):
+    def __init__(self, name, client=None, make_client_context=None, resolver=None):
         """Return a new Bucket for the named bucket, using the given client.
 
         If your bucket allows sibling content (conflicts) you should supply a
@@ -78,8 +79,18 @@ class Bucket(object):
                 return random.choice([value_1, value_2])
 
         """
+        assert client is not None or make_client_context is not None,\
+        "Must specify either client or make_client_context"
+        assert not (client is not None and make_client_context is not None),\
+        "Cannot specify both client and make_client_context"
         self.name = name
-        self.client = client
+        if make_client_context:
+            self.make_client_context = make_client_context
+        else:
+            @contextmanager
+            def noop_cm():
+                yield client
+            self.make_client_context = noop_cm
         self._vclocks = {}
         if resolver:
             self.resolve = resolver
@@ -91,7 +102,8 @@ class Bucket(object):
         using ``put`` with this same Bucket instance.
         
         """
-        response = self.client.get(self.name, key)
+        with self.make_client_context() as client:
+            response = client.get(self.name, key)
         if response:
             return self._handle_response(key, response)
 
@@ -108,13 +120,15 @@ class Bucket(object):
             params['return_body'] = True
             if 'vclock' not in params and key in self._vclocks:
                 params['vclock'] = self._vclocks.pop(key)
-        response = self.client.put(self.name, key, self.dumps(value), **params)
+        with self.make_client_context() as client:
+            response = client.put(self.name, key, self.dumps(value), **params)
         if response:
             return self._handle_response(key, response)
 
     def delete(self, key):
         """Deletes all values for the given key from the bucket."""
-        self.client.delete(self.name, key)
+        with self.make_client_context() as client:
+            client.delete(self.name, key)
 
     def _handle_response(self, key, response):
         # Returns responses for non-conflicting content. Resolves conflicts
@@ -321,7 +335,7 @@ if __name__ == '__main__':
 
         # Test that the conflict is resolved, this time using the Bucket
         # interface.
-        b = Bucket('testing', c, resolve_longest)
+        b = Bucket('testing', c, resolver=resolve_longest)
         resolved = b.get('bar')
         assert resolved == 'bye', resolved
         assert len(c.get('testing', 'bar')['content']) == 1
