@@ -19,6 +19,7 @@ from diesel.util.queue import Queue, QueueEmpty
 try:
     import riak_proto as riak_pb2 # fastproto-enabled
 except:
+    import sys
     sys.stderr.write("Warning: using slower pure-python protobuf library\n")
     from diesel.protocols import riak_pb2
 
