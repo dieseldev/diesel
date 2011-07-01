@@ -159,7 +159,7 @@ class Bucket(object):
         return rich_value
 
 
-class Client(diesel.Client):
+class RiakClient(diesel.Client):
     """A client for the Riak distributed key/value database.
     
     Instances can be used stand-alone or passed to a Bucket constructor
