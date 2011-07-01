@@ -16,9 +16,13 @@ import struct
 import diesel
 from diesel.util.queue import Queue, QueueEmpty
 
-from diesel.protocols import riak_pb2
-from contextlib import contextmanager
+try:
+    import riak_proto as riak_pb2 # fastproto-enabled
+except:
+    sys.stderr.write("Warning: using slower pure-python protobuf library\n")
+    from diesel.protocols import riak_pb2
 
+from contextlib import contextmanager
 
 # The commented-out message codes and types below are for requests and/or
 # responses that don't have a body.
@@ -295,6 +299,8 @@ class RiakClient(diesel.Client):
         
         """
         request = riak_pb2.RpbSetBucketReq(bucket=bucket)
+        if request.props is None:
+            request.props = riak_pb2.RpbBucketProps()
         for name, value in props.iteritems():
             setattr(request.props, name, value)
         self._send(request)
@@ -324,21 +330,29 @@ def _to_dict(pb):
     # Takes a protocol buffer (pb) and transforms it into a dict of more
     # common Python types.
     out = {}
-    for descriptor, value in pb.ListFields():
+    if hasattr(pb, 'ListFields'):
+        fields = [d.name for (d, _) in pb.ListFields()]
+    else:
+        fields = [f for f in dir(pb) if f[0].islower()]
+    for name in fields:
+        value = getattr(pb, name)
         # Perform a couple sniff tests to see if a value is:
         # a) A protocol buffer
         # b) An iterable protocol buffer
         # c) Neither
         # Handles all of those situations.
         try:
-            value.MergeFrom
-            try:
+            if type(value) == tuple:
                 value = [_to_dict(v) for v in iter(value)]
-            except TypeError:
-                value = _to_dict(v)
+            else:
+                value.ParseFromString
+                try:
+                    value = [_to_dict(v) for v in iter(value)]
+                except TypeError:
+                    value = _to_dict(v)
         except AttributeError:
             pass
-        out[descriptor.name] = value
+        out[name] = value
     return out
 
 
@@ -354,7 +368,7 @@ if __name__ == '__main__':
     import cPickle
 
     def test_client():
-        c = RiakClient()
+        c = RiakClient('riak-1')
 
         # Do some cleanup from a previous run.
         c.delete('testing', 'bar')
