@@ -294,7 +294,7 @@ if __name__ == '__main__':
     import cPickle
 
     def test_client():
-        c = Client()
+        c = RiakClient('riak-1')
 
         # Do some cleanup from a previous run.
         c.delete('testing', 'bar')
