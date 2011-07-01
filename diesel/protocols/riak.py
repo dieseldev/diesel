@@ -14,6 +14,7 @@ and hooks for conflict resolution and custom loading/dumping of values.
 import struct
 
 import diesel
+from diesel.util.queue import Queue, QueueEmpty
 
 from diesel.protocols import riak_pb2
 from contextlib import contextmanager
@@ -54,6 +55,10 @@ MESSAGE_CODES = [
 PB_TO_MESSAGE_CODE = dict((cls, code) for code, cls in MESSAGE_CODES)
 MESSAGE_CODE_TO_PB = dict(MESSAGE_CODES)
 
+class BucketSubrequestException(Exception):
+    def __init__(self, s, sub_exceptions):
+        Exception.__init__(s)
+        self.sub_exceptions = sub_exceptions
 
 class Bucket(object):
     """A Bucket of keys/values in a Riak database.
@@ -86,11 +91,13 @@ class Bucket(object):
         self.name = name
         if make_client_context:
             self.make_client_context = make_client_context
+            self.used_client_context = True
         else:
             @contextmanager
             def noop_cm():
                 yield client
             self.make_client_context = noop_cm
+            self.used_client_context = False
         self._vclocks = {}
         if resolver:
             self.resolve = resolver
@@ -106,6 +113,45 @@ class Bucket(object):
             response = client.get(self.name, key)
         if response:
             return self._handle_response(key, response)
+
+    def _subrequest(self, inq, outq):
+        while True:
+            try:
+                key = inq.get(waiting=False)
+            except QueueEmpty:
+                break
+            else:
+                try:
+                    res = self.get(key)
+                except Exception, e:
+                    outq.put((key, False, e))
+                else:
+                    outq.put((key, True, res))
+
+    def get_many(self, keys, concurrency_limit=100, no_failures=False):
+        assert self.used_client_context,\
+        "Cannot fetch in parallel without a pooled make_client_context!"
+        inq = Queue()
+        outq = Queue()
+        for k in keys:
+            inq.put(k)
+
+        for x in xrange(min(len(keys), concurrency_limit)):
+            diesel.fork(self._subrequest, inq, outq)
+
+        failure = False
+        okay, err = [], []
+        for k in keys:
+            (key, success, val) = outq.get()
+            if success:
+                okay.append((key, val))
+            else:
+                err.append((key, val))
+
+        if no_failures:
+            raise BucketSubrequestException(
+            "Error in parallel subrequests", err)
+        return okay, err
 
     def put(self, key, value, safe=True, **params):
         """Puts the given key/value into the bucket.
