@@ -43,25 +43,6 @@ class RiakClient(diesel.Client):
     def __init__(self, host='127.0.0.1', port=8087, **kw):
         diesel.Client.__init__(self, host, port, **kw)
 
-    def _send(self, pb):
-        message_code = PB_TO_MESSAGE_CODE[pb.__class__]
-        message = pb.SerializeToString()
-        message_size = len(message)
-        total_size = message_size + 1 # plus 1 mc byte
-        fmt = "!iB%ds" % message_size
-        diesel.send(struct.pack(fmt, total_size, message_code, message))
-
-    def _receive(self):
-        response_size, = struct.unpack('!i', diesel.receive(4))
-        #import pdb;pdb.set_trace()
-        if response_size:
-            raw_response = diesel.receive(response_size) # minus 1 mc byte
-            message_code, = struct.unpack('B',raw_response[0])
-            response = raw_response[1:]
-            pb = MESSAGE_CODE_TO_PB[message_code]()
-            pb.ParseFromString(response)
-            return pb
-
     @diesel.call
     def get(self, bucket, key):
         pb = riak_pb2.RpbGetReq(bucket=bucket, key=key)
@@ -83,6 +64,25 @@ class RiakClient(diesel.Client):
         fmt = "!iB"
         diesel.send(struct.pack(fmt, total_size, message_code))
         return self._receive()
+
+    def _send(self, pb):
+        message_code = PB_TO_MESSAGE_CODE[pb.__class__]
+        message = pb.SerializeToString()
+        message_size = len(message)
+        total_size = message_size + 1 # plus 1 mc byte
+        fmt = "!iB%ds" % message_size
+        diesel.send(struct.pack(fmt, total_size, message_code, message))
+
+    def _receive(self):
+        response_size, = struct.unpack('!i', diesel.receive(4))
+        #import pdb;pdb.set_trace()
+        if response_size:
+            raw_response = diesel.receive(response_size)
+            message_code, = struct.unpack('B',raw_response[0])
+            response = raw_response[1:]
+            pb = MESSAGE_CODE_TO_PB[message_code]()
+            pb.ParseFromString(response)
+            return pb
 
 if __name__ == '__main__':
     def test_client():
