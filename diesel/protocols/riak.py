@@ -106,7 +106,7 @@ class Bucket(object):
             params['return_body'] = True
         if 'vclock' not in params and key in self._vclocks:
             params['vclock'] = self._vclocks.pop(key)
-        response = self.client.put(self.name, key, value, **params)
+        response = self.client.put(self.name, key, self.dumps(value), **params)
         if response:
             return self._handle_response(key, response)
 
@@ -119,7 +119,7 @@ class Bucket(object):
         # if there are multiple values for a key.
         if len(response['content']) == 1:
             self._vclocks[key] = response['vclock']
-            return response['content'][0]['value']
+            return self.loads(response['content'][0]['value'])
         else:
             return self._resolve(key, response)
 
@@ -130,6 +130,14 @@ class Bucket(object):
         resolved_value = self._resolver(response)
         params = dict(vclock=response['vclock'], return_body=True)
         return self.put(key, resolved_value, **params)
+
+    def loads(self, raw_value):
+        """Subclass to support loading rich values."""
+        return raw_value
+
+    def dumps(self, rich_value):
+        """Subclass to support dumping rich values."""
+        return rich_value
 
 
 def object_resolver(resolution_function):
@@ -268,7 +276,16 @@ def _to_dict(pb):
         out[descriptor.name] = value
     return out
 
+
+# XXX hack
+class Point(object):
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
 if __name__ == '__main__':
+    import cPickle
+
     def test_client():
         c = Client()
 
@@ -277,6 +294,7 @@ if __name__ == '__main__':
         c.delete('testing', 'foo')
         c.delete('testing', 'lala')
         c.delete('testing', 'baz')
+        c.delete('testing.pickles', 'a')
 
         assert not c.get('testing', 'foo')
         assert c.put('testing', 'foo', '1', return_body=True)
@@ -313,5 +331,21 @@ if __name__ == '__main__':
         assert len(c.get('testing', 'baz')['content']) == 1
         assert b.get('baz') == 'tttt'
 
+        # Custom Bucket.
+        class PickleBucket(Bucket): # lol
+            def loads(self, raw_value):
+                return cPickle.loads(raw_value)
+
+            def dumps(self, rich_value):
+                return cPickle.dumps(rich_value)
+
+        p = PickleBucket('testing.pickles', c)
+        assert p.put('here', Point(4,2))
+        out = p.get('here')
+        assert (4,2) == (out.x, out.y)
+        assert isinstance(out, Point)
+
         diesel.quickstop()
     diesel.quickstart(test_client)
+
+del Point
