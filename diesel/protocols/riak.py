@@ -8,6 +8,9 @@ import diesel
 from diesel.protocols import riak_pb2
 
 
+# The commented-out message codes and types below are for requests and/or
+# responses that don't have a body.
+
 MESSAGE_CODES = [
 (0, riak_pb2.RpbErrorResp),
 #(1, riak_pb2.RpbPingReq),
@@ -36,21 +39,10 @@ MESSAGE_CODES = [
 (24, riak_pb2.RpbMapRedResp),
 ]
 
+
 PB_TO_MESSAGE_CODE = dict((cls, code) for code, cls in MESSAGE_CODES)
 MESSAGE_CODE_TO_PB = dict(MESSAGE_CODES)
 
-def object_resolver(resolution_function):
-    def resolve_all(response):
-        res = response['content'].pop(0)
-        while response['content']:
-            other = response['content'].pop(0)
-            other['value'] = resolution_function(
-                res['last_mod'], res['value'],
-                other['last_mod'], other['value'],
-            )
-            res = other
-        return res['value']
-    return resolve_all
 
 class Bucket(object):
     """A Bucket of keys/values in a Riak database.
@@ -128,6 +120,20 @@ class Bucket(object):
         resolved_value = self._resolver(response)
         params = dict(vclock=response['vclock'], return_body=True)
         return self.put(key, resolved_value, **params)
+
+
+def object_resolver(resolution_function):
+    def resolve_all(response):
+        res = response['content'].pop(0)
+        while response['content']:
+            other = response['content'].pop(0)
+            other['value'] = resolution_function(
+                res['last_mod'], res['value'],
+                other['last_mod'], other['value'],
+            )
+            res = other
+        return res['value']
+    return resolve_all
 
 
 class RiakClient(diesel.Client):
