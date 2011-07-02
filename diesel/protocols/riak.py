@@ -8,7 +8,7 @@ dense dictionaries of data.
 
 The other interface is via Buckets. These use a Client to allow you to work
 with keys and values in the context of a Riak bucket. They offer a simpler API
-and a hook for conflict resolution.
+and hooks for conflict resolution and custom loading/dumping of values.
 
 """
 import struct
@@ -68,9 +68,10 @@ class Bucket(object):
     def __init__(self, name, client, resolver=None):
         """Return a new Bucket for the named bucket, using the given client.
 
-        If your bucket allows sibling content (conflicts) you should supply
-        a conflict resolver function. It should take four arguments and
-        return a resolved value. Here is an example::
+        If your bucket allows sibling content (conflicts) you should supply a
+        conflict resolver function or subclass and override ``resolve``. It
+        should take four arguments and return a resolved value. Here is an
+        example::
 
             def resolve_random(timestamp_1, value_1, timestamp_2, value_2):
                 '''The worlds worst resolver function!'''
@@ -79,8 +80,9 @@ class Bucket(object):
         """
         self.name = name
         self.client = client
-        self._resolver = object_resolver(resolver)
         self._vclocks = {}
+        if resolver:
+            self.resolve = resolver
 
     def get(self, key):
         """Get the value for key from the bucket.
@@ -104,8 +106,8 @@ class Bucket(object):
         """
         if safe:
             params['return_body'] = True
-        if 'vclock' not in params and key in self._vclocks:
-            params['vclock'] = self._vclocks.pop(key)
+            if 'vclock' not in params and key in self._vclocks:
+                params['vclock'] = self._vclocks.pop(key)
         response = self.client.put(self.name, key, self.dumps(value), **params)
         if response:
             return self._handle_response(key, response)
@@ -127,9 +129,26 @@ class Bucket(object):
         # Performs conflict resolution for the given key and response. If all
         # goes well a new harmonized value for the key will be put up to the
         # bucket. If things go wrong, expect ... exceptions. :-|
-        resolved_value = self._resolver(response)
+        res = response['content'].pop(0)
+        while response['content']:
+            other = response['content'].pop(0)
+            other['value'] = self.dumps(
+                self.resolve(
+                    res['last_mod'], 
+                    self.loads(res['value']),
+                    other['last_mod'], 
+                    self.loads(other['value']),
+                )
+            )
+            res = other
+        resolved_value = self.loads(res['value'])
         params = dict(vclock=response['vclock'], return_body=True)
         return self.put(key, resolved_value, **params)
+
+    def resolve(self, timestamp1, value1, timestamp2, value2):
+        """Subclass to support custom conflict resolution."""
+        msg = "Pass in a resolver or override this method."
+        raise NotImplementedError(msg)
 
     def loads(self, raw_value):
         """Subclass to support loading rich values."""
@@ -138,20 +157,6 @@ class Bucket(object):
     def dumps(self, rich_value):
         """Subclass to support dumping rich values."""
         return rich_value
-
-
-def object_resolver(resolution_function):
-    def resolve_all(response):
-        res = response['content'].pop(0)
-        while response['content']:
-            other = response['content'].pop(0)
-            other['value'] = resolution_function(
-                res['last_mod'], res['value'],
-                other['last_mod'], other['value'],
-            )
-            res = other
-        return res['value']
-    return resolve_all
 
 
 class Client(diesel.Client):
@@ -277,7 +282,9 @@ def _to_dict(pb):
     return out
 
 
-# XXX hack
+# Testing Code Below
+# ==================
+# XXX hack - can't define it in __main__ below
 class Point(object):
     def __init__(self, x, y):
         self.x = x
@@ -294,7 +301,8 @@ if __name__ == '__main__':
         c.delete('testing', 'foo')
         c.delete('testing', 'lala')
         c.delete('testing', 'baz')
-        c.delete('testing.pickles', 'a')
+        c.delete('testing.pickles', 'here')
+        c.delete('testing.pickles', 'there')
 
         assert not c.get('testing', 'foo')
         assert c.put('testing', 'foo', '1', return_body=True)
@@ -339,11 +347,27 @@ if __name__ == '__main__':
             def dumps(self, rich_value):
                 return cPickle.dumps(rich_value)
 
+            def resolve(self, t1, v1, t2, v2):
+                # Returns the value with the smallest different between points.
+                d1 = abs(v1.x - v1.y)
+                d2 = abs(v2.x - v2.y)
+                if d1 < d2:
+                    return v1
+                return v2
+
+        assert not c.set_bucket_props('testing.pickles', {'allow_mult':True})
         p = PickleBucket('testing.pickles', c)
         assert p.put('here', Point(4,2))
         out = p.get('here')
         assert (4,2) == (out.x, out.y)
         assert isinstance(out, Point)
+
+        # Resolve Point conflicts.
+        p.put('there', Point(4,12), safe=False)
+        p.put('there', Point(3,7), safe=False)
+        there = p.get('there')
+        assert (3,7) == (there.x, there.y), (there.x, there.y)
+        assert isinstance(there, Point)
 
         diesel.quickstop()
     diesel.quickstart(test_client)
