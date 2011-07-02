@@ -53,33 +53,78 @@ def object_resolver(resolution_function):
     return resolve_all
 
 class Bucket(object):
+    """A Bucket of keys/values in a Riak database.
+
+    Buckets are intended to be cheap, non-shared objects for easily performing
+    common key/value operations with Riak.
+
+    Buckets should not be shared amongst concurrent consumers. Each consumer
+    should have its own Bucket instance. This is due to the way vector clocks
+    are tracked on the Bucket instances.
+
+    """
     def __init__(self, name, client, resolver=None):
+        """Return a new Bucket for the named bucket, using the given client.
+
+        If your bucket allows sibling content (conflicts) you should supply
+        a conflict resolver function. It should take four arguments and
+        return a resolved value. Here is an example::
+
+            def resolve_random(timestamp_1, value_1, timestamp_2, value_2):
+                '''The worlds worst resolver function!'''
+                return random.choice([value_1, value_2])
+
+        """
         self.name = name
         self.client = client
         self._resolver = object_resolver(resolver)
+        self._vclocks = {}
 
     def get(self, key):
-        # XXX problem here is that we don't return the vector clock
-        # for subsequent puts of the returned value.
+        """Get the value for key from the bucket.
+        
+        Records the vector clock for the value for future modification
+        using ``put`` with this same Bucket instance.
+        
+        """
         response = self.client.get(self.name, key)
         if response:
             return self._handle_response(key, response)
 
-    def put(self, key, value, **params):
+    def put(self, key, value, safe=True, **params):
+        """Puts the given key/value into the bucket.
+
+        If safe==True the response will be read back and conflict resolution
+        might take place as well if the put triggers multiple sibling values
+        for the key.
+
+        Extra params are passed to the ``RiakClient.put`` method.
+        """
+        if safe:
+            params['return_body'] = True
+        if 'vclock' not in params and key in self._vclocks:
+            params['vclock'] = self._vclocks.pop(key)
         response = self.client.put(self.name, key, value, **params)
         if response:
             return self._handle_response(key, response)
 
     def delete(self, key):
+        """Deletes all values for the given key from the bucket."""
         self.client.delete(self.name, key)
 
     def _handle_response(self, key, response):
+        # Returns responses for non-conflicting content. Resolves conflicts
+        # if there are multiple values for a key.
         if len(response['content']) == 1:
+            self._vclocks[key] = response['vclock']
             return response['content'][0]['value']
         else:
             return self._resolve(key, response)
 
     def _resolve(self, key, response):
+        # Performs conflict resolution for the given key and response. If all
+        # goes well a new harmonized value for the key will be put up to the
+        # bucket. If things go wrong, expect ... exceptions. :-|
         resolved_value = self._resolver(response)
         params = dict(vclock=response['vclock'], return_body=True)
         return self.put(key, resolved_value, **params)
@@ -183,13 +228,19 @@ def to_dict(pb):
 if __name__ == '__main__':
     def test_client():
         c = RiakClient()
+
+        # Do some cleanup from a previous run.
         c.delete('testing', 'bar')
         c.delete('testing', 'foo')
-        c.get('testing', 'foo')
+        c.delete('testing', 'lala')
+        c.delete('testing', 'baz')
+
+        assert not c.get('testing', 'foo')
         assert c.put('testing', 'foo', '1', return_body=True)
         assert c.get('testing', 'foo')
 
-        c.set_bucket_props('testing', {'allow_mult':True})
+        # Create a conflict for the 'bar' key in 'testing'.
+        assert not c.set_bucket_props('testing', {'allow_mult':True})
         assert c.put('testing', 'bar', 'hi', return_body=True)
         assert c.put('testing', 'bar', 'bye', return_body=True)
         assert len(c.get('testing', 'bar')['content']) > 1
@@ -199,14 +250,25 @@ if __name__ == '__main__':
                 return v1
             return v2
 
+        # Test that the conflict is resolved, this time using the Bucket
+        # interface.
         b = Bucket('testing', c, resolve_longest)
         resolved = b.get('bar')
         assert resolved == 'bye', resolved
         assert len(c.get('testing', 'bar')['content']) == 1
-        assert not b.put('lala', 'g'*1024)
+
+        # put/get/delete with a Bucket
+        assert b.put('lala', 'g'*1024)
         assert b.get('lala') == 'g'*1024
         b.delete('lala')
         assert not b.get('lala')
+
+        # Multiple changes to a key using a Bucket should be a-ok.
+        assert b.put('baz', 'zzzz')
+        assert b.put('baz', 'ffff')
+        assert b.put('baz', 'tttt')
+        assert len(c.get('testing', 'baz')['content']) == 1
+        assert b.get('baz') == 'tttt'
 
         diesel.quickstop()
     diesel.quickstart(test_client)
