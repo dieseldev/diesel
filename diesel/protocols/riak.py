@@ -1,5 +1,15 @@
 """Riak protocol buffers client.
 
+Provides a couple interfaces to working with a Riak database. 
+
+The first is a lower-level Client object. It has methods for interacting with
+the server, buckets, keys and values. The methods are more verbose and return
+dense dictionaries of data.
+
+The other interface is via Buckets. These use a Client to allow you to work
+with keys and values in the context of a Riak bucket. They offer a simpler API
+and a hook for conflict resolution.
+
 """
 import struct
 
@@ -137,13 +147,19 @@ def object_resolver(resolution_function):
 
 
 class Client(diesel.Client):
-    """A client for the Riak distributed key/value database."""
+    """A client for the Riak distributed key/value database.
+    
+    Instances can be used stand-alone or passed to a Bucket constructor
+    (which has a simpler API).
+    
+    """
     def __init__(self, host='127.0.0.1', port=8087, **kw):
+        """Creates a new Riak Client connection object."""
         diesel.Client.__init__(self, host, port, **kw)
 
     @diesel.call
     def get(self, bucket, key):
-        """Get the value of key from bucket.
+        """Get the value of key from named bucket.
         
         Returns a dictionary with a list of the content for the key
         and the vector clock (vclock) for the key.
@@ -157,7 +173,7 @@ class Client(diesel.Client):
 
     @diesel.call
     def put(self, bucket, key, value, **params):
-        """Puts the value to the key in the bucket.
+        """Puts the value to the key in the named bucket.
 
         If an ``extra_content`` dictionary parameter is present, its content
         is merged into the RpbContent object.
@@ -183,7 +199,7 @@ class Client(diesel.Client):
 
     @diesel.call
     def delete(self, bucket, key):
-        """Deletes the given key from the bucket, including all values."""
+        """Deletes the given key from the named bucket, including all values."""
         request = riak_pb2.RpbDelReq(bucket=bucket, key=key)
         self._send(request)
         return self._receive()
@@ -199,7 +215,7 @@ class Client(diesel.Client):
 
     @diesel.call
     def set_bucket_props(self, bucket, props):
-        """Sets some properties on the bucket.
+        """Sets some properties on the named bucket.
         
         ``props`` should be a dictionary of properties supported by the
         RpbBucketProps protocol buffer.
@@ -212,6 +228,7 @@ class Client(diesel.Client):
         return self._receive()
 
     def _send(self, pb):
+        # Send a protocol buffer on the wire as a request.
         message_code = PB_TO_MESSAGE_CODE[pb.__class__]
         message = pb.SerializeToString()
         message_size = len(message)
@@ -220,6 +237,7 @@ class Client(diesel.Client):
         diesel.send(struct.pack(fmt, total_size, message_code, message))
 
     def _receive(self):
+        # Receive a protocol buffer from the wire as a response.
         response_size, = struct.unpack('!i', diesel.receive(4))
         raw_response = diesel.receive(response_size)
         message_code, = struct.unpack('B',raw_response[0])
