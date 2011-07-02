@@ -15,6 +15,7 @@ import struct
 
 import diesel
 from diesel.util.queue import Queue, QueueEmpty
+from diesel.util.event import Event
 
 try:
     import riak_proto as riak_pb2 # fastproto-enabled
@@ -56,6 +57,26 @@ MESSAGE_CODES = [
 (24, riak_pb2.RpbMapRedResp),
 ]
 
+resolutions_in_progress = {}
+
+class ResolvedLookup(Event):
+    def __init__(self):
+        Event.__init__(self)
+        self.error = None
+        self.value = None
+
+@contextmanager
+def in_resolution(bucket, key):
+    e = ResolvedLookup()
+    resolutions_in_progress[(bucket, key)] = e
+    try:
+        yield e
+    except:
+        a = resolutions_in_progress.pop((bucket, key))
+        a.error = True
+        a.set()
+    else:
+        del resolutions_in_progress[(bucket, key)]
 
 PB_TO_MESSAGE_CODE = dict((cls, code) for code, cls in MESSAGE_CODES)
 MESSAGE_CODE_TO_PB = dict(MESSAGE_CODES)
@@ -199,7 +220,19 @@ class Bucket(object):
             self._vclocks[key] = response['vclock']
             return self.loads(response['content'][0]['value'])
         else:
-            return self._resolve(key, response)
+            res = (self.bucket, key)
+            if res in resolutions_in_progress:
+                ev = resolutions_in_progress[res]
+                ev.wait()
+                if not ev.error:
+                    return ev.value
+                else:
+                    return self._handle_response(key, response)
+            with in_resolution(*res) as ev:
+                result = self._resolve(key, response)
+                ev.value = result
+                ev.set()
+            return result
 
     def _resolve(self, key, response):
         # Performs conflict resolution for the given key and response. If all
