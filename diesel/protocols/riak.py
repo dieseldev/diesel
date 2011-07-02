@@ -90,7 +90,7 @@ class Bucket(object):
         might take place as well if the put triggers multiple sibling values
         for the key.
 
-        Extra params are passed to the ``RiakClient.put`` method.
+        Extra params are passed to the ``Client.put`` method.
         """
         if safe:
             params['return_body'] = True
@@ -136,7 +136,8 @@ def object_resolver(resolution_function):
     return resolve_all
 
 
-class RiakClient(diesel.Client):
+class Client(diesel.Client):
+    """A client for the Riak distributed key/value database."""
     def __init__(self, host='127.0.0.1', port=8087, **kw):
         diesel.Client.__init__(self, host, port, **kw)
 
@@ -152,7 +153,7 @@ class RiakClient(diesel.Client):
         self._send(request)
         response = self._receive()
         if response:
-            return to_dict(response)
+            return _to_dict(response)
 
     @diesel.call
     def put(self, bucket, key, value, **params):
@@ -178,16 +179,18 @@ class RiakClient(diesel.Client):
         self._send(request)
         response = self._receive()
         if response:
-            return to_dict(response)
+            return _to_dict(response)
 
     @diesel.call
     def delete(self, bucket, key):
+        """Deletes the given key from the bucket, including all values."""
         request = riak_pb2.RpbDelReq(bucket=bucket, key=key)
         self._send(request)
         return self._receive()
 
     @diesel.call
     def info(self):
+        # No protocol buffer object to build or send.
         message_code = 7
         total_size = 1
         fmt = "!iB"
@@ -196,6 +199,12 @@ class RiakClient(diesel.Client):
 
     @diesel.call
     def set_bucket_props(self, bucket, props):
+        """Sets some properties on the bucket.
+        
+        ``props`` should be a dictionary of properties supported by the
+        RpbBucketProps protocol buffer.
+        
+        """
         request = riak_pb2.RpbSetBucketReq(bucket=bucket)
         for name, value in props.iteritems():
             setattr(request.props, name, value)
@@ -220,20 +229,30 @@ class RiakClient(diesel.Client):
             pb.ParseFromString(response)
             return pb
 
-def to_dict(pb):
+def _to_dict(pb):
+    # Takes a protocol buffer (pb) and transforms it into a dict of more
+    # common Python types.
     out = {}
     for descriptor, value in pb.ListFields():
+        # Perform a couple sniff tests to see if a value is:
+        # a) A protocol buffer
+        # b) An iterable protocol buffer
+        # c) Neither
+        # Handles all of those situations.
         try:
             value.MergeFrom
-            value = [to_dict(v) for v in iter(value)]
-        except (AttributeError, TypeError):
+            try:
+                value = [_to_dict(v) for v in iter(value)]
+            except TypeError:
+                value = _to_dict(v)
+        except AttributeError:
             pass
         out[descriptor.name] = value
     return out
 
 if __name__ == '__main__':
     def test_client():
-        c = RiakClient()
+        c = Client()
 
         # Do some cleanup from a previous run.
         c.delete('testing', 'bar')
