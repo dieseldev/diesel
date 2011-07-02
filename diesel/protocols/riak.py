@@ -220,7 +220,7 @@ class Bucket(object):
             self._vclocks[key] = response['vclock']
             return self.loads(response['content'][0]['value'])
         else:
-            res = (self.bucket, key)
+            res = (self.name, key)
             if res in resolutions_in_progress:
                 ev = resolutions_in_progress[res]
                 ev.wait()
