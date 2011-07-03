@@ -106,6 +106,11 @@ class Bucket(object):
         self._vclocks = {}
         if resolver:
             self.resolve = resolver
+        self.client_id = None
+
+    def for_client(self, client_id):
+        self.client_id = client_id
+        return self
 
     def get(self, key):
         """Get the value for key from the bucket.
@@ -115,6 +120,8 @@ class Bucket(object):
         
         """
         with self.make_client_context() as client:
+            if self.client_id:
+                client.set_client_id(self.client_id)
             response = client.get(self.name, key)
         if response:
             return self._handle_response(key, response)
@@ -172,6 +179,8 @@ class Bucket(object):
             if 'vclock' not in params and key in self._vclocks:
                 params['vclock'] = self._vclocks.pop(key)
         with self.make_client_context() as client:
+            if self.client_id:
+                client.set_client_id(self.client_id)
             response = client.put(self.name, key, self.dumps(value), **params)
         if response:
             return self._handle_response(key, response)
@@ -179,6 +188,8 @@ class Bucket(object):
     def delete(self, key):
         """Deletes all values for the given key from the bucket."""
         with self.make_client_context() as client:
+            if self.client_id:
+                client.set_client_id(self.client_id)
             client.delete(self.name, key)
 
     def _handle_response(self, key, response):
@@ -453,18 +464,18 @@ if __name__ == '__main__':
         assert isinstance(out, Point)
 
         # Resolve Point conflicts.
-        c.set_client_id('c 1')
-        p.put('there', Point(4,12), safe=False)
-        c.set_client_id('c 2')
-        p.put('there', Point(3,7), safe=False)
-        c.set_client_id('c 3')
-        p.put('there', Point(90,99), safe=False)
-        c.set_client_id('c 4')
-        p.put('there', Point(4,10), safe=False)
-        c.set_client_id('c 5')
-        p.put('there', Point(1,9), safe=False)
+        p1 = PickleBucket('testing.pickles', c).for_client('c 1')
+        p1.put('there', Point(4,12), safe=False)
+        p2 = PickleBucket('testing.pickles', c).for_client('c 2')
+        p2.put('there', Point(3,7), safe=False)
+        p3 = PickleBucket('testing.pickles', c).for_client('c 3')
+        p3.put('there', Point(90,99), safe=False)
+        p4 = PickleBucket('testing.pickles', c).for_client('c 4')
+        p4.put('there', Point(4,10), safe=False)
+        p5 = PickleBucket('testing.pickles', c).for_client('c 5')
+        p5.put('there', Point(1,9), safe=False)
         assert len(c.get('testing.pickles', 'there')['content']) == 5
-        there = p.get('there')
+        there = p5.get('there')
         assert (3,7) == (there.x, there.y), (there.x, there.y)
         assert isinstance(there, Point)
 
