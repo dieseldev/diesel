@@ -1,3 +1,4 @@
+package riak_proto;
 /* -------------------------------------------------------------------
 **
 ** riakclient.proto: Protocol buffers for riak

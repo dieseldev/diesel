@@ -14,9 +14,16 @@ and hooks for conflict resolution and custom loading/dumping of values.
 import struct
 
 import diesel
+from diesel.util.queue import Queue, QueueEmpty
 
-from diesel.protocols import riak_pb2
+try:
+    import riak_proto as riak_pb2 # fastproto-enabled
+except:
+    import sys
+    sys.stderr.write("Warning: using slower pure-python protobuf library\n")
+    from diesel.protocols import riak_pb2
 
+from contextlib import contextmanager
 
 # The commented-out message codes and types below are for requests and/or
 # responses that don't have a body.
@@ -53,6 +60,10 @@ MESSAGE_CODES = [
 PB_TO_MESSAGE_CODE = dict((cls, code) for code, cls in MESSAGE_CODES)
 MESSAGE_CODE_TO_PB = dict(MESSAGE_CODES)
 
+class BucketSubrequestException(Exception):
+    def __init__(self, s, sub_exceptions):
+        Exception.__init__(s)
+        self.sub_exceptions = sub_exceptions
 
 class Bucket(object):
     """A Bucket of keys/values in a Riak database.
@@ -65,7 +76,7 @@ class Bucket(object):
     are tracked on the Bucket instances.
 
     """
-    def __init__(self, name, client, resolver=None):
+    def __init__(self, name, client=None, make_client_context=None, resolver=None):
         """Return a new Bucket for the named bucket, using the given client.
 
         If your bucket allows sibling content (conflicts) you should supply a
@@ -78,8 +89,20 @@ class Bucket(object):
                 return random.choice([value_1, value_2])
 
         """
+        assert client is not None or make_client_context is not None,\
+        "Must specify either client or make_client_context"
+        assert not (client is not None and make_client_context is not None),\
+        "Cannot specify both client and make_client_context"
         self.name = name
-        self.client = client
+        if make_client_context:
+            self.make_client_context = make_client_context
+            self.used_client_context = True
+        else:
+            @contextmanager
+            def noop_cm():
+                yield client
+            self.make_client_context = noop_cm
+            self.used_client_context = False
         self._vclocks = {}
         if resolver:
             self.resolve = resolver
@@ -91,9 +114,49 @@ class Bucket(object):
         using ``put`` with this same Bucket instance.
         
         """
-        response = self.client.get(self.name, key)
+        with self.make_client_context() as client:
+            response = client.get(self.name, key)
         if response:
             return self._handle_response(key, response)
+
+    def _subrequest(self, inq, outq):
+        while True:
+            try:
+                key = inq.get(waiting=False)
+            except QueueEmpty:
+                break
+            else:
+                try:
+                    res = self.get(key)
+                except Exception, e:
+                    outq.put((key, False, e))
+                else:
+                    outq.put((key, True, res))
+
+    def get_many(self, keys, concurrency_limit=100, no_failures=False):
+        assert self.used_client_context,\
+        "Cannot fetch in parallel without a pooled make_client_context!"
+        inq = Queue()
+        outq = Queue()
+        for k in keys:
+            inq.put(k)
+
+        for x in xrange(min(len(keys), concurrency_limit)):
+            diesel.fork(self._subrequest, inq, outq)
+
+        failure = False
+        okay, err = [], []
+        for k in keys:
+            (key, success, val) = outq.get()
+            if success:
+                okay.append((key, val))
+            else:
+                err.append((key, val))
+
+        if no_failures:
+            raise BucketSubrequestException(
+            "Error in parallel subrequests", err)
+        return okay, err
 
     def put(self, key, value, safe=True, **params):
         """Puts the given key/value into the bucket.
@@ -108,13 +171,15 @@ class Bucket(object):
             params['return_body'] = True
             if 'vclock' not in params and key in self._vclocks:
                 params['vclock'] = self._vclocks.pop(key)
-        response = self.client.put(self.name, key, self.dumps(value), **params)
+        with self.make_client_context() as client:
+            response = client.put(self.name, key, self.dumps(value), **params)
         if response:
             return self._handle_response(key, response)
 
     def delete(self, key):
         """Deletes all values for the given key from the bucket."""
-        self.client.delete(self.name, key)
+        with self.make_client_context() as client:
+            client.delete(self.name, key)
 
     def _handle_response(self, key, response):
         # Returns responses for non-conflicting content. Resolves conflicts
@@ -159,7 +224,7 @@ class Bucket(object):
         return rich_value
 
 
-class Client(diesel.Client):
+class RiakClient(diesel.Client):
     """A client for the Riak distributed key/value database.
     
     Instances can be used stand-alone or passed to a Bucket constructor
@@ -235,6 +300,8 @@ class Client(diesel.Client):
         
         """
         request = riak_pb2.RpbSetBucketReq(bucket=bucket)
+        if request.props is None:
+            request.props = riak_pb2.RpbBucketProps()
         for name, value in props.iteritems():
             setattr(request.props, name, value)
         self._send(request)
@@ -277,21 +344,29 @@ def _to_dict(pb):
     # Takes a protocol buffer (pb) and transforms it into a dict of more
     # common Python types.
     out = {}
-    for descriptor, value in pb.ListFields():
+    if hasattr(pb, 'ListFields'):
+        fields = [d.name for (d, _) in pb.ListFields()]
+    else:
+        fields = [f for f in dir(pb) if f[0].islower()]
+    for name in fields:
+        value = getattr(pb, name)
         # Perform a couple sniff tests to see if a value is:
         # a) A protocol buffer
         # b) An iterable protocol buffer
         # c) Neither
         # Handles all of those situations.
         try:
-            value.MergeFrom
-            try:
+            if type(value) == tuple:
                 value = [_to_dict(v) for v in iter(value)]
-            except TypeError:
-                value = _to_dict(v)
+            else:
+                value.ParseFromString
+                try:
+                    value = [_to_dict(v) for v in iter(value)]
+                except TypeError:
+                    value = _to_dict(v)
         except AttributeError:
             pass
-        out[descriptor.name] = value
+        out[name] = value
     return out
 
 
@@ -307,7 +382,7 @@ if __name__ == '__main__':
     import cPickle
 
     def test_client():
-        c = Client()
+        c = RiakClient()
         assert not c.set_client_id('testing-client')
 
         # Do some cleanup from a previous run.
@@ -336,7 +411,7 @@ if __name__ == '__main__':
 
         # Test that the conflict is resolved, this time using the Bucket
         # interface.
-        b = Bucket('testing', c, resolve_longest)
+        b = Bucket('testing', c, resolver=resolve_longest)
         resolved = b.get('bar')
         assert resolved == 'bye', resolved
         assert len(c.get('testing', 'bar')['content']) == 1
