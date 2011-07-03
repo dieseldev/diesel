@@ -240,6 +240,19 @@ class Client(diesel.Client):
         self._send(request)
         return self._receive()
 
+    @diesel.call
+    def set_client_id(self, client_id):
+        """Sets the remote client id for this connection.
+
+        This is crazy-important to do if your bucket allows sibling documents
+        and you are reusing connections. In general, client ids should map to
+        actors within your system.
+
+        """
+        request = riak_pb2.RpbSetClientIdReq(client_id=client_id)
+        self._send(request)
+        return self._receive()
+
     def _send(self, pb):
         # Send a protocol buffer on the wire as a request.
         message_code = PB_TO_MESSAGE_CODE[pb.__class__]
@@ -295,12 +308,14 @@ if __name__ == '__main__':
 
     def test_client():
         c = Client()
+        assert not c.set_client_id('testing-client')
 
         # Do some cleanup from a previous run.
         c.delete('testing', 'bar')
         c.delete('testing', 'foo')
         c.delete('testing', 'lala')
         c.delete('testing', 'baz')
+        c.delete('testing', 'diff')
         c.delete('testing.pickles', 'here')
         c.delete('testing.pickles', 'there')
 
@@ -363,12 +378,28 @@ if __name__ == '__main__':
         assert isinstance(out, Point)
 
         # Resolve Point conflicts.
+        c.set_client_id('c 1')
         p.put('there', Point(4,12), safe=False)
+        c.set_client_id('c 2')
         p.put('there', Point(3,7), safe=False)
+        c.set_client_id('c 3')
+        p.put('there', Point(90,99), safe=False)
+        c.set_client_id('c 4')
+        p.put('there', Point(4,10), safe=False)
+        c.set_client_id('c 5')
+        p.put('there', Point(1,9), safe=False)
+        assert len(c.get('testing.pickles', 'there')['content']) == 5
         there = p.get('there')
         assert (3,7) == (there.x, there.y), (there.x, there.y)
         assert isinstance(there, Point)
 
+        # Doing stuff with different client ids but the same vector clock.
+        c.set_client_id('diff 1')
+        assert b.put('diff', '---')
+        c.set_client_id('diff 2')
+        assert b.put('diff', '+++')
+        assert b.get('diff') == '+++'
+        
         diesel.quickstop()
     diesel.quickstart(test_client)
 
