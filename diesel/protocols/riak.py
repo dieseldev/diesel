@@ -213,6 +213,13 @@ class Bucket(object):
                 client.set_client_id(self.client_id)
             client.delete(self.name, key)
 
+    def keys(self):
+        """Get all the keys for a given bucket, is an iterator."""
+        with self.make_client_context() as client:
+            if self.client_id:
+                client.set_client_id(self.client_id)
+            return client.keys(self.name)
+
     def _handle_response(self, key, response):
         # Returns responses for non-conflicting content. Resolves conflicts
         # if there are multiple values for a key.
@@ -327,6 +334,18 @@ class RiakClient(diesel.Client):
         return self._receive()
 
     @diesel.call
+    def keys(self, bucket):
+        """Gets the keys for the given bucket, is an iterator"""
+        request = riak_pb2.RpbListKeysReq(bucket=bucket)
+        self._send(request)
+
+        response = riak_pb2.RpbListKeysResp(done=False) #Do/while?
+        while not response.done:
+            response = self._receive()
+            for key in response.keys:
+                yield key
+
+    @diesel.call
     def info(self):
         # No protocol buffer object to build or send.
         message_code = 7
@@ -364,6 +383,7 @@ class RiakClient(diesel.Client):
         self._send(request)
         return self._receive()
 
+    @diesel.call
     def _send(self, pb):
         # Send a protocol buffer on the wire as a request.
         message_code = PB_TO_MESSAGE_CODE[pb.__class__]
@@ -373,6 +393,7 @@ class RiakClient(diesel.Client):
         fmt = "!iB%ds" % message_size
         diesel.send(struct.pack(fmt, total_size, message_code, message))
 
+    @diesel.call
     def _receive(self):
         # Receive a protocol buffer from the wire as a response.
         response_size, = struct.unpack('!i', diesel.receive(4))

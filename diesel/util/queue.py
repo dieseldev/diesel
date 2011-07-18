@@ -33,6 +33,11 @@ class Queue(object):
         elif not waiting:
             raise QueueEmpty()
 
+    def __iter__(self):
+        return self
+
+    def next(self):
+        return self.get()
 
     @property
     def is_empty(self):
