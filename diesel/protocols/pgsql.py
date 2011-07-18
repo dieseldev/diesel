@@ -7,13 +7,13 @@ import hashlib
 PGSQL_PORT = 5432
 
 def log(*args):
-    if True:
+    if False:
         print ' '.join(map(str,args))
 
 # TODO: convert more types!
 type_functions = {
-    1043: str,
-    23: int,
+    1043: lambda x: str(x) if x is not None else x,
+    23: lambda x: int(x) if x is not None else x,
 }
 
 class PostgresClient(Client):
