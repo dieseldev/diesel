@@ -42,7 +42,7 @@ class Logger(object):
     '''
     def __init__(self, fd=None, verbosity=LOGLVL_WARN):
         if fd is None:
-            fd = [sys.stdout]
+            fd = [sys.stderr]
         if type(fd) not in (list, tuple):
             fd = [fd]
         self.fdlist = list(fd)
