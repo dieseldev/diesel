@@ -75,6 +75,7 @@ def in_resolution(bucket, key):
         a = resolutions_in_progress.pop((bucket, key))
         a.error = True
         a.set()
+        raise
     else:
         del resolutions_in_progress[(bucket, key)]
 
