@@ -277,6 +277,15 @@ class Bucket(object):
         return rich_value
 
 
+class RiakErrorResp(Exception):
+    def __init__(self, error_resp):
+        Exception.__init__(self, error_resp.errmsg, error_resp.errcode)
+        self.errmsg = error_resp.errmsg
+        self.errcode = error_resp.errcode
+
+    def __repr__(self):
+        return "RiakErrorResp: %s" % (self.errmsg)
+
 class RiakClient(diesel.Client):
     """A client for the Riak distributed key/value database.
     
@@ -405,6 +414,9 @@ class RiakClient(diesel.Client):
         if response:
             pb = MESSAGE_CODE_TO_PB[message_code]()
             pb.ParseFromString(response)
+            if message_code == 0:
+                # RpbErrorResp - raise an exception
+                raise RiakErrorResp(pb)
             return pb
 
 def _to_dict(pb):
@@ -450,7 +462,7 @@ if __name__ == '__main__':
 
     def test_client():
         c = RiakClient()
-        assert not c.set_client_id('testing-client')
+        c.set_client_id('testing-client')
 
         # Do some cleanup from a previous run.
         c.delete('testing', 'bar')
@@ -467,8 +479,8 @@ if __name__ == '__main__':
 
         # Create a conflict for the 'bar' key in 'testing'.
         assert not c.set_bucket_props('testing', {'allow_mult':True})
-        assert c.put('testing', 'bar', 'hi', return_body=True)
-        assert c.put('testing', 'bar', 'bye', return_body=True)
+        b1 = c.put('testing', 'bar', 'hi', return_body=True)
+        b2 = c.put('testing', 'bar', 'bye', return_body=True)
         assert len(c.get('testing', 'bar')['content']) > 1
 
         def resolve_longest(t1, v1, t2, v2):
@@ -542,6 +554,18 @@ if __name__ == '__main__':
         assert b.put('diff', '+++')
         assert b.get('diff') == '+++'
         
+        # Provoking an error
+        try:
+            # Tell Riak to require 10000 nodes to write this before success.
+            c.put('testing', 'error!', 'oh noes!', w=10000)
+        except RiakErrorResp, e:
+            assert e.errcode == 1, e.errcode
+            assert e.errmsg == '{n_val_violation,3}', e.errmsg
+            assert repr(e) == "RiakErrorResp: {n_val_violation,3}", repr(e)
+        except Exception, e:
+            assert 0, "UNEXPECTED EXCEPTION: %r" % e
+        else:
+            assert 0, "DID NOT RAISE"
         diesel.quickstop()
     diesel.quickstart(test_client)
 
