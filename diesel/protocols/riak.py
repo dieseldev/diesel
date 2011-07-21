@@ -365,10 +365,10 @@ class RiakClient(diesel.Client):
         
         """
         request = riak_pb2.RpbSetBucketReq(bucket=bucket)
-        if request.props is None:
-            request.props = riak_pb2.RpbBucketProps()
+        bucket_props = riak_pb2.RpbBucketProps()
         for name, value in props.iteritems():
-            setattr(request.props, name, value)
+            setattr(bucket_props, name, value)
+        request.props = bucket_props
         self._send(request)
         return self._receive()
 
