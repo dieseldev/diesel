@@ -19,10 +19,11 @@ from diesel.util.event import Event
 
 try:
     import riak_proto as riak_pb2 # fastproto-enabled
-except:
+except ImportError:
     import sys
-    sys.stderr.write("Warning: using slower pure-python protobuf library\n")
-    from diesel.protocols import riak_pb2
+    sys.stderr.write("Warning: must use fastproto protocol buffers library.\n")
+    sys.stderr.write("See diesel/tools/riak_fastproto.")
+    raise SystemExit(1)
 
 from contextlib import contextmanager
 
