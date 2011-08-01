@@ -226,6 +226,7 @@ class Bucket(object):
     def _handle_response(self, key, response):
         # Returns responses for non-conflicting content. Resolves conflicts
         # if there are multiple values for a key.
+        self.track_siblings(key, len(response['content']))
         if len(response['content']) == 1:
             self._vclocks[key] = response['vclock']
             return self.loads(response['content'][0]['value'])
@@ -279,6 +280,9 @@ class Bucket(object):
     def dumps(self, rich_value):
         """Subclass to support dumping rich values."""
         return rich_value
+
+    def track_siblings(self, key, siblings):
+        pass
 
 
 class RiakErrorResp(Exception):
