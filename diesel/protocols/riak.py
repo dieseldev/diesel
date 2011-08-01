@@ -148,7 +148,7 @@ class Bucket(object):
                 client.set_client_id(self.client_id)
             response = client.get(self.name, key)
         if response:
-            return self._handle_response(key, response)
+            return self._handle_response(key, response, resave=False)
 
     def _subrequest(self, inq, outq):
         while True:
@@ -223,7 +223,7 @@ class Bucket(object):
                 client.set_client_id(self.client_id)
             return client.keys(self.name)
 
-    def _handle_response(self, key, response):
+    def _handle_response(self, key, response, resave=True):
         # Returns responses for non-conflicting content. Resolves conflicts
         # if there are multiple values for a key.
         self.track_siblings(key, len(response['content']))
@@ -236,19 +236,19 @@ class Bucket(object):
                 ev = resolutions_in_progress[res]
                 if ev.resolver == self:
                     # recursing on put() with > 1 response
-                    return self._resolve(key, response)
+                    return self._resolve(key, response, resave=resave)
                 ev.wait()
                 if not ev.error:
                     return ev.value
                 else:
-                    return self._handle_response(key, response)
+                    return self._handle_response(key, response, resave=resave)
             with in_resolution(*(res + (self,))) as ev:
-                result = self._resolve(key, response)
+                result = self._resolve(key, response, resave=resave)
                 ev.value = result
                 ev.set()
             return result
 
-    def _resolve(self, key, response):
+    def _resolve(self, key, response, resave=True):
         # Performs conflict resolution for the given key and response. If all
         # goes well a new harmonized value for the key will be put up to the
         # bucket. If things go wrong, expect ... exceptions. :-|
@@ -266,7 +266,10 @@ class Bucket(object):
             res = other
         resolved_value = self.loads(res['value'])
         params = dict(vclock=response['vclock'], return_body=True)
-        return self.put(key, resolved_value, **params)
+        if resave:
+            return self.put(key, resolved_value, **params)
+        else:
+            return resolved_value
 
     def resolve(self, timestamp1, value1, timestamp2, value2):
         """Subclass to support custom conflict resolution."""
