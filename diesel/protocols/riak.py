@@ -61,14 +61,15 @@ MESSAGE_CODES = [
 resolutions_in_progress = {}
 
 class ResolvedLookup(Event):
-    def __init__(self):
+    def __init__(self, resolver):
         Event.__init__(self)
         self.error = None
         self.value = None
+        self.resolver = resolver
 
 @contextmanager
-def in_resolution(bucket, key):
-    e = ResolvedLookup()
+def in_resolution(bucket, key, entity):
+    e = ResolvedLookup(entity)
     resolutions_in_progress[(bucket, key)] = e
     try:
         yield e
@@ -232,12 +233,15 @@ class Bucket(object):
             res = (self.name, key)
             if res in resolutions_in_progress:
                 ev = resolutions_in_progress[res]
+                if ev.resolver == self:
+                    # recursing on put() with > 1 response
+                    return self._resolve(key, response)
                 ev.wait()
                 if not ev.error:
                     return ev.value
                 else:
                     return self._handle_response(key, response)
-            with in_resolution(*res) as ev:
+            with in_resolution(*(res + (self,))) as ev:
                 result = self._resolve(key, response)
                 ev.value = result
                 ev.set()
