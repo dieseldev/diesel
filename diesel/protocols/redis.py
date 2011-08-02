@@ -650,11 +650,31 @@ class RedisClient(Client):
         return None
 
     @call
+    def psubscribe(self, *channels):
+        '''Subscribe to the given glob pattern-matched channels.
+
+        Note: assumes subscriptions succeed
+        '''
+        self._send('PSUBSCRIBE', *channels)
+        return None
+
+    @call
+    def punsubscribe(self, *channels):
+        '''Unsubscribe from the given glob pattern-matched channels, or all of them if none are given.
+
+        Note: assumes subscriptions don't succeed
+        '''
+        self._send('PUNSUBSCRIBE', *channels)
+        return None
+
+    @call
     def get_from_subscriptions(self, wake_sig=None):
         '''Wait for a published message on a subscribed channel.
         
         Returns a tuple consisting of:
         
+            * The subscription pattern which matched
+                (the same as the channel for non-glob subscriptions)
             * The channel the message was received from.
             * The message itself.
 
@@ -663,17 +683,16 @@ class RedisClient(Client):
         NOTE: The message will always be a string.  Handle this as you see fit.
         NOTE: subscribe/unsubscribe acks are ignored here
         '''
-        m = None
-        while m != 'message':
+        while True:
             r = self._get_response(wake_sig)
             if r:
-                m, channel, payload = r
-                repl = channel, payload
+                if r[0] == 'message':
+                    return [r[1]] + r[1:]
+                elif r[0] == 'pmessage':
+                    return r[1:]
             else:
-                repl = None
-                break
+                return None
 
-        return repl
 
     @call
     def publish(self, channel, message):
@@ -833,45 +852,61 @@ class RedisSubHub(object):
         client = RedisClient(self.host, self.port)
         return  client 
 
+    def __isglob(self, glob):
+        return '*' in glob or '?' in glob or ('[' in glob and ']' and glob)
+
     def __call__(self):
         conn = self.make_client()
         subs = self.subs
-        if subs:
-            conn.subscribe(*subs)
+        for sub in subs:
+            if self.__isglob(sub):
+                conn.psubscribe(sub)
+            else:
+                conn.subscribe(sub)
         while True:
             new = rm = None
             if self.sub_adds:
                 sa = self.sub_adds[:]
                 self.sub_adds = []
-                new = set()
+                new_subs, new_glob_subs = set(), set()
                 for k, q in sa:
+                    new = new_glob_subs if self.__isglob(k) else new_subs
+
                     if k not in subs:
                         new.add(k)
                         subs[k] = set([q])
                     else:
                         subs[k].add(q)
-                if new:
-                    conn.subscribe(*new)
+
+                if new_subs:
+                    conn.subscribe(*new_subs)
+                if new_glob_subs:
+                    conn.psubscribe(*new_glob_subs)
 
             if self.sub_rms:
                 sr = self.sub_rms[:]
                 self.sub_rms = []
-                rm = set()
+                rm_subs, rm_glob_subs = set()
                 for k, q in sr:
+                    rm = rm_glob_subs if self.__isglob(k) else rm_subs
+
                     subs[k].remove(q)
                     if not subs[k]:
                         del subs[k]
                         rm.add(k)
-                if rm:
-                    conn.unsubscribe(*rm)
+
+                if rm_subs:
+                    conn.unsubscribe(*rm_subs)
+                if rm_glob_subs:
+                    conn.punsubscribe(*rm_glob_subs)
 
             if not self.sub_rms and not self.sub_adds:
                 r = conn.get_from_subscriptions(self.sub_wake_signal)
                 if r:
-                    cls, msg = r
+                    cls, key, msg = r
                     if cls in subs:
                         for q in subs[cls]:
-                            q.put((cls, msg))
+                            q.put((key, msg))
 
     @contextmanager
     def sub(self, classes):
