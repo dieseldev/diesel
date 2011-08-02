@@ -30,5 +30,11 @@ Redis, Beanstalkd, and PostgreSQL.
     download_url="http://jamwt.com/diesel/diesel-%s.tar.gz" % VERSION, 
     packages=["diesel", "diesel.protocols", "diesel.util"],
     scripts=["examples/dhttpd"],
+    entry_points={
+        'console_scripts': [
+            'dpython = diesel.interactive:python',
+            'idpython = diesel.interactive:ipython',
+        ],
+    },
     install_requires=(["greenlet", "pyopenssl"] + additional_requires),
     )
