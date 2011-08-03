@@ -886,7 +886,7 @@ class RedisSubHub(object):
             if self.sub_rms:
                 sr = self.sub_rms[:]
                 self.sub_rms = []
-                rm_subs, rm_glob_subs = set()
+                rm_subs, rm_glob_subs = set(), set()
                 for k, q in sr:
                     rm = rm_glob_subs if self.__isglob(k) else rm_subs
 
