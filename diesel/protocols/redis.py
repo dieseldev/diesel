@@ -826,7 +826,7 @@ class RedisTransaction(object):
         else:
             # Try and execute the transaction.
             self.value = self.client.exec_()
-            if not self.value:
+            if self.value is None:
                 self.aborted = True
                 msg = 'A watched key changed before the transaction completed.'
                 raise RedisTransactionError(msg)
