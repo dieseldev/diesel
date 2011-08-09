@@ -246,6 +246,24 @@ class RedisClient(Client):
         resp = self._get_response()
         return resp
 
+    @call
+    def getbit(self, k, offset):
+        self._send('GETBIT', k, offset)
+        resp = self._get_response()
+        return int(resp)
+
+    @call
+    def setbit(self, k, offset, value):
+        self._send('SETBIT', k, offset, value)
+        resp = self._get_response()
+        return resp
+
+    @call
+    def strlen(self, k):
+        self._send('STRLEN', k)
+        resp = self._get_response()
+        return int(resp)
+
 
     ##################################################
     ### LIST OPERATIONS
