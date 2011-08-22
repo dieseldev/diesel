@@ -36,5 +36,5 @@ Redis, Beanstalkd, and PostgreSQL.
             'idpython = diesel.interactive:ipython',
         ],
     },
-    install_requires=(["greenlet", "pyopenssl"] + additional_requires),
+    install_requires=(["greenlet", "pyopenssl", "flask"] + additional_requires),
     )
