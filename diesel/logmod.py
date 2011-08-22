@@ -70,6 +70,8 @@ class Logger(object):
     def warn(self, message):
         return self._writelogline(LOGLVL_WARN, message)
 
+    warning = warn
+
     def error(self, message):
         return self._writelogline(LOGLVL_ERR, message)
 
