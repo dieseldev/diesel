@@ -1,7 +1,7 @@
 '''Slight wrapper around flask to fit the diesel
 mold.
 '''
-from flask import Flask
+from flask import * # we're essentially republishing
 
 from app import Application, Service
 from logmod import Logger, LOGLVL_DEBUG

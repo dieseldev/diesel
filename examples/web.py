@@ -1,10 +1,11 @@
-from diesel.web import DieselFlask
+from diesel.web import DieselFlask, request
 
 app = DieselFlask(__name__)
 
 @app.route("/")
 def hello():
-    return "hello, world!"
+    name = request.args.get('name', 'world')
+    return "hello, %s!" % name
 
 @app.route("/err")
 def err():
