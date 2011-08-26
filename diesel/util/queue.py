@@ -9,34 +9,30 @@ class QueueTimeout(Exception): pass
 
 class Queue(object):
     def __init__(self):
+        self.wait_id = uuid4().hex
         self.inp = deque()
-        self.waiters = deque()
 
     def put(self, i=None):
         self.inp.append(i)
-        if self.waiters:
-            wait_id = self.waiters.popleft()
-            fire(wait_id)
+        fire(self.wait_id)
 
     def get(self, waiting=True, timeout=None):
         start = time()
-        if not self.inp and waiting:
-            wait_id = uuid4().hex
-            self.waiters.append(wait_id)
         while not self.inp and waiting:
             if timeout:
                 remaining = timeout - (time() - start)
                 if remaining <= 0:
                     raise QueueTimeout()
                 else:
-                    first(waits=[wait_id], sleep=remaining)
+                    first(waits=[self.wait_id], sleep=remaining)
             else:
-                wait(wait_id)
+                wait(self.wait_id)
 
         if self.inp:
             return self.inp.popleft()
         elif not waiting:
             raise QueueEmpty()
+
     def __iter__(self):
         return self
 
