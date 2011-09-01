@@ -3,14 +3,25 @@ from diesel.util.queue import Queue
 from diesel import fork, until, receive, first, ConnectionClosed, send
 from simplejson import dumps, loads
 import cgi, hashlib
-from struct import pack
+from struct import pack, unpack
+from base64 import b64encode
+from array import array
 
 class WebSocketDisconnect(object): pass
 class WebSocketData(dict): pass
 
+server_handshake_hybi = \
+'''HTTP/1.1 101 Switching Protocols\r
+Upgrade: websocket\r
+Connection: Upgrade\r
+Sec-WebSocket-Accept: %s\r'''
+
 class WebSocketServer(HttpServer):
     '''Very simple Web Socket server.
     '''
+
+    GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+
     def __init__(self, web_handler, web_socket_handler, ws_location):
         self.web_handler = web_handler
         self.web_socket_handler = web_socket_handler
@@ -18,12 +29,28 @@ class WebSocketServer(HttpServer):
         HttpServer.__init__(self, self.do_upgrade)
 
     def do_upgrade(self, req):
-        if req.headers.get_one('Upgrade') != 'WebSocket':
+        if req.headers.get_one('Upgrade') != 'websocket' and req.headers.get_one('Upgrade') != 'WebSocket':
             return self.web_handler(req)
+
+        hybi = False
 
         # do upgrade response
         org = req.headers.get_one('Origin')
-        if 'Sec-WebSocket-Key1' in req.headers:
+        if 'Sec-WebSocket-Key' in req.headers:
+            assert req.headers.get_one('Sec-WebSocket-Version') == '8', \
+                   "We currently only support version 8 and below"
+
+            protocol = (req.headers.get_one('Sec-WebSocket-Protocol')
+                        if 'Sec-WebSocket-Protocol' in req.headers else None)
+            key = req.headers.get_one('Sec-WebSocket-Key')
+            accept = b64encode(hashlib.sha1(key + self.GUID).digest())
+            send(server_handshake_hybi % accept)
+            if protocol:
+                send("Sec-WebSocket-Protocol: %s\r" % protocol)
+            send("\r\n\r\n")
+            hybi = True
+
+        elif 'Sec-WebSocket-Key1' in req.headers:
             protocol = (req.headers.get_one('Sec-WebSocket-Protocol')
                         if 'Sec-WebSocket-Protocol' in req.headers else None)
             key1 = req.headers.get_one('Sec-WebSocket-Key1')
@@ -46,6 +73,7 @@ Sec-WebSocket-Location: %s\r
                 send("Sec-WebSocket-Protocol: %s\r\n" % (protocol,))
             send("\r\n")
             send(secure_response)
+
         else:
             send(
 '''HTTP/1.1 101 Web Socket Protocol Handshake\r
@@ -56,7 +84,8 @@ WebSocket-Location: %s\r
 WebSocket-Protocol: diesel-generic\r
 \r
 ''' % (org, self.ws_location))
-        
+
+
         inq = Queue()
         outq = Queue()
 
@@ -65,30 +94,85 @@ WebSocket-Protocol: diesel-generic\r
             outq.put(WebSocketDisconnect())
 
         fork(wrap, inq, outq)
-                                    
+
         while True:
             try:
-                typ, val = first(receive=1, waits=[outq.wait_id])
-                if typ == 'receive':
-                    assert val == '\x00'
-                    val = until('\xff')[:-1]
-                    if val == '':
-                        inq.put(WebSocketDisconnect())
-                    else:
-                        data = dict((k, v[0]) if len(v) == 1 else (k, v) for k, v in cgi.parse_qs(val).iteritems())
-                        inq.put(WebSocketData(data))
-                else:
-                    try:
-                        v = outq.get(waiting=False)
-                    except QueueEmpty:
-                        pass
-                    else:
-                        if type(v) is WebSocketDisconnect:
-                            send('\x00\xff')
-                            break
+                if hybi:
+                    typ, val = first(receive=2, waits=[outq.wait_id])
+                    if typ == 'receive':
+                        b1, b2 = unpack(">BB", val)
+
+                        # The spec requires that this be one of the understood values, but we're just accepting anything
+                        opcode = b1 & 0x0f
+                        fin = (b1 & 0x80) >> 7
+                        has_mask = (b2 & 0x80) >> 7
+
+                        assert has_mask == 1, "Frames must be masked"
+
+                        if opcode == 8:
+                            inq.put(WebSocketDisconnect())
                         else:
-                            data = dumps(dict(v))
-                            send('\x00%s\xff' % data)
+                            length = b2 & 0x7f
+                            if length == 126:
+                                length = unpack('H', receive(2))
+                            elif length == 127:
+                                length = unpack('L', receive(8))
+
+                            mask = unpack('BBBB', receive(4))
+
+                            payload = array('B', receive(length))
+                            for i in xrange(len(payload)):
+                                payload[i] ^= mask[i % 4]
+
+                            data = dict((k, v[0]) if len(v) == 1 else (k, v) for k, v in cgi.parse_qs(payload.tostring()).iteritems())
+                            inq.put(WebSocketData(data))
+                    else:
+                        try:
+                            v = outq.get(waiting=False)
+                        except QueueEmpty:
+                            pass
+                        else:
+                            if type(v) is WebSocketDisconnect:
+                                b1 = 0x80 | (8 & 0x0f) # FIN + opcode
+                                send(pack('>BB', b1, 0))
+                                break
+                            else:
+                                payload = dumps(v)
+
+                                b1 = 0x80 | (1 & 0x0f) # FIN + opcode
+
+                                payload_len = len(payload)
+                                if payload_len <= 125:
+                                    header = pack('>BB', b1, payload_len)
+                                elif payload_len > 125 and payload_len < 65536:
+                                    header = pack('>BBH', b1, 126, payload_len)
+                                elif payload_len >= 65536:
+                                    header = pack('>BBQ', b1, 127, payload_len)
+
+                            send(header + payload)
+                else:
+                    typ, val = first(receive=1, waits=[outq.wait_id])
+                    if typ == 'receive':
+                        assert val == '\x00'
+                        val = until('\xff')[:-1]
+                        if val == '':
+                            inq.put(WebSocketDisconnect())
+                        else:
+                            data = dict((k, v[0]) if len(v) == 1 else (k, v) for k, v in cgi.parse_qs(val).iteritems())
+                            inq.put(WebSocketData(data))
+                    else:
+                        try:
+                            v = outq.get(waiting=False)
+                        except QueueEmpty:
+                            pass
+                        else:
+                            if type(v) is WebSocketDisconnect:
+                                send('\x00\xff')
+                                break
+                            else:
+                                data = dumps(dict(v))
+                                send('\x00%s\xff' % data)
+
 
             except ConnectionClosed:
                 inq.put(WebSocketDisconnect())
