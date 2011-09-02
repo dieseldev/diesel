@@ -331,7 +331,7 @@ class Loop(object):
         if v > 0:
             self._wakeup_timer = self.hub.call_later(v, cb)
         else:
-            self.hub.schedule(cb)
+            self.hub.schedule(cb, True)
 
     def fire_in(self, what, value):
         if what in self.fire_handlers:

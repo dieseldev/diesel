@@ -46,7 +46,8 @@ class Application(object):
         or .halt() is called.
         '''
         self._run = True
-        log.info('Starting diesel application')
+        log.warn('Starting diesel <%s>'
+                % self.hub.describe)
 
         for s in self._services:
             s.bind_and_listen()
