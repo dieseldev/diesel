@@ -102,7 +102,6 @@ WebSocket-Protocol: diesel-generic\r
                     if typ == 'receive':
                         b1, b2 = unpack(">BB", val)
 
-                        # The spec requires that this be one of the understood values, but we're just accepting anything
                         opcode = b1 & 0x0f
                         fin = (b1 & 0x80) >> 7
                         has_mask = (b2 & 0x80) >> 7
@@ -112,6 +111,7 @@ WebSocket-Protocol: diesel-generic\r
                         if opcode == 8:
                             inq.put(WebSocketDisconnect())
                         else:
+                            assert opcode == 1, "Currently only opcode 1 is supported"
                             length = b2 & 0x7f
                             if length == 126:
                                 length = unpack('H', receive(2))
