@@ -28,7 +28,7 @@ thread integration, and more.
 An HTTP/1.1+WSGI+WebSockets implementation is included, as well as tight
 integration with the Flask web framework.
 
-Other bundled protocols include MongoDB and Redis client libraries.
+Other bundled protocols include MongoDB, Riak, and Redis client libraries.
 ''',
     url="http://dieselweb.org",
     download_url="http://jamwt.com/diesel/diesel-%s.tar.gz" % VERSION,
