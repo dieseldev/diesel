@@ -8,17 +8,12 @@
 
 * Util
     * Pool, client failure, release vs. reclaim
-    * Queue, callback patterns
+    * Queue, callback patterns, iterator, locks etc
 
 * Core
-    * Generator stack behavior
-    * Stack trace output
     * bytes(), until() behavior and combinations
-    * sleep(), and combinations
-    * @call into 
+    * @call into
     * defer to thread behavior
-    * fire and wait
     * connections vs. loops
     * loops not using connection-specific things
     * run tests over tls too--both client and server
-    * yielding loops, multiple loops, etc
