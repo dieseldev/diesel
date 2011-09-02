@@ -1,0 +1,11 @@
+2.1
+ * waiter interface for first(..)
+ * finish tests
+ * docs
+ * website
+ * bless libev and ditch legacy?
+
+2.X
+ * postgres bindings
+ * memcache bindings
+ * operation now in progress broken on connect
