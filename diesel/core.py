@@ -1,6 +1,6 @@
 # vim:ts=4:sw=4:expandtab
-'''Core implementation/handling of generators, including
-the various yield tokens.
+'''Core implementation/handling of coroutines, protocol primitives,
+scheduling primitives, green-thread procedures.
 '''
 import socket
 import traceback

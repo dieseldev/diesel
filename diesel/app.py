@@ -136,8 +136,8 @@ class Service(object):
     '''
     LQUEUE_SIZ = 500
     def __init__(self, connection_handler, port, iface='', ssl_ctx=None):
-        '''Given a generator definition `connection_handler`, handle
-        connections on port `port`.
+        '''Given a protocol-implementing callable `connection_handler`,
+        handle connections on port `port`.
 
         Interface defaults to all interfaces, but overridable with `iface`.
         '''

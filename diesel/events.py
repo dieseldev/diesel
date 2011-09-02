@@ -2,8 +2,7 @@ from collections import defaultdict
 
 class WaitPool(object):
     '''A structure that manages all `wait`ers, makes sure fired events
-    get to the right places, and that all other waits are canceled when
-    a one event is passed back to a generator.
+    get to the right places.
     '''
     def __init__(self):
         self.waits = defaultdict(set)
