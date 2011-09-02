@@ -5,10 +5,8 @@ assert sys.version_info >= (2, 5), \
 from setuptools import setup
 
 additional_requires = []
-if sys.version_info <= (2, 6):
-	additional_requires.append('select26')
 
-VERSION = "2.0.0"
+VERSION = "2.1.0b0"
 
 setup(name="diesel",
     version=VERSION,
@@ -36,5 +34,5 @@ Redis, Beanstalkd, and PostgreSQL.
             'idpython = diesel.interactive:ipython',
         ],
     },
-    install_requires=(["greenlet", "pyopenssl", "flask"] + additional_requires),
+    install_requires=(["greenlet", "pyev", "pyopenssl", "flask"] + additional_requires),
     )
