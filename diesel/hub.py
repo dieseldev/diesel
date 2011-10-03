@@ -125,6 +125,10 @@ class AbstractEventHub(object):
         except IOError:
             pass
 
+    def schedule_loop_from_other_thread(self, l, v=None):
+        self.thread_comp_in.put((l.wake, v))
+        self.wake_from_other_thread()
+
     def handle_events(self):
         '''Run one pass of event handling.
         '''

@@ -95,6 +95,10 @@ def fork(*args, **kw):
 def fork_child(*args, **kw):
     return current_loop.fork(True, *args, **kw)
 
+def fork_from_thread(f, *args, **kw):
+    l = Loop(f, *args, **kw)
+    runtime.current_app.hub.schedule_loop_from_other_thread(l, ContinueNothing)
+
 class call(object):
     def __init__(self, f, inst=None):
         self.f = f
