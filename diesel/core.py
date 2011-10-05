@@ -202,8 +202,10 @@ class Loop(object):
         if self._wakeup_timer and self._wakeup_timer.pending:
             self._wakeup_timer.cancel()
         if self.connection_stack:
-            self.connection_stack[-1].buffer.clear_term()
-            self.connection_stack[-1].waiting_callback = None
+            conn = self.connection_stack[-1]
+            conn.buffer.clear_term()
+            conn.waiting_callback = None
+            conn.can_callback = None
         self.fire_handlers = {}
         self.fire_due = False
         self.app.waits.clear(self)
