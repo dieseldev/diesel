@@ -206,7 +206,6 @@ class Loop(object):
             conn = self.connection_stack[-1]
             conn.buffer.clear_term()
             conn.waiting_callback = None
-            conn.can_callback = None
         self.fire_handlers = {}
         self.fire_due = False
         self.app.waits.clear(self)
@@ -378,11 +377,22 @@ class Loop(object):
         r = self.app.runhub.switch()
         return r
 
+    def wake_fire(self, value=ContinueNothing):
+        assert self.fire_due, "wake_fire called when fire wasn't due!"
+        self.fire_due = False
+        return self.wake(value)
+
     def wake(self, value=ContinueNothing):
         '''Wake up this loop.  Called by the main hub to resume a loop
         when it is rescheduled.
         '''
         global current_loop
+
+        # if we have a fire pending,
+        # don't run (triggered by sleep or bytes)
+        if self.fire_due:
+            return
+
         if self.coroutine is None:
             self.coroutine = greenlet(self.run)
             assert self.coroutine.parent == runtime.current_app.runhub
@@ -540,6 +550,7 @@ class Connection(object):
             self.shutdown(True)
         else:
             res = self.buffer.feed(data)
+            # Require a result that satisfies current term
             if res:
                 self.waiting_callback(res)
 
