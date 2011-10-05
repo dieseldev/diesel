@@ -23,10 +23,17 @@ class Lock(Waiter):
     def __exit__(self, *args, **kw):
         self.release()
 
+    @property
+    def is_locked(self):
+        return self.count == 0
+
+    def ready_early(self):
+        return not self.is_locked
+
     def process_fire(self, value):
         if self.count == 0:
             raise StopWaitDispatch()
-        
+
         self.count -= 1
         return value
 

@@ -15,6 +15,9 @@ class Event(Waiter):
     def clear(self):
         self.is_set = False
 
+    def ready_early(self):
+        return self.is_set
+
     def process_fire(self, value):
         if not self.is_set:
             raise StopWaitDispatch()
