@@ -15,6 +15,7 @@ from diesel import buffer
 from diesel.security import ssl_async_handshake
 from diesel import runtime
 from diesel import log
+from diesel.events import EarlyValue
 
 class ConnectionClosed(socket.error):
     '''Raised if the client closes the connection.
@@ -266,7 +267,10 @@ class Loop(object):
 
         if waits:
             for w in waits:
-                self._wait(w, marked_cb(w))
+                v = self._wait(w, marked_cb(w))
+                if type(v) is EarlyValue:
+                    self.clear_pending_events()
+                    return w, v.val
         return self.dispatch()
 
     def connect(self, client, ip, sock, timeout=None):
@@ -351,17 +355,21 @@ class Loop(object):
             self.fire_due = True
 
     def wait(self, event):
-        self._wait(event)
+        v = self._wait(event)
+        if type(v) is EarlyValue:
+            return v
         return self.dispatch()
 
     def _wait(self, event, cb_maker=identity):
-        rcb = cb_maker(self.wake)
+        rcb = cb_maker(self.wake_fire)
         def cb(d):
             def call_in():
                 rcb(d)
             self.hub.schedule(call_in)
-        wid = self.app.waits.wait(self, event)
-        self.fire_handlers[wid] = cb
+        v = self.app.waits.wait(self, event)
+        if type(v) is EarlyValue:
+            return v
+        self.fire_handlers[v] = cb
 
     def fire(self, event, value=None):
         self.app.waits.fire(event, value)

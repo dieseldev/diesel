@@ -48,3 +48,6 @@ class Queue(Waiter):
             return self.inp.popleft()
         else:
             raise StopWaitDispatch()
+
+    def ready_early(self):
+        return not self.is_empty

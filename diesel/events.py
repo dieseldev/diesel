@@ -5,6 +5,10 @@ class StaticValue(object):
     def __init__(self, value):
         self.value = value
 
+class EarlyValue(object):
+    def __init__(self, val):
+        self.val = val
+
 class Waiter(object):
     @property
     def wait_id(self):
@@ -12,6 +16,9 @@ class Waiter(object):
 
     def process_fire(self, given):
         return StaticValue(given)
+
+    def ready_early(self):
+        return False
 
 class StringWaiter(str, Waiter):
     def wait_id(self):
@@ -29,6 +36,9 @@ class WaitPool(object):
     def wait(self, who, what):
         if isinstance(what, basestring):
             what = StringWaiter(what)
+
+        if what.ready_early():
+            return EarlyValue(what.process_fire(None))
 
         self.waits[what.wait_id].add(who)
         self.loop_refs[who].add(what)
