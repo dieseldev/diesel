@@ -150,6 +150,7 @@ class Loop(object):
         self.running = False
         self._wakeup_timer = None
         self.fire_handlers = {}
+        self.fire_due = False
         self.connection_stack = []
         self.coroutine = None
 
@@ -194,7 +195,7 @@ class Loop(object):
     def __str__(self):
         return '<Loop id=%s callable=%s>' % (self.id,
         str(self.loop_callable))
-        
+
     def clear_pending_events(self):
         '''When a loop is rescheduled, cancel any other timers or waits.
         '''
@@ -204,6 +205,7 @@ class Loop(object):
             self.connection_stack[-1].buffer.clear_term()
             self.connection_stack[-1].waiting_callback = None
         self.fire_handlers = {}
+        self.fire_due = False
         self.app.waits.clear(self)
 
     def thread(self, f, *args, **kw):
@@ -344,6 +346,7 @@ class Loop(object):
             handler = self.fire_handlers[what]
             self.fire_handlers = {}
             handler(value)
+            self.fire_due = True
 
     def wait(self, event):
         self._wait(event)

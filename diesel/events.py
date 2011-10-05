@@ -40,6 +40,8 @@ class WaitPool(object):
 
         static = False
         for handler in self.waits[what.wait_id]:
+            if handler.fire_due:
+                continue
             if not static:
                 try:
                     value = what.process_fire(value)
