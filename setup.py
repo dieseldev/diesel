@@ -6,7 +6,7 @@ from setuptools import setup
 
 additional_requires = []
 
-VERSION = "2.1.0b0"
+VERSION = "2.1.0"
 
 setup(name="diesel",
     version=VERSION,
