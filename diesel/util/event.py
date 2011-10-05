@@ -1,20 +1,32 @@
-from diesel import fire
-from queue import Queue
+from diesel import wait, fire, sleep, first
+from diesel.events import Waiter, StopWaitDispatch
 
-class Event(Queue):
-    def isSet(self):
-        return not self.is_empty
+class EventTimeout(Exception): pass
+
+class Event(Waiter):
+    def __init__(self):
+        self.is_set = False
 
     def set(self):
-        if not self.inp:
-            self.put()
+        if not self.is_set:
+            self.is_set = True
+            fire(self)
 
     def clear(self):
-        self.inp.clear()
+        self.is_set = False
+
+    def process_fire(self, value):
+        if not self.is_set:
+            raise StopWaitDispatch()
+        return value
 
     def wait(self, timeout=None):
-        self.get(timeout=timeout)
-        self.set()
+        kw = dict(waits=[self])
+        if timeout:
+            kw['sleep'] = timeout
+        mark, data = first(**kw)
+        if mark != self:
+            raise EventTimeout()
 
 class Countdown(Event):
     def __init__(self, count):
