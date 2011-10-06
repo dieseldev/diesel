@@ -12,7 +12,7 @@ class EarlyValue(object):
 class Waiter(object):
     @property
     def wait_id(self):
-        return hash(self)
+        return str(hash(self))
 
     def process_fire(self, given):
         return StaticValue(given)
