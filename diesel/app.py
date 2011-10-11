@@ -46,7 +46,8 @@ class Application(object):
         or .halt() is called.
         '''
         self._run = True
-        log.info('Starting diesel application')
+        log.warn('Starting diesel <%s>'
+                % self.hub.describe)
 
         for s in self._services:
             s.bind_and_listen()
@@ -135,8 +136,8 @@ class Service(object):
     '''
     LQUEUE_SIZ = 500
     def __init__(self, connection_handler, port, iface='', ssl_ctx=None):
-        '''Given a generator definition `connection_handler`, handle
-        connections on port `port`.
+        '''Given a protocol-implementing callable `connection_handler`,
+        handle connections on port `port`.
 
         Interface defaults to all interfaces, but overridable with `iface`.
         '''

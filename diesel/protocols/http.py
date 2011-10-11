@@ -178,8 +178,6 @@ class HttpServer(object):
         initialization), this __call__ method is what's actually
         invoked by diesel.
 
-        This is our generator, this is our protocol handler.
-
         It does protocol work, then calls the request_handler, 
         looking for HttpClose if necessary.
         '''

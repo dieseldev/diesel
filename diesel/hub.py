@@ -7,6 +7,13 @@ try:
 except ImportError:
     import select
 
+try:
+    import pyev
+except:
+    have_libev = False
+else:
+    have_libev = True
+
 from collections import deque
 from time import time
 import thread
@@ -26,12 +33,13 @@ class Timer(object):
         self.kw = kw
         self.pending = True
         self.inq = False
+        self.hub_data = None
 
     def cancel(self):
         self.pending = False
         if self.inq:
             self.inq = False
-            self.hub.timers.remove(self)
+            self.hub.remove_timer(self)
             self.hub = None
 
     def callback(self):
@@ -72,6 +80,7 @@ class AbstractEventHub(object):
         self.run_now = deque()
         self.fdmap = {}
         self._setup_threading()
+        self.reschedule = deque()
 
     def _setup_threading(self):
         self._t_recv, self._t_wakeup = os.pipe()
@@ -93,6 +102,12 @@ class AbstractEventHub(object):
                     c(v)
         self.register(_PipeWrap(self._t_recv), handle_thread_done, None, None)
 
+    def remove_timer(self, t):
+        try:
+            self.timers.remove(t)
+        except ValueError:
+            pass
+
     def run_in_thread(self, reschedule, f, *args, **kw):
         def wrap():
             try:
@@ -110,6 +125,10 @@ class AbstractEventHub(object):
         except IOError:
             pass
 
+    def schedule_loop_from_other_thread(self, l, v=None):
+        self.thread_comp_in.put((l.wake, v))
+        self.wake_from_other_thread()
+
     def handle_events(self):
         '''Run one pass of event handling.
         '''
@@ -122,8 +141,11 @@ class AbstractEventHub(object):
         self.new_timers.append(t)
         return t
 
-    def schedule(self, c):
-        self.run_now.append(c)
+    def schedule(self, c, reschedule=False):
+        if reschedule:
+            self.reschedule.append(c)
+        else:
+            self.run_now.append(c)
 
     def register(self, fd, read_callback, write_callback, error_callback):
         '''Register a socket fd with the hub, providing callbacks
@@ -171,87 +193,9 @@ class AbstractEventHub(object):
         '''
         raise NotImplementedError
 
-
-class SelectEventHub(AbstractEventHub):
-    '''A select-based hub.
-    '''
-    def __init__(self):
-        self.in_set, self.out_set = set(), set()
-        super(SelectEventHub, self).__init__()
-
-    def handle_events(self):
-        '''Run one pass of event handling.
-
-        select() is called, with a timeout equal to the next-scheduled
-        timer.  When select returns, all fd-related events (if any) are
-        handled, and timers are handled as well.
-        '''
-        while self.run_now and self.run:
-            self.run_now.popleft()()
-
-        if self.new_timers:
-            for tr in self.new_timers:
-                if tr.pending:
-                    tr.inq = True
-                    self.timers.append(tr)
-            self.timers = deque(sorted(self.timers))
-            self.new_timers = []
-
-        tm = time()
-        timeout = (self.timers[0].trigger_time - tm) if self.timers else 1e6
-        # epoll, etc, limit to 2^31/1000 or OverflowError
-        timeout = min(timeout, 1e6)
-        if timeout < 0:
-            timeout = 0
-
-        # Run timers first, to try to nail their timings
-        while self.timers:
-            if self.timers[0].due:
-                t = self.timers.popleft()
-                if t.pending:
-                    t.callback()
-                    while self.run_now and self.run:
-                        self.run_now.popleft()()
-                    if not self.run:
-                        return
-            else:
-                break
-
-        select_lists = select.select(self.in_set, self.out_set, [], timeout)
-        for i, fds in enumerate(select_lists):
-            for fd in fds:
-                self.events[fd.fileno()][i]()
-                while self.run_now and self.run:
-                    self.run_now.popleft()()
-
-                if not self.run:
-                    return
-
-    def _add_fd(self, fd):
-        '''Add this socket to the list of sockets used in the
-        poll call.
-        '''
-        self.in_set.add(fd)
-
-    def enable_write(self, fd):
-        '''Enable write polling and the write callback.
-        '''
-        self.out_set.add(fd)
-
-    def disable_write(self, fd):
-        '''Disable write polling and the write callback.
-        '''
-        if fd in self.out_set:
-            self.out_set.remove(fd)
-
-    def _remove_fd(self, fd):
-        '''Remove this socket from the list of sockets the
-        hub is polling on.
-        '''
-        self.in_set.remove(fd)
-        if fd in self.out_set:
-            self.out_set.remove(fd)
-
+    @property
+    def describe(self):
+        raise NotImplementedError()
 
 class EPollEventHub(AbstractEventHub):
     '''A epoll-based hub.
@@ -259,6 +203,10 @@ class EPollEventHub(AbstractEventHub):
     def __init__(self):
         self.epoll = select.epoll()
         super(EPollEventHub, self).__init__()
+
+    @property
+    def describe(self):
+        return "legacy select.epoll"
 
     def handle_events(self):
         '''Run one pass of event handling.
@@ -269,7 +217,7 @@ class EPollEventHub(AbstractEventHub):
         '''
         while self.run_now and self.run:
             self.run_now.popleft()()
-
+        
         if self.new_timers:
             for tr in self.new_timers:
                 if tr.pending:
@@ -282,7 +230,7 @@ class EPollEventHub(AbstractEventHub):
         timeout = (self.timers[0].trigger_time - tm) if self.timers else 1e6
         # epoll, etc, limit to 2^^31/1000 or OverflowError
         timeout = min(timeout, 1e6)
-        if timeout < 0:
+        if timeout < 0 or self.reschedule:
             timeout = 0
 
         # Run timers first, to try to nail their timings
@@ -314,6 +262,9 @@ class EPollEventHub(AbstractEventHub):
             if not self.run:
                 return
 
+        self.run_now = self.reschedule
+        self.reschedule = deque()
+
     def _add_fd(self, fd):
         '''Add this socket to the list of sockets used in the
         poll call.
@@ -337,21 +288,116 @@ class EPollEventHub(AbstractEventHub):
         '''
         self.epoll.unregister(fd)
 
+class LibEvHub(AbstractEventHub):
+    def __init__(self):
+        self._ev_loop = pyev.default_loop()
+        self._ev_timers = {}
+        self._ev_fdmap = {}
+        AbstractEventHub.__init__(self)
+
+    @property
+    def describe(self):
+        return "libev/pyev (%s/%s) backend=%s" % (
+                pyev.version() + ({
+                    1  : "select()",
+                    2  : "poll()",
+                    4  : "epoll()",
+                    8  : "kqueue()",
+                    16 : "/dev/poll",
+                    32 : "event ports",
+                    }.get(self._ev_loop.backend, "UNKNOWN"),))
+
+    def handle_events(self):
+        '''Run one pass of event handling.
+        '''
+        while self.run_now and self.run:
+            self.run_now.popleft()()
+
+        if not self.run:
+            self._ev_loop.stop()
+            del self._ev_loop
+            return
+
+        self.run_now.extend(self.reschedule)
+        self.reschedule = deque()
+
+        if self.run_now:
+            self._ev_loop.start(pyev.EVRUN_NOWAIT)
+        else:
+            while not self.run_now:
+                self._ev_loop.start(pyev.EVRUN_ONCE)
+
+    def call_later(self, interval, f, *args, **kw):
+        '''Schedule a timer on the hub.
+        '''
+        t = Timer(self, interval, f, *args, **kw)
+        t.inq = True
+        evt = self._ev_loop.timer(interval, 0, self._ev_timer_fired)
+        t.hub_data = evt
+        self._ev_timers[evt] = t
+        evt.start()
+        return t
+
+    def _ev_timer_fired(self, watcher, revents):
+        t = self._ev_timers.pop(watcher)
+        if t.hub_data:
+            t.hub_data = None
+            self.run_now.append(t.callback)
+
+    def remove_timer(self, t):
+        evt = t.hub_data
+        if evt in self._ev_timers:
+            del self._ev_timers[evt]
+            evt.stop()
+
+    def schedule(self, c, reschedule=False):
+        if reschedule:
+            self.reschedule.append(c)
+        else:
+            self.run_now.append(c)
+
+    def _ev_io_fired(self, watcher, revents):
+        r, w, e = self.events[watcher.fd]
+        if revents & pyev.EV_READ:
+            self.run_now.append(r)
+        if revents & pyev.EV_WRITE:
+            self.run_now.append(w)
+        if revents & pyev.EV_ERROR:
+            self.run_now.append(e)
+
+    def _add_fd(self, fd):
+        '''Add this socket to the list of sockets used in the
+        poll call.
+        '''
+        assert fd not in self._ev_fdmap
+        rev = self._ev_loop.io(fd, pyev.EV_READ, self._ev_io_fired)
+        wev = self._ev_loop.io(fd, pyev.EV_WRITE, self._ev_io_fired)
+        self._ev_fdmap[fd] = rev, wev
+        rev.start()
+
+    def enable_write(self, fd):
+        '''Enable write polling and the write callback.
+        '''
+        self._ev_fdmap[fd][1].start()
+
+    def disable_write(self, fd):
+        '''Disable write polling and the write callback.
+        '''
+        self._ev_fdmap[fd][1].stop()
+
+    def _remove_fd(self, fd):
+        '''Remove this socket from the list of sockets the
+        hub is polling on.
+        '''
+        rev, wev = self._ev_fdmap.pop(fd)
+        rev.stop()
+        wev.stop()
+
 # Expose a usable EventHub implementation
-if os.environ.get('DIESEL_NO_EPOLL') or not hasattr(select, 'epoll'):
-    EventHub = SelectEventHub
+if (os.environ.get('DIESEL_LIBEV') or 
+    os.environ.get('DIESEL_NO_EPOLL') or 
+    not hasattr(select, 'epoll')):
+    assert have_libev, "if you don't have select.epoll (not on linux?), please install pyev!"
+    EventHub = LibEvHub
 else:
     EventHub = EPollEventHub
-
-if __name__ == '__main__':
-    hub = EventHub()
-    def whatever(message, other=None):
-        print 'got', message, other
-    hub.call_later(3.0, whatever, 'yes!', other='rock!')
-    import socket, sys
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.bind(('', 11911))
-    s.listen(5)
-    hub.register(s, lambda: sys.stdout.write('new socket!'), lambda: sys.stdout.write('arg!'))
-    while True:
-        hub.handle_events()

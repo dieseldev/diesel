@@ -1,6 +1,6 @@
 # vim:ts=4:sw=4:expandtab
-'''Core implementation/handling of generators, including
-the various yield tokens.
+'''Core implementation/handling of coroutines, protocol primitives,
+scheduling primitives, green-thread procedures.
 '''
 import socket
 import traceback
@@ -15,6 +15,7 @@ from diesel import buffer
 from diesel.security import ssl_async_handshake
 from diesel import runtime
 from diesel import log
+from diesel.events import EarlyValue
 
 class ConnectionClosed(socket.error):
     '''Raised if the client closes the connection.
@@ -95,6 +96,10 @@ def fork(*args, **kw):
 def fork_child(*args, **kw):
     return current_loop.fork(True, *args, **kw)
 
+def fork_from_thread(f, *args, **kw):
+    l = Loop(f, *args, **kw)
+    runtime.current_app.hub.schedule_loop_from_other_thread(l, ContinueNothing)
+
 class call(object):
     def __init__(self, f, inst=None):
         self.f = f
@@ -146,6 +151,7 @@ class Loop(object):
         self.running = False
         self._wakeup_timer = None
         self.fire_handlers = {}
+        self.fire_due = False
         self.connection_stack = []
         self.coroutine = None
 
@@ -159,6 +165,8 @@ class Loop(object):
             pass
         except (SystemExit, KeyboardInterrupt, ApplicationEnd):
             raise
+        except ParentDiedException:
+            pass
         except:
             log.error("-- Unhandled Exception in local loop <%s> --" % self.loop_label)
             log.error(traceback.format_exc())
@@ -188,16 +196,18 @@ class Loop(object):
     def __str__(self):
         return '<Loop id=%s callable=%s>' % (self.id,
         str(self.loop_callable))
-        
+
     def clear_pending_events(self):
         '''When a loop is rescheduled, cancel any other timers or waits.
         '''
         if self._wakeup_timer and self._wakeup_timer.pending:
             self._wakeup_timer.cancel()
         if self.connection_stack:
-            self.connection_stack[-1].buffer.clear_term()
-            self.connection_stack[-1].waiting_callback = None
+            conn = self.connection_stack[-1]
+            conn.buffer.clear_term()
+            conn.waiting_callback = None
         self.fire_handlers = {}
+        self.fire_due = False
         self.app.waits.clear(self)
 
     def thread(self, f, *args, **kw):
@@ -256,7 +266,10 @@ class Loop(object):
 
         if waits:
             for w in waits:
-                self._wait(w, marked_cb('wait-' + w))
+                v = self._wait(w, marked_cb(w))
+                if type(v) is EarlyValue:
+                    self.clear_pending_events()
+                    return w, v.val
         return self.dispatch()
 
     def connect(self, client, ip, sock, timeout=None):
@@ -331,26 +344,31 @@ class Loop(object):
         if v > 0:
             self._wakeup_timer = self.hub.call_later(v, cb)
         else:
-            self.hub.schedule(cb)
+            self.hub.schedule(cb, True)
 
     def fire_in(self, what, value):
         if what in self.fire_handlers:
-            handler = self.fire_handlers.pop(what)
+            handler = self.fire_handlers[what]
             self.fire_handlers = {}
             handler(value)
+            self.fire_due = True
 
     def wait(self, event):
-        self._wait(event)
+        v = self._wait(event)
+        if type(v) is EarlyValue:
+            return v
         return self.dispatch()
 
     def _wait(self, event, cb_maker=identity):
-        rcb = cb_maker(self.wake)
+        rcb = cb_maker(self.wake_fire)
         def cb(d):
             def call_in():
                 rcb(d)
             self.hub.schedule(call_in)
-        self.fire_handlers[event] = cb
-        self.app.waits.wait(self, event)
+        v = self.app.waits.wait(self, event)
+        if type(v) is EarlyValue:
+            return v
+        self.fire_handlers[v] = cb
 
     def fire(self, event, value=None):
         self.app.waits.fire(event, value)
@@ -359,11 +377,22 @@ class Loop(object):
         r = self.app.runhub.switch()
         return r
 
+    def wake_fire(self, value=ContinueNothing):
+        assert self.fire_due, "wake_fire called when fire wasn't due!"
+        self.fire_due = False
+        return self.wake(value)
+
     def wake(self, value=ContinueNothing):
         '''Wake up this loop.  Called by the main hub to resume a loop
         when it is rescheduled.
         '''
         global current_loop
+
+        # if we have a fire pending,
+        # don't run (triggered by sleep or bytes)
+        if self.fire_due:
+            return
+
         if self.coroutine is None:
             self.coroutine = greenlet(self.run)
             assert self.coroutine.parent == runtime.current_app.runhub
@@ -521,6 +550,7 @@ class Connection(object):
             self.shutdown(True)
         else:
             res = self.buffer.feed(data)
+            # Require a result that satisfies current term
             if res:
                 self.waiting_callback(res)
 

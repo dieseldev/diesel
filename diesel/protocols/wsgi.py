@@ -61,6 +61,8 @@ def build_wsgi_env(req, port):
     env['wsgi.run_once'] = False
     return env
 
+import functools
+
 class WSGIRequestHandler(object):
     '''The request_handler for the HttpServer that
     bootsraps the WSGI environemtn and hands it off to the
@@ -70,30 +72,31 @@ class WSGIRequestHandler(object):
         self.port = port
         self.wsgi_callable = wsgi_callable
 
-    def _start_response(self, status, response_headers, exc_info=None):
+    def _start_response(self, env, status, response_headers, exc_info=None):
         if exc_info:
             raise exc_info[0], exc_info[1], exc_info[2]
         else:
-            self.status = status
-            self.response_headers = response_headers
-        return self.write_output
-
-    def write_output(self, output):
-        self.outbuf.append(output)
+            env['diesel.status'] = status
+            env['diesel.response_headers'] = response_headers
+        return env['diesel.output'].append
 
     def __call__(self, req):
         env = build_wsgi_env(req, self.port)
-        self.outbuf = []
-        for output in self.wsgi_callable(env, self._start_response):
-            self.write_output(output)
-        return self.finalize_request(req)
+        buf = []
+        env['diesel.output'] = buf
+        env['diesel.status'] = None
+        env['diesel.response_headers'] = None
+        for output in self.wsgi_callable(env, 
+                functools.partial(self._start_response, env)):
+            buf.append(output)
+        return self.finalize_request(req, env)
 
-    def finalize_request(self, req):
-        code = int(self.status.split()[0])
+    def finalize_request(self, req, env):
+        code = int(env['diesel.status'].split()[0])
         heads = HttpHeaders()
-        for n, v in self.response_headers:
+        for n, v in env['diesel.response_headers']:
             heads.add(n, v)
-        body = ''.join(self.outbuf)
+        body = ''.join(env['diesel.output'])
         if 'Content-Length' not in heads:
             heads.set('Content-Length', len(body))
         
