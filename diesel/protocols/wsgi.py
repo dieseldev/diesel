@@ -48,6 +48,7 @@ def build_wsgi_env(req, port):
     env['SERVER_NAME'] = HOSTNAME
     env['SERVER_PORT'] = str(port)
     env['SERVER_PROTOCOL'] = 'HTTP/' + req.version
+    env['REMOTE_ADDR'] = req.remote_addr[0]
     for name, v in req.headers.iteritems():
         env['HTTP_%s' % cgiish_name(name)] = v[0]
 
