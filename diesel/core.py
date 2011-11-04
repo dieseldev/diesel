@@ -70,7 +70,6 @@ def send(*args, **kw):
     return current_loop.send(*args, **kw)
 
 def sendto(*args, **kw):
-    assert isinstance(current_loop, UDPLoop), "can only sendto() on a UDP loop"
     return current_loop.sendto(*args, **kw)
 
 def wait(*args, **kw):
@@ -442,6 +441,9 @@ class Loop(object):
         conn = self.check_connection()
         conn.pipeline.add(o, priority)
         conn.set_writable(True)
+
+    def sendto(self, o, addr_and_port):
+        raise NotImplementedError
 
 class UDPLoop(Loop):
     def __init__(self, loop_callable, *args, **kw):
