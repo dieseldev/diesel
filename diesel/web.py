@@ -1,6 +1,8 @@
 '''Slight wrapper around flask to fit the diesel
 mold.
 '''
+import traceback
+
 from flask import * # we're essentially republishing
 
 from app import Application, Service
@@ -19,6 +21,22 @@ class DieselFlask(Flask):
 
     def make_logger(self):
         return self.diesel_app.logger.sublog('web+' + self.logger_name)
+
+    def log_exception(self, exc_info):
+        """A replacement for Flask's default.
+
+        The default passed an exc_info parameter to logger.error(), which
+        diesel doesn't support.
+
+        """
+        self.logger.error('Exception on %s [%s]' % (
+            request.path,
+            request.method
+        ))
+        if exc_info and isinstance(exc_info, tuple):
+            self.logger.error(traceback.format_exception(*exc_info))
+        elif exc_info:
+            self.logger.error(traceback.format_exc())
 
     def run(self, port=8080, iface='', verbosity=LOGLVL_DEBUG, debug=True):
         if debug:
