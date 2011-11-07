@@ -112,7 +112,7 @@ WebSocket-Protocol: diesel-generic\r
                         if opcode == 8:
                             inq.put(WebSocketDisconnect())
                         else:
-                            assert opcode == 1, "Currently only opcode 1 is supported"
+                            assert opcode == 1, "Currently only opcode 1 is supported (opcode=%s)" % opcode
                             length = b2 & 0x7f
                             if length == 126:
                                 length = unpack('>H', receive(2))
