@@ -99,7 +99,7 @@ WebSocket-Protocol: diesel-generic\r
         while True:
             try:
                 if hybi:
-                    typ, val = first(receive=2, waits=[outq.wait_id])
+                    typ, val = first(receive=2, waits=[outq])
                     if typ == 'receive':
                         b1, b2 = unpack(">BB", val)
 
@@ -120,39 +120,33 @@ WebSocket-Protocol: diesel-generic\r
                                 length = unpack('>L', receive(8))
 
                             mask = unpack('>BBBB', receive(4))
-
                             payload = array('B', receive(length))
                             for i in xrange(len(payload)):
                                 payload[i] ^= mask[i % 4]
 
                             data = dict((k, v[0]) if len(v) == 1 else (k, v) for k, v in cgi.parse_qs(payload.tostring()).iteritems())
                             inq.put(WebSocketData(data))
-                    else:
-                        try:
-                            v = outq.get(waiting=False)
-                        except QueueEmpty:
-                            pass
+                    elif typ == outq:
+                        if type(val) is WebSocketDisconnect:
+                            b1 = 0x80 | (8 & 0x0f) # FIN + opcode
+                            send(pack('>BB', b1, 0))
+                            break
                         else:
-                            if type(v) is WebSocketDisconnect:
-                                b1 = 0x80 | (8 & 0x0f) # FIN + opcode
-                                send(pack('>BB', b1, 0))
-                                break
-                            else:
-                                payload = dumps(v)
+                            payload = dumps(val)
 
-                                b1 = 0x80 | (1 & 0x0f) # FIN + opcode
+                            b1 = 0x80 | (1 & 0x0f) # FIN + opcode
 
-                                payload_len = len(payload)
-                                if payload_len <= 125:
-                                    header = pack('>BB', b1, payload_len)
-                                elif payload_len > 125 and payload_len < 65536:
-                                    header = pack('>BBH', b1, 126, payload_len)
-                                elif payload_len >= 65536:
-                                    header = pack('>BBQ', b1, 127, payload_len)
+                            payload_len = len(payload)
+                            if payload_len <= 125:
+                                header = pack('>BB', b1, payload_len)
+                            elif payload_len > 125 and payload_len < 65536:
+                                header = pack('>BBH', b1, 126, payload_len)
+                            elif payload_len >= 65536:
+                                header = pack('>BBQ', b1, 127, payload_len)
 
-                            send(header + payload)
+                        send(header + payload)
                 else:
-                    typ, val = first(receive=1, waits=[outq.wait_id])
+                    typ, val = first(receive=1, waits=[outq])
                     if typ == 'receive':
                         assert val == '\x00'
                         val = until('\xff')[:-1]
@@ -161,17 +155,12 @@ WebSocket-Protocol: diesel-generic\r
                         else:
                             data = dict((k, v[0]) if len(v) == 1 else (k, v) for k, v in cgi.parse_qs(val).iteritems())
                             inq.put(WebSocketData(data))
-                    else:
-                        try:
-                            v = outq.get(waiting=False)
-                        except QueueEmpty:
-                            pass
+                    elif typ == outq:
+                        if type(val) is WebSocketDisconnect:
+                            send('\x00\xff')
+                            break
                         else:
-                            if type(v) is WebSocketDisconnect:
-                                send('\x00\xff')
-                                break
-                            else:
-                                data = dumps(dict(v))
+                            data = dumps(dict(val))
                                 send('\x00%s\xff' % data)
 
 
