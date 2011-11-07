@@ -121,7 +121,7 @@ WebSocket-Protocol: diesel-generic\r
 
                             mask = unpack('>BBBB', receive(4))
 
-                            payload = array('>B', receive(length))
+                            payload = array('B', receive(length))
                             for i in xrange(len(payload)):
                                 payload[i] ^= mask[i % 4]
 
