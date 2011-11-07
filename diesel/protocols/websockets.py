@@ -161,7 +161,7 @@ WebSocket-Protocol: diesel-generic\r
                             break
                         else:
                             data = dumps(dict(val))
-                                send('\x00%s\xff' % data)
+                            send('\x00%s\xff' % data)
 
 
             except ConnectionClosed:
