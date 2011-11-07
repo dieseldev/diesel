@@ -37,8 +37,9 @@ class WebSocketServer(HttpServer):
         # do upgrade response
         org = req.headers.get_one('Origin')
         if 'Sec-WebSocket-Key' in req.headers:
-            assert req.headers.get_one('Sec-WebSocket-Version') == '8', \
-                   "We currently only support version 8 and below"
+            assert req.headers.get_one('Sec-WebSocket-Version') in ['8', '13'], \
+                   "We currently only support Websockets version 8 and 13 (ver=%s)" % \
+                   req.headers.get_one('Sec-WebSocket-Version')
 
             protocol = (req.headers.get_one('Sec-WebSocket-Protocol')
                         if 'Sec-WebSocket-Protocol' in req.headers else None)
