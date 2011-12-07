@@ -1,6 +1,9 @@
 '''Simple connection pool for asynchronous code.
 '''
 from collections import deque
+from diesel import *
+from diesel.util.queue import Queue
+from diesel.util.event import Event
 
 class ConnectionPool(object):
     '''A connection pool that holds `pool_size` connected instances,
@@ -51,3 +54,52 @@ class ConnContextWrapper(object):
     def __exit__(self, type, value, tb):
         error = type is not None
         self.pool.release(self.conn, error)
+
+class ThreadPoolDie(object): pass
+
+class ThreadPool(object):
+    def __init__(self, concurrency, handler, generator):
+        self.concurrency = concurrency
+        self.handler = handler
+        self.generator = generator
+
+    def handler_wrap(self):
+        try:
+            label("thread-pool-%s" % self.handler)
+            while True:
+                self.waiting += 1
+                if self.waiting == 1:
+                    self.trigger.set()
+                i = self.q.get()
+                self.waiting -= 1
+                if i == ThreadPoolDie:
+                    return
+                self.handler(i)
+        finally:
+            self.running -=1
+
+    def __call__(self):
+        self.q = Queue()
+        self.trigger = Event()
+        self.waiting = 0
+        self.running = 0
+        try:
+            while True:
+                for x in xrange(self.concurrency - self.running):
+                    self.running += 1
+                    fork(self.handler_wrap)
+
+                if self.waiting == 0:
+                    self.trigger.wait()
+                    self.trigger.clear()
+
+                try:
+                    n = self.generator()
+                except StopIteration:
+                    break
+
+                self.q.put(n)
+                sleep()
+        finally:
+            for x in xrange(self.concurrency):
+                self.q.put(ThreadPoolDie)
