@@ -1,7 +1,7 @@
 from .http import HttpServer, HttpHeaders
 from diesel.util.queue import Queue
 from diesel import fork, until, receive, first, ConnectionClosed, send
-from simplejson import dumps, loads
+from simplejson import dumps, loads, JSONDecodeError
 import cgi, hashlib
 from struct import pack, unpack
 from base64 import b64encode
@@ -90,11 +90,11 @@ WebSocket-Protocol: diesel-generic\r
         inq = Queue()
         outq = Queue()
 
-        def wrap(inq, outq):
-            self.web_socket_handler(inq, outq)
+        def wrap(req, inq, outq):
+            self.web_socket_handler(req, inq, outq)
             outq.put(WebSocketDisconnect())
 
-        fork(wrap, inq, outq)
+        fork(wrap, req, inq, outq)
 
         while True:
             try:
@@ -124,8 +124,12 @@ WebSocket-Protocol: diesel-generic\r
                             for i in xrange(len(payload)):
                                 payload[i] ^= mask[i % 4]
 
-                            data = dict((k, v[0]) if len(v) == 1 else (k, v) for k, v in cgi.parse_qs(payload.tostring()).iteritems())
-                            inq.put(WebSocketData(data))
+                            try:
+                                data = loads(payload.tostring())
+                                inq.put(data)
+                            except JSONDecodeError:
+                                pass
+
                     elif typ == outq:
                         if type(val) is WebSocketDisconnect:
                             b1 = 0x80 | (8 & 0x0f) # FIN + opcode
@@ -153,8 +157,11 @@ WebSocket-Protocol: diesel-generic\r
                         if val == '':
                             inq.put(WebSocketDisconnect())
                         else:
-                            data = dict((k, v[0]) if len(v) == 1 else (k, v) for k, v in cgi.parse_qs(val).iteritems())
-                            inq.put(WebSocketData(data))
+                            try:
+                                data = loads(val)
+                                inq.put(data)
+                            except JSONDecodeError:
+                                pass
                     elif typ == outq:
                         if type(val) is WebSocketDisconnect:
                             send('\x00\xff')

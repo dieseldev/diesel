@@ -3,7 +3,7 @@ from diesel.protocols.websockets import WebSocketServer, WebSocketData as WSD
 from diesel import Service, Application, sleep
 from diesel.util.queue import QueueTimeout
 
-LOCATION = "ws://172.16.26.129:8091/"
+LOCATION = "ws://localhost:8091/"
 
 content = '''
 <html>
@@ -16,13 +16,15 @@ chatter.onopen = function (evt) {
 }
 
 chatter.onmessage = function (evt) {
-    var p = document.getElementById("the-p");    
+    var p = document.getElementById("the-p");
     p.innerHTML = evt.data;
 }
 
 function push () {
     var i = document.getElementById("the-i");
-    chatter.send('{"message" : "' + i.value + '"}');
+    chatter.send(JSON.stringify({
+        message: i.value
+    }));
 }
 
 </script>
@@ -50,7 +52,7 @@ def web_handler(req):
 
 import time
 
-def socket_handler(inq, outq):
+def socket_handler(req, inq, outq):
     message = "hello, there!"
     while True:
         try:
@@ -59,7 +61,7 @@ def socket_handler(inq, outq):
             pass
         else:
             message = v['message']
-                        
+
         outq.put(WSD(message=message, time=time.time()))
 
 a = Application()
