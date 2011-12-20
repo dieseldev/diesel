@@ -192,10 +192,18 @@ class Service(object):
         else:
             make_connection()
 
+class Thunk(object):
+    def __init__(self, c):
+        self.c = c
+    def eval(self):
+        return self.c()
+
 def quickstart(*args):
     app = Application()
     args = list(args)
     for a in args:
+        if isinstance(a, Thunk):
+            a = a.eval()
         if isinstance(a, list):
             args.extend(a)
         elif isinstance(a, Service):
