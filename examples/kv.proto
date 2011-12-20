@@ -1,0 +1,18 @@
+message GetRequest {
+    required string key = 1;
+}
+
+message GetOkay {
+    required bytes value = 1;
+}
+
+message GetMissing {
+}
+
+message SetRequest {
+    required string key = 1;
+    required bytes value = 2;
+}
+
+message SetOkay {
+}
