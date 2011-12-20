@@ -77,6 +77,8 @@ class ThreadPool(object):
                 self.handler(i)
         finally:
             self.running -=1
+            if self.waiting == 0:
+                self.trigger.set()
 
     def __call__(self):
         self.q = Queue()
