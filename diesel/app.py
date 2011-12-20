@@ -165,6 +165,7 @@ class Service(object):
 
         sock.listen(self.LQUEUE_SIZ)
         self.sock = sock
+        self.port = sock.getsockname()[1] # in case of 0 binds
 
     @property
     def listening(self):
