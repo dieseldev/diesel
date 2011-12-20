@@ -2,7 +2,7 @@
  * Convoy:
    - broadcast
    - test failure modes
-   - make concurrent!  back with new util. thread pools
+   - make incoming messages concurrent!  back with new util. thread pools
    - step up/step down transitions on Role objects
    - i_own call-in to the convoy
    - write up some use cases and scenarios
@@ -18,11 +18,13 @@
  * website
 
 3.X
+ * community features (nice process for protocol extension development
+   and distribution?)
  * postgres bindings
  * memcache bindings
  * operation now in progress broken on connect
 
 4.0
  * Modify palm to be ctypes-based.. becauuuse..
- * Integrate with PyPy once it has first-class
+ * Integrate diesel with PyPy once it has first-class
    JIT-enabled greenlets
