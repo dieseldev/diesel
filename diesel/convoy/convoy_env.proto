@@ -1,0 +1,31 @@
+message MessageEnvelope {
+    required bytes body = 1;
+    required string type = 2;
+    required string req_id = 3;
+    required string node_id = 4;
+    required bool wants_result = 5;
+}
+
+message MessageResponse {
+    required string in_response_to = 1;
+
+    enum MessageDeliveryStatus {
+        REFUSED = 1;
+        ACCEPTED = 2;
+        FINISHED = 3;
+    }
+
+    enum MessageResult {
+        EXCEPTION = 1;
+        RESULT = 2;
+        NULL = 3;
+    }
+
+    optional MessageResult result = 2;
+
+    optional string error_message = 3;
+
+    repeated MessageEnvelope responses = 4;
+
+    required MessageDeliveryStatus delivered = 5;
+}
