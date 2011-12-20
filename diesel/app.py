@@ -8,7 +8,7 @@ import errno
 from greenlet import greenlet
 
 from diesel.hub import EventHub
-from diesel import logmod, log, Connection, Loop
+from diesel import logmod, log, Connection, Loop, UDPLoop
 from diesel.security import ssl_async_handshake
 from diesel import runtime
 from diesel.events import WaitPool
@@ -191,6 +191,38 @@ class Service(object):
             ssl_async_handshake(sock, self.application.hub, make_connection)
         else:
             make_connection()
+
+class UDPService(Service):
+    '''A UDP service listening on a certain port, with a protocol
+    implemented by a passed connection handler.
+    '''
+    def __init__(self, connection_handler, port, iface=''):
+        Service.__init__(self, connection_handler, port, iface)
+
+    def bind_and_listen(self):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # unsure if the following two lines are necessary for UDP
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.setblocking(0)
+
+        try:
+            sock.bind((self.iface, self.port))
+        except socket.error, e:
+            self.handle_cannot_bind(str(e))
+
+        self.sock = sock
+
+    def accept_new_connection(self):
+        try:
+            data, addr = self.sock.recvfrom(1024)
+        except socket.error, e:
+            code, s = e
+            if code in (errno.EAGAIN, errno.EINTR):
+                return
+            raise
+
+        l = UDPLoop(self.connection_handler, data, addr)
+        runtime.current_app.add_loop(l)
 
 def quickstart(*args):
     app = Application()
