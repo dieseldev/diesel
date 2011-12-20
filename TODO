@@ -13,6 +13,8 @@
    (deprecate the Application object and make everything
     fork_ etc based including keep-alive stuff)
  * get dowski's queue back?
+ * merge in timdoug's UDP support from 2.x
+ * native resolver using UDP code
  * finish tests
  * docs
  * website
