@@ -113,7 +113,7 @@ class Convoy(object):
                         if r in self.roles_owned:
                             self.roles_owned.remove(r)
                         if resp.set:
-                            ans = r.set
+                            ans = resp.set
                 else:
                     ans = self.ns.lookup(r.name())
 
