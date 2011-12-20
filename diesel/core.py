@@ -343,11 +343,13 @@ class Loop(object):
         self.hub.register(sock, read_callback, connect_callback, error_callback)
         self.hub.enable_write(sock)
         try:
-            return self.dispatch()
+            self.dispatch()
         except ClientConnectionError:
             if cancel_timer is not None:
                 cancel_timer.cancel()
             raise
+        else:
+            client.on_connect()
 
     def sleep(self, v=0):
         self._sleep(v)
