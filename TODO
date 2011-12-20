@@ -1,12 +1,24 @@
 2.1
- * get dowski's queue back
  * waiter interface for first(..)
+
+3.0
+ * get dowski's queue back?
+ * Convoy:
+   - broadcast
+   - test failure modes
+   - make concurrent!  back with thread pools
+   - step up/step down transitions on Role objects
+   - i_own call-in to the convoy
+   - write up some use cases and scenarios
+   - distributed key/value system?
+ * dieseld + quickstart-based launcher consolidation
+   (deprecate the Application object and make everything
+    fork_ etc based including keep-alive stuff)
  * finish tests
  * docs
  * website
- * bless libev and ditch legacy?
 
-2.X
+3.X
  * postgres bindings
  * memcache bindings
  * operation now in progress broken on connect
