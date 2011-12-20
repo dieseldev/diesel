@@ -29,6 +29,9 @@ class Client(object):
             else:
                 raise
 
+    def on_connect(self):
+        pass
+
     def __enter__(self):
         return self
 
