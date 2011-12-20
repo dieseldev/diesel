@@ -1,6 +1,3 @@
-2.1
- * waiter interface for first(..)
-
 3.0
  * Convoy:
    - broadcast
@@ -24,3 +21,8 @@
  * postgres bindings
  * memcache bindings
  * operation now in progress broken on connect
+
+4.0
+ * Modify palm to be ctypes-based.. becauuuse..
+ * Integrate with PyPy once it has first-class
+   JIT-enabled greenlets
