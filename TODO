@@ -2,18 +2,20 @@
  * waiter interface for first(..)
 
 3.0
- * get dowski's queue back?
  * Convoy:
    - broadcast
    - test failure modes
-   - make concurrent!  back with thread pools
+   - make concurrent!  back with new util. thread pools
    - step up/step down transitions on Role objects
    - i_own call-in to the convoy
    - write up some use cases and scenarios
    - distributed key/value system?
- * dieseld + quickstart-based launcher consolidation
+   - more logging and cleaner logging for consensus server routing table
+     movements
+ * diesel + quickstart-based launcher (glowplug?) consolidation
    (deprecate the Application object and make everything
     fork_ etc based including keep-alive stuff)
+ * get dowski's queue back?
  * finish tests
  * docs
  * website
