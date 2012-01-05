@@ -432,9 +432,9 @@ class Loop(object):
         try:
             conn = self.connection_stack[-1]
         except IndexError:
-            raise RuntimeError("Cannot complete socket operation: no associated connection")
+            raise RuntimeError("Cannot complete TCP socket operation: no associated connection")
         if conn.closed:
-            raise ConnectionClosed("Cannot complete socket operation: associated connection is closed")
+            raise ConnectionClosed("Cannot complete TCP socket operation: associated connection is closed")
         return conn
 
     def send(self, o, priority=5):
@@ -450,12 +450,16 @@ class UDPLoop(Loop):
         Loop.__init__(self, loop_callable, *args, **kw)
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-    def sendto(self, o, addr_and_port):
+    def sendto(self, o, addr_and_port=None):
+        if not addr_and_port:
+            try:
+                addr_and_port = self.udp_default
+            except AttributeError:
+                raise RuntimeError("Cannot complete UDP socket operation: address and port unknown")
         self.sock.sendto(o, addr_and_port)
 
-    def send(self, o, addr=None, port=None, priority=None):
-        assert addr and port, "need a addr and port in order to send() on a UDPLoop"
-        self.sendto(o, (addr, port,))
+    def set_udp_default(self, addr_and_port):
+        self.udp_default = addr_and_port
 
 class Connection(object):
     def __init__(self, sock, addr):

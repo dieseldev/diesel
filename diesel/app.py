@@ -222,6 +222,7 @@ class UDPService(Service):
             raise
 
         l = UDPLoop(self.connection_handler, data, addr)
+        l.set_udp_default((addr[0], self.port))
         runtime.current_app.add_loop(l)
 
 def quickstart(*args):

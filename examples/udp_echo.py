@@ -1,10 +1,10 @@
 # vim:ts=4:sw=4:expandtab
 '''Simple udp echo server.
 '''
-from diesel import Application, UDPService, send
+from diesel import Application, UDPService, sendto
 
 def hi_server(data, addr):
-    send("you said %s" % data, addr=addr[0], port=8014)
+    sendto("you said %s" % data, (addr[0], 8014))
 
 app = Application()
 app.add_service(UDPService(hi_server, 8013))
