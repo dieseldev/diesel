@@ -7,6 +7,6 @@ from core import sleep, Loop, UDPLoop, wait, fire, thread, until, Connection, Co
 from core import until_eol, send, sendto, receive, call, first, fork, fork_child, label, fork_from_thread
 from core import ParentDiedException, ClientConnectionError, TerminateLoop
 from app import Application, Service, UDPService, quickstart, quickstop
-from client import Client
+from client import Client, UDPClient
 from resolver import resolve_dns_name, DNSResolutionError
 from runtime import is_running

@@ -505,6 +505,12 @@ class Connection(object):
             ConnectionClosed('Connection closed by remote host',
             self.buffer.pop()))
 
+    def send(self, data):
+        return self.sock.send(data)
+
+    def recv(self, sz):
+        return self.sock.recv(sz)
+
     def handle_write(self):
         '''The low-level handler called by the event hub
         when the socket is ready for writing.
@@ -516,7 +522,7 @@ class Connection(object):
                 self.shutdown()
             else:
                 try:
-                    bsent = self.sock.send(data)
+                    bsent = self.send(data)
                 except socket.error, e:
                     code, s = e
                     if code in (errno.EAGAIN, errno.EINTR):
@@ -551,7 +557,7 @@ class Connection(object):
         if self.closed:
             return
         try:
-            data = self.sock.recv(BUFSIZ)
+            data = self.recv(BUFSIZ)
         except socket.error, e:
             code, s = e
             if code in (errno.EAGAIN, errno.EINTR):
@@ -578,3 +584,15 @@ class Connection(object):
 
     def handle_error(self):
         self.shutdown(True)
+
+class UDPConnection(Connection):
+    def __init__(self, sock, ip, port):
+        self.port = port
+        super(UDPConnection, self).__init__(sock, ip)
+
+    def send(self, data):
+        return self.sock.sendto(data, (self.addr, self.port))
+
+    def recv(self, sz):
+        data, address = self.sock.recvfrom(sz)
+        return data

@@ -1,4 +1,5 @@
 # vim:ts=4:sw=4:expandtab
+import random
 import socket
 import errno
 
@@ -14,9 +15,12 @@ class Client(object):
         self.port = port
 
         from resolver import resolve_dns_name
-        from core import _private_connect
 
         ip = resolve_dns_name(self.addr)
+        self._setup_socket(ip, timeout)
+
+    def _setup_socket(self, ip, timeout):
+        from core import _private_connect
         remote_addr = (ip, self.port)
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.setblocking(0)
@@ -46,3 +50,14 @@ class Client(object):
     @property
     def is_closed(self):
         return not self.conn or self.conn.closed
+
+class UDPClient(Client):
+    def _setup_socket(self, ip, timeout):
+        from core import UDPConnection
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.listen_port = random.randint(1024, 65535)
+        sock.setblocking(0)
+        sock.bind(('', self.listen_port))
+        self.conn = UDPConnection(sock, ip, self.port)
+        self.connected = True
+

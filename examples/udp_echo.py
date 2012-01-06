@@ -4,7 +4,7 @@
 from diesel import Application, UDPService, sendto
 
 def hi_server(data, addr):
-    sendto("you said %s" % data, (addr[0], 8014))
+    sendto("you said %s" % data, addr)
 
 app = Application()
 app.add_service(UDPService(hi_server, 8013))
