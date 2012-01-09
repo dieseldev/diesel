@@ -55,8 +55,8 @@ class DNSClient(UDPClient):
                     # Handle the possibility of responses that are not to our
                     # original request - they are ignored and we wait for a
                     # response that matches our query.
-                    item, data = first(dgram=True, sleep=remaining)
-                    if item == 'dgram':
+                    item, data = first(datagram=True, sleep=remaining)
+                    if item == 'datagram':
                         response = from_wire(data)
                         if query.is_response(response):
                             if response.answer:

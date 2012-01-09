@@ -67,6 +67,7 @@ def until_eol():
 class datagram(object):
     pass
 datagram = datagram()
+_datagram = datagram
 
 def receive(*args, **kw):
     return current_loop.input_op(*args, **kw)
@@ -236,7 +237,7 @@ class Loop(object):
         self.loop_label = label
 
     def first(self, sleep=None, waits=None,
-            receive=None, until=None, until_eol=None, dgram=None):
+            receive=None, until=None, until_eol=None, datagram=None):
         def marked_cb(kw):
             def deco(f):
                 def mark(d):
@@ -246,9 +247,9 @@ class Loop(object):
                 return mark
             return deco
 
-        f_sent = filter(None, (receive, until, until_eol, dgram))
+        f_sent = filter(None, (receive, until, until_eol, datagram))
         assert len(f_sent) <= 1,(
-        "only 1 of (receive, until, until_eol, dgram) may be provided")
+        "only 1 of (receive, until, until_eol, datagram) may be provided")
         sentinel = None
         if receive:
             sentinel = receive
@@ -259,9 +260,9 @@ class Loop(object):
         elif until_eol:
             sentinel = "\r\n"
             tok = 'until_eol'
-        elif dgram:
-            sentinel = datagram
-            tok = 'dgram'
+        elif datagram:
+            sentinel = _datagram
+            tok = 'datagram'
         if sentinel:
             early_val = self._input_op(sentinel, marked_cb(tok))
             if early_val:
