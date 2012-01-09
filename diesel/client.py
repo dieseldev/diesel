@@ -13,10 +13,12 @@ class Client(object):
         self.addr = addr
         self.port = port
 
-        from resolver import resolve_dns_name
-
-        ip = resolve_dns_name(self.addr)
+        ip = self._resolve(self.addr)
         self._setup_socket(ip, timeout)
+
+    def _resolve(self, addr):
+        from resolver import resolve_dns_name
+        return resolve_dns_name(addr)
 
     def _setup_socket(self, ip, timeout):
         from core import _private_connect
@@ -60,6 +62,9 @@ class UDPClient(Client):
         sock.setblocking(0)
         self.conn = UDPSocket(self, sock, ip, self.port)
         self.connected = True
+
+    def _resolve(self, addr):
+        return addr
 
     class remote_addr(object):
         def __get__(self, inst, other):

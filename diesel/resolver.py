@@ -1,10 +1,11 @@
-'''Fetches the A record for a given name on a background thread, keeps
+'''Fetches the A record for a given name in a green thread, keeps
 a cache.
 '''
 
+import random
 import time
-import socket
-from diesel import thread
+from diesel.protocols.DNS import DNSClient, NotFound, Timeout
+from diesel.util.pool import ConnectionPool
 
 DNS_CACHE_TIME = 60 * 5 # five minutes
 
@@ -12,23 +13,23 @@ cache = {}
 
 class DNSResolutionError(Exception): pass
 
+_pool = ConnectionPool(lambda: DNSClient(), lambda c: c.close())
+
 def resolve_dns_name(name):
-    '''Given a hostname `name`, invoke the socket.gethostbyname function
-    to retreive the A (IPv4 only) record on a background thread.
+    '''Uses a pool of DNSClients to resolve name to an IP address.
 
     Keep a cache.
     '''
     try:
-        ip, tm = cache[name]
+        ips, tm = cache[name]
         if time.time() - tm > DNS_CACHE_TIME:
             del cache[name]
             cache[name]
     except KeyError:
         try:
-            ip = thread(socket.gethostbyname, name)
-        except socket.gaierror:
+            with _pool.connection as conn:
+                ips = conn.resolve(name)
+        except (NotFound, Timeout):
             raise DNSResolutionError("could not resolve A record for %s" % name)
-        cache[name] = ip, time.time()
-        return resolve_dns_name(name)
-    else:
-        return ip
+        cache[name] = ips, time.time()
+    return random.choice(ips)

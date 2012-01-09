@@ -661,3 +661,16 @@ class UDPSocket(Connection):
     def cleanup(self):
         self.waiting_callback = None
 
+    def close(self):
+        self.set_writable(True)
+        
+    def shutdown(self, remote_closed=False):
+        '''Clean up after the connection_handler ends.'''
+        self.hub.unregister(self.sock)
+        self.closed = True
+        self.sock.close()
+
+        if remote_closed and self.waiting_callback:
+            self.waiting_callback(
+                ConnectionClosed('Connection closed by remote host')
+            )

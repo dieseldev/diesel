@@ -41,5 +41,11 @@ Other bundled protocols include MongoDB, Riak, and Redis client libraries.
             'dnosetests = diesel.dnosetests:main',
         ],
     },
-    install_requires=(["greenlet", "pyev", "pyopenssl", "flask"] + additional_requires),
+    install_requires=([
+        "greenlet", 
+        "pyev", 
+        "pyopenssl", 
+        "flask",
+        "dnspython",
+    ] + additional_requires),
     )
