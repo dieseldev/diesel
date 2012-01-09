@@ -34,15 +34,19 @@ class DNSClient(UDPClient):
                 remaining = timeout
                 while True:
                     # Handle the possibility of responses that are not to our
-                    # original request.
+                    # original request - they are ignored and we wait for a
+                    # response that matches our query.
                     item, data = first(dgram=True, sleep=remaining)
                     if item == 'dgram':
                         response = from_wire(data)
                         if query.is_response(response):
                             if response.answer:
-                                return [item.address for item in response.answer[0].items]
+                                a_records = [r for r in response.answer if r.rdtype == A]
+                                return [item.address for item in a_records[0].items]
                             raise NotFound
                         else:
+                            # Not a response to our query - continue waiting for
+                            # one that is.
                             remaining = remaining - (time.time() - start)
                     elif item == 'sleep':
                         break
@@ -50,9 +54,4 @@ class DNSClient(UDPClient):
                 raise Timeout(host)
         finally:
             self.addr = self.primary
-
-
-
-
-
 
