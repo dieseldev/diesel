@@ -13,22 +13,41 @@ class NotFound(Exception):
 class Timeout(Exception):
     pass
 
+_resolv_conf = ResolvConf()
+_local_nameservers = _resolv_conf.nameservers
+del _resolv_conf
+
 class DNSClient(UDPClient):
+    """A DNS client.
+
+    Uses nameservers from /etc/resolv.conf if none are supplied.
+
+    """
     def __init__(self, servers=None, port=53):
         if servers is None:
-            resolv_conf = ResolvConf()
-            self.nameservers = servers = resolv_conf.nameservers
+            self.nameservers = servers = _local_nameservers
             self.primary = self.nameservers[0]
         super(DNSClient, self).__init__(servers[0], port)
 
     @call
-    def resolve(self, host, timeout=10):
+    def resolve(self, name, timeout=5):
+        """Try to resolve name.
+
+        Returns:
+            A list of IP addresses for name.
+
+        Raises:
+            * Timeout if the request to all servers times out.
+            * NotFound if we get a response from a server but the name
+              was not resolved.
+        
+        """
         timeout = timeout / float(len(self.nameservers))
         try:
             for server in self.nameservers:
                 # Try each nameserver in succession.
                 self.addr = server
-                query = make_query(host, A)
+                query = make_query(name, A)
                 send(query.to_wire())
                 start = time.time()
                 remaining = timeout
@@ -51,7 +70,7 @@ class DNSClient(UDPClient):
                     elif item == 'sleep':
                         break
             else:
-                raise Timeout(host)
+                raise Timeout(name)
         finally:
             self.addr = self.primary
 
