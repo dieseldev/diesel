@@ -200,6 +200,7 @@ class UDPService(Service):
     '''
     def __init__(self, connection_handler, port, iface=''):
         Service.__init__(self, connection_handler, port, iface)
+        self.remote_addr = (None, None)
 
     def bind_and_listen(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -213,8 +214,8 @@ class UDPService(Service):
             self.handle_cannot_bind(str(e))
 
         self.sock = sock
+        c = UDPSocket(self, sock)
         l = Loop(self.connection_handler)
-        c = UDPSocket(l, sock)
         l.connection_stack.append(c)
         runtime.current_app.add_loop(l)
 

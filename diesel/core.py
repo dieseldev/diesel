@@ -573,10 +573,10 @@ class Connection(object):
     def handle_error(self):
         self.shutdown(True)
 
-class Datagram(object):
-    def __init__(self, payload, addr):
+class Datagram(str):
+    def __new__(self, payload, addr):
         self.addr = addr
-        self.payload = payload
+        return str.__new__(self, payload)
 
 class UDPSocket(Connection):
     def __init__(self, parent, sock, ip=None, port=None):
@@ -588,15 +588,14 @@ class UDPSocket(Connection):
         self.outgoing = deque([])
 
     def queue_outgoing(self, msg, priority=5):
-        dgram = Datagram(msg, (self.parent.addr, self.parent.port))
+        dgram = Datagram(msg, self.parent.remote_addr)
         self.outgoing.append(dgram)
 
     def check_incoming(self, condition, callback):
         assert condition is datagram, "UDP supports datagram sentinels only"
         def _wrap(value=ContinueNothing):
             if isinstance(value, Datagram):
-                self.parent.addr, self.parent.port = value.addr
-                value = value.payload
+                self.parent.remote_addr = value.addr
             return callback(value)
         return _wrap
 
@@ -607,7 +606,7 @@ class UDPSocket(Connection):
         while self.outgoing:
             dgram = self.outgoing.popleft()
             try:
-                bsent = self.sock.sendto(dgram.payload, dgram.addr)
+                bsent = self.sock.sendto(dgram, dgram.addr)
             except socket.error, e:
                 code, s = e
                 if code in (errno.EAGAIN, errno.EINTR):
@@ -626,7 +625,7 @@ class UDPSocket(Connection):
                 % traceback.format_exc())
                 self.shutdown(True)
             else:
-                assert bsent == len(dgram.payload), "complete datagram not sent!"
+                assert bsent == len(dgram), "complete datagram not sent!"
         self.set_writable(False)
 
     def handle_read(self):
@@ -654,7 +653,7 @@ class UDPSocket(Connection):
             % traceback.format_exc())
             dgram = Datagram('', (None, None))
 
-        if not dgram.payload:
+        if not dgram:
             self.shutdown(True)
         else:
             self.waiting_callback(dgram)

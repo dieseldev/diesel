@@ -61,3 +61,10 @@ class UDPClient(Client):
         self.conn = UDPSocket(self, sock, ip, self.port)
         self.connected = True
 
+    class remote_addr(object):
+        def __get__(self, inst, other):
+            return (inst.addr, inst.port)
+
+        def __set__(self, inst, value):
+            inst.addr, inst.port = value
+    remote_addr = remote_addr()
