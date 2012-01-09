@@ -1,5 +1,4 @@
 # vim:ts=4:sw=4:expandtab
-import random
 import socket
 import errno
 
@@ -52,12 +51,13 @@ class Client(object):
         return not self.conn or self.conn.closed
 
 class UDPClient(Client):
+    def __init__(self, addr, port):
+        super(UDPClient, self).__init__(addr, port)
+
     def _setup_socket(self, ip, timeout):
-        from core import UDPConnection
+        from core import UDPSocket
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.listen_port = random.randint(1024, 65535)
         sock.setblocking(0)
-        sock.bind(('', self.listen_port))
-        self.conn = UDPConnection(sock, ip, self.port)
+        self.conn = UDPSocket(self, sock, ip, self.port)
         self.connected = True
 

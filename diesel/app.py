@@ -8,7 +8,7 @@ import errno
 from greenlet import greenlet
 
 from diesel.hub import EventHub
-from diesel import logmod, log, Connection, Loop, UDPLoop
+from diesel import logmod, log, Connection, UDPSocket, Loop
 from diesel.security import ssl_async_handshake
 from diesel import runtime
 from diesel.events import WaitPool
@@ -51,8 +51,7 @@ class Application(object):
 
         for s in self._services:
             s.bind_and_listen()
-            self.hub.register(s.sock, s.accept_new_connection, None,
-                self.global_bail("low-level socket error on bound service"))
+            s.register(self)
 
         for l in self._loops:
             self.hub.schedule(l.wake)
@@ -90,12 +89,7 @@ class Application(object):
         if self._run:
             # TODO -- this path doesn't clean up binds yet
             service.bind_and_listen()
-            self.hub.register(
-                service.sock,
-                service.accept_new_connection,
-                None,
-                self.global_bail("low-level socket error on bound service")
-            )
+            service.register(self)
         else:
             self._services.append(service)
 
@@ -152,6 +146,14 @@ class Service(object):
         log.critical("service at %s:%s cannot bind: %s" % (self.iface or '*', 
                 self.port, reason))
         raise
+
+    def register(self, app):
+        app.hub.register(
+            self.sock,
+            self.accept_new_connection,
+            None,
+            app.global_bail("low-level socket error on bound service"),
+        )
 
     def bind_and_listen(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -211,19 +213,13 @@ class UDPService(Service):
             self.handle_cannot_bind(str(e))
 
         self.sock = sock
-
-    def accept_new_connection(self):
-        try:
-            data, addr = self.sock.recvfrom(1024)
-        except socket.error, e:
-            code, s = e
-            if code in (errno.EAGAIN, errno.EINTR):
-                return
-            raise
-
-        l = UDPLoop(self.connection_handler, data, addr)
-        l.set_udp_default((addr[0], self.port))
+        l = Loop(self.connection_handler)
+        c = UDPSocket(l, sock)
+        l.connection_stack.append(c)
         runtime.current_app.add_loop(l)
+
+    def register(self, app):
+        pass
 
 def quickstart(*args):
     app = Application()
