@@ -6,6 +6,7 @@ import random
 import time
 from diesel.protocols.DNS import DNSClient, NotFound, Timeout
 from diesel.util.pool import ConnectionPool
+from diesel.util.lock import synchronized
 
 DNS_CACHE_TIME = 60 * 5 # five minutes
 
@@ -20,16 +21,17 @@ def resolve_dns_name(name):
 
     Keep a cache.
     '''
-    try:
-        ips, tm = cache[name]
-        if time.time() - tm > DNS_CACHE_TIME:
-            del cache[name]
-            cache[name]
-    except KeyError:
+    with synchronized('__diesel__.dns.' + name):
         try:
-            with _pool.connection as conn:
-                ips = conn.resolve(name)
-        except (NotFound, Timeout):
-            raise DNSResolutionError("could not resolve A record for %s" % name)
-        cache[name] = ips, time.time()
+            ips, tm = cache[name]
+            if time.time() - tm > DNS_CACHE_TIME:
+                del cache[name]
+                cache[name]
+        except KeyError:
+            try:
+                with _pool.connection as conn:
+                    ips = conn.resolve(name)
+            except (NotFound, Timeout):
+                raise DNSResolutionError("could not resolve A record for %s" % name)
+            cache[name] = ips, time.time()
     return random.choice(ips)
