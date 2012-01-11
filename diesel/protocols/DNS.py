@@ -1,4 +1,5 @@
 import time
+from collections import deque
 
 from diesel import UDPClient, call, send, first, datagram
 
@@ -15,6 +16,11 @@ class Timeout(Exception):
 
 _resolv_conf = ResolvConf()
 _local_nameservers = _resolv_conf.nameservers
+_search_domains = []
+if _resolv_conf.domain:
+    _search_domains.append(str(_resolv_conf.domain)[:-1])
+_search_domains.extend(map(lambda n: str(n)[:-1], _resolv_conf.search))
+
 del _resolv_conf
 
 class DNSClient(UDPClient):
@@ -30,7 +36,7 @@ class DNSClient(UDPClient):
         super(DNSClient, self).__init__(servers[0], port)
 
     @call
-    def resolve(self, name, timeout=5):
+    def resolve(self, name, orig_timeout=5):
         """Try to resolve name.
 
         Returns:
@@ -40,8 +46,28 @@ class DNSClient(UDPClient):
             * Timeout if the request to all servers times out.
             * NotFound if we get a response from a server but the name
               was not resolved.
-        
+
         """
+        names = deque([name])
+        for n in _search_domains:
+            names.append(('%s.%s' % (name, n)))
+        start = time.time()
+        timeout = orig_timeout
+        r = None
+        while names:
+            n = names.popleft()
+            try:
+                r = self._actually_resolve(n, timeout)
+            except:
+                timeout = orig_timeout - (time.time() - start)
+                if timeout <= 0 or not names:
+                    raise
+            else:
+                break
+        assert r is not None
+        return r
+
+    def _actually_resolve(self, name, timeout):
         timeout = timeout / float(len(self.nameservers))
         try:
             for server in self.nameservers:
