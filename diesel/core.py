@@ -7,6 +7,7 @@ import traceback
 import errno
 import sys
 import itertools
+from collections import deque
 from OpenSSL import SSL
 from greenlet import greenlet
 
@@ -63,14 +64,16 @@ def until(*args, **kw):
 def until_eol():
     return until("\r\n")
 
+class datagram(object):
+    pass
+datagram = datagram()
+_datagram = datagram
+
 def receive(*args, **kw):
     return current_loop.input_op(*args, **kw)
 
 def send(*args, **kw):
     return current_loop.send(*args, **kw)
-
-def sendto(*args, **kw):
-    return current_loop.sendto(*args, **kw)
 
 def wait(*args, **kw):
     return current_loop.wait(*args, **kw)
@@ -207,8 +210,7 @@ class Loop(object):
             self._wakeup_timer.cancel()
         if self.connection_stack:
             conn = self.connection_stack[-1]
-            conn.buffer.clear_term()
-            conn.waiting_callback = None
+            conn.cleanup()
         self.fire_handlers = {}
         self.fire_due = False
         self.app.waits.clear(self)
@@ -235,7 +237,7 @@ class Loop(object):
         self.loop_label = label
 
     def first(self, sleep=None, waits=None,
-            receive=None, until=None, until_eol=None):
+            receive=None, until=None, until_eol=None, datagram=None):
         def marked_cb(kw):
             def deco(f):
                 def mark(d):
@@ -245,9 +247,9 @@ class Loop(object):
                 return mark
             return deco
 
-        f_sent = filter(None, (receive, until, until_eol))
+        f_sent = filter(None, (receive, until, until_eol, datagram))
         assert len(f_sent) <= 1,(
-        "only 1 of (receive, until, until_eol) may be provided")
+        "only 1 of (receive, until, until_eol, datagram) may be provided")
         sentinel = None
         if receive:
             sentinel = receive
@@ -258,6 +260,9 @@ class Loop(object):
         elif until_eol:
             sentinel = "\r\n"
             tok = 'until_eol'
+        elif datagram:
+            sentinel = _datagram
+            tok = 'datagram'
         if sentinel:
             early_val = self._input_op(sentinel, marked_cb(tok))
             if early_val:
@@ -418,12 +423,10 @@ class Loop(object):
     def _input_op(self, sentinel, cb_maker=identity):
         conn = self.check_connection()
         cb = cb_maker(self.wake)
-        res = conn.buffer.set_term(sentinel)
-        return self.check_buffer(conn, cb)
-
-    def check_buffer(self, conn, cb):
-        res = conn.buffer.check()
-        if res:
+        res = conn.check_incoming(sentinel, cb)
+        if callable(res):
+            cb = res
+        elif res:
             return res
         conn.waiting_callback = cb
         return None
@@ -432,30 +435,15 @@ class Loop(object):
         try:
             conn = self.connection_stack[-1]
         except IndexError:
-            raise RuntimeError("Cannot complete socket operation: no associated connection")
+            raise RuntimeError("Cannot complete TCP socket operation: no associated connection")
         if conn.closed:
-            raise ConnectionClosed("Cannot complete socket operation: associated connection is closed")
+            raise ConnectionClosed("Cannot complete TCP socket operation: associated connection is closed")
         return conn
 
     def send(self, o, priority=5):
         conn = self.check_connection()
-        conn.pipeline.add(o, priority)
+        conn.queue_outgoing(o, priority)
         conn.set_writable(True)
-
-    def sendto(self, o, addr_and_port):
-        raise NotImplementedError
-
-class UDPLoop(Loop):
-    def __init__(self, loop_callable, *args, **kw):
-        Loop.__init__(self, loop_callable, *args, **kw)
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
-    def sendto(self, o, addr_and_port):
-        self.sock.sendto(o, addr_and_port)
-
-    def send(self, o, addr=None, port=None, priority=None):
-        assert addr and port, "need a addr and port in order to send() on a UDPLoop"
-        self.sendto(o, (addr, port,))
 
 class Connection(object):
     def __init__(self, sock, addr):
@@ -468,6 +456,13 @@ class Connection(object):
         self._writable = False
         self.closed = False
         self.waiting_callback = None
+
+    def queue_outgoing(self, msg, priority=5):
+        self.pipeline.add(msg, priority)
+
+    def check_incoming(self, condition, callback):
+        self.buffer.set_term(condition)
+        return self.buffer.check()
 
     def set_writable(self, val):
         '''Set the associated socket writable.  Called when there is
@@ -483,6 +478,10 @@ class Connection(object):
         if not val and self._writable:
             self.hub.disable_write(self.sock)
             self._writable = False
+
+    def cleanup(self):
+        self.buffer.clear_term()
+        self.waiting_callback = None
 
     def close(self):
         self.set_writable(True)
@@ -574,3 +573,105 @@ class Connection(object):
 
     def handle_error(self):
         self.shutdown(True)
+
+class Datagram(str):
+    def __new__(self, payload, addr):
+        self.addr = addr
+        return str.__new__(self, payload)
+
+class UDPSocket(Connection):
+    def __init__(self, parent, sock, ip=None, port=None):
+        self.port = port
+        self.parent = parent
+        super(UDPSocket, self).__init__(sock, ip)
+        del self.buffer
+        del self.pipeline
+        self.outgoing = deque([])
+
+    def queue_outgoing(self, msg, priority=5):
+        dgram = Datagram(msg, self.parent.remote_addr)
+        self.outgoing.append(dgram)
+
+    def check_incoming(self, condition, callback):
+        assert condition is datagram, "UDP supports datagram sentinels only"
+        def _wrap(value=ContinueNothing):
+            if isinstance(value, Datagram):
+                self.parent.remote_addr = value.addr
+            return callback(value)
+        return _wrap
+
+    def handle_write(self):
+        '''The low-level handler called by the event hub
+        when the socket is ready for writing.
+        '''
+        while self.outgoing:
+            dgram = self.outgoing.popleft()
+            try:
+                bsent = self.sock.sendto(dgram, dgram.addr)
+            except socket.error, e:
+                code, s = e
+                if code in (errno.EAGAIN, errno.EINTR):
+                    self.outgoing.appendleft(dgram)
+                    return 
+                self.shutdown(True)
+            except (SSL.WantReadError, SSL.WantWriteError, SSL.WantX509LookupError):
+                self.outgoing.appendleft(dgram)
+                return
+            except SSL.ZeroReturnError:
+                self.shutdown(True)
+            except SSL.SysCallError:
+                self.shutdown(True)
+            except:
+                sys.stderr.write("Unknown Error on send():\n%s"
+                % traceback.format_exc())
+                self.shutdown(True)
+            else:
+                assert bsent == len(dgram), "complete datagram not sent!"
+        self.set_writable(False)
+
+    def handle_read(self):
+        '''The low-level handler called by the event hub
+        when the socket is ready for reading.
+        '''
+        if self.closed:
+            return
+        try:
+            data, addr = self.sock.recvfrom(BUFSIZ)
+            dgram = Datagram(data, addr)
+        except socket.error, e:
+            code, s = e
+            if code in (errno.EAGAIN, errno.EINTR):
+                return
+            dgram = Datagram('', (None, None))
+        except (SSL.WantReadError, SSL.WantWriteError, SSL.WantX509LookupError):
+            return
+        except SSL.ZeroReturnError:
+            dgram = Datagram('', (None, None))
+        except SSL.SysCallError:
+            dgram = Datagram('', (None, None))
+        except:
+            sys.stderr.write("Unknown Error on recv():\n%s"
+            % traceback.format_exc())
+            dgram = Datagram('', (None, None))
+
+        if not dgram:
+            self.shutdown(True)
+        else:
+            self.waiting_callback(dgram)
+
+    def cleanup(self):
+        self.waiting_callback = None
+
+    def close(self):
+        self.set_writable(True)
+        
+    def shutdown(self, remote_closed=False):
+        '''Clean up after the connection_handler ends.'''
+        self.hub.unregister(self.sock)
+        self.closed = True
+        self.sock.close()
+
+        if remote_closed and self.waiting_callback:
+            self.waiting_callback(
+                ConnectionClosed('Connection closed by remote host')
+            )
