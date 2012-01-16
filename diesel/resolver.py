@@ -2,6 +2,7 @@
 a cache.
 '''
 
+import os
 import random
 import time
 from diesel.protocols.DNS import DNSClient, NotFound, Timeout
@@ -16,11 +17,31 @@ class DNSResolutionError(Exception): pass
 
 _pool = ConnectionPool(lambda: DNSClient(), lambda c: c.close())
 
+hosts = {}
+
+def load_hosts():
+    if os.path.isfile("/etc/hosts"):
+        for line in open("/etc/hosts"):
+            parts = line.split()
+            ip = None
+            for p in parts:
+                if p.startswith("#"):
+                    break
+                if not ip:
+                    ip = p
+                else:
+                    hosts[p] = ip
+
+load_hosts()
+
 def resolve_dns_name(name):
     '''Uses a pool of DNSClients to resolve name to an IP address.
 
     Keep a cache.
     '''
+    if name in hosts:
+        return hosts[name]
+
     with synchronized('__diesel__.dns.' + name):
         try:
             ips, tm = cache[name]
