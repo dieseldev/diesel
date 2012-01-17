@@ -28,7 +28,7 @@ def load_hosts():
                 if p.startswith("#"):
                     break
                 if not ip:
-                    if ':' in ip:
+                    if ':' in p:
                         break
                     ip = p
                 else:
