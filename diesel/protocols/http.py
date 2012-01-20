@@ -51,7 +51,7 @@ status_strings = {
 }
 
 def parse_request_line(line):
-    '''Given a request line, split it into 
+    '''Given a request line, split it into
     (method, url, protocol).
     '''
     items = line.split(' ')
@@ -89,7 +89,7 @@ class HttpHeaders(object):
             for v in vs:
                 s.append('%s: %s' % (h.title(), v))
         return '\r\n'.join(s)
-    
+
     def link(self):
         self.items = self._headers.items
         self.keys = self._headers.keys
@@ -146,13 +146,13 @@ class HttpRequest(object):
         self.headers = None
         self.body = None
         self.remote_addr = remote_addr
-        
-    def format(self):    
+
+    def format(self):
         '''Format the request line for the wire.
         '''
         return '%s %s HTTP/%s' % (self.method, self.url, self.version)
-        
-class HttpClose(Exception): pass    
+
+class HttpClose(Exception): pass
 
 class HttpServer(object):
     '''An HTTP/1.1 implementation of a server.
@@ -178,7 +178,7 @@ class HttpServer(object):
         initialization), this __call__ method is what's actually
         invoked by diesel.
 
-        It does protocol work, then calls the request_handler, 
+        It does protocol work, then calls the request_handler,
         looking for HttpClose if necessary.
         '''
         while True:
@@ -188,7 +188,7 @@ class HttpServer(object):
             except ConnectionClosed:
                 break
 
-            method, url, version = parse_request_line(header_line)    
+            method, url, version = parse_request_line(header_line)
             req = HttpRequest(method, url, version, remote_addr=addr)
 
             header_block = until('\r\n\r\n')
@@ -229,7 +229,7 @@ def http_response(req, code, heads, body):
         close = False
         heads.set('Connection', 'keep-alive')
     send('''HTTP/%s %s %s\r\n%s\r\n\r\n''' % (
-    req.version, code, status_strings.get(code, "Unknown Status"), 
+    req.version, code, status_strings.get(code, "Unknown Status"),
     heads.format()))
     if body:
         send(body)
@@ -310,34 +310,40 @@ class HttpClient(Client):
         body.
 
         Very low level--you must set "host" yourself,
-        for example.  It will set Content-Length, 
+        for example.  It will set Content-Length,
         however.
         '''
         timeout_handler = TimeoutHandler(timeout or 60)
         req = HttpRequest(method, path, '1.1')
-        
+
         if body:
             headers.set('Content-Length', len(body))
 
-        send('%s\r\n%s\r\n\r\n' % (req.format(), 
+        send('%s\r\n%s\r\n\r\n' % (req.format(),
         headers.format()))
 
-        if body:    
+        if body:
             send(body)
 
         ev, val = first(until_eol=True, sleep=timeout_handler.remaining())
         if ev == 'sleep': timeout_handler.timeout()
 
         resp_line = val
-        
-        version, code, status = resp_line.split(None, 2)
+
+        try:
+            version, code, reason = resp_line.split(None, 2)
+        except ValueError:
+            # empty reason string
+            version, code = resp_line.split(None, 1)
+            reason = ''
+
         code = int(code)
 
         ev, val = first(until="\r\n\r\n", sleep=timeout_handler.remaining())
         if ev == 'sleep': timeout_handler.timeout()
 
         header_block = val
-        
+
         heads = HttpHeaders()
         heads.parse(header_block)
 
