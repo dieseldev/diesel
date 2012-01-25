@@ -8,7 +8,7 @@ import errno
 from greenlet import greenlet
 
 from diesel.hub import EventHub
-from diesel import logmod, log, Connection, Loop
+from diesel import logmod, log, Connection, UDPSocket, Loop
 from diesel.security import ssl_async_handshake
 from diesel import runtime
 from diesel.events import WaitPool
@@ -51,8 +51,7 @@ class Application(object):
 
         for s in self._services:
             s.bind_and_listen()
-            self.hub.register(s.sock, s.accept_new_connection, None,
-                self.global_bail("low-level socket error on bound service"))
+            s.register(self)
 
         for l in self._loops:
             self.hub.schedule(l.wake)
@@ -90,12 +89,7 @@ class Application(object):
         if self._run:
             # TODO -- this path doesn't clean up binds yet
             service.bind_and_listen()
-            self.hub.register(
-                service.sock,
-                service.accept_new_connection,
-                None,
-                self.global_bail("low-level socket error on bound service")
-            )
+            service.register(self)
         else:
             self._services.append(service)
 
@@ -153,6 +147,14 @@ class Service(object):
                 self.port, reason))
         raise
 
+    def register(self, app):
+        app.hub.register(
+            self.sock,
+            self.accept_new_connection,
+            None,
+            app.global_bail("low-level socket error on bound service"),
+        )
+
     def bind_and_listen(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -198,6 +200,35 @@ class Thunk(object):
         self.c = c
     def eval(self):
         return self.c()
+
+class UDPService(Service):
+    '''A UDP service listening on a certain port, with a protocol
+    implemented by a passed connection handler.
+    '''
+    def __init__(self, connection_handler, port, iface=''):
+        Service.__init__(self, connection_handler, port, iface)
+        self.remote_addr = (None, None)
+
+    def bind_and_listen(self):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # unsure if the following two lines are necessary for UDP
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.setblocking(0)
+
+        try:
+            sock.bind((self.iface, self.port))
+        except socket.error, e:
+            self.handle_cannot_bind(str(e))
+
+        self.sock = sock
+        c = UDPSocket(self, sock)
+        l = Loop(self.connection_handler)
+        l.connection_stack.append(c)
+        runtime.current_app.add_loop(l)
+
+    def register(self, app):
+        pass
+
 
 def quickstart(*args):
     app = Application()
