@@ -17,7 +17,12 @@ try:
     from IPython.Shell import IPShell
     IPYTHON_AVAILABLE = True
 except ImportError:
-    IPYTHON_AVAILABLE = False
+    try:
+        # Support changes made in iPython 0.11
+        from IPython.frontend.terminal.ipapp import TerminalInteractiveShell as IPShell
+        IPYTHON_AVAILABLE = True
+    except ImportError:
+        IPYTHON_AVAILABLE = False
 
 
 # Library Functions:
