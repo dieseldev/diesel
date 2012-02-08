@@ -20,6 +20,27 @@ MongoDB. It makes writing network applications fun.
 Read the documentation, browse the API and join the community in #diesel on
 freenode.
 
+Installation
+============
+
+Diesel is an active project. Your best bet to stay up with the latest at this
+point is to clone from github.::
+
+    git clone git://github.com/jamwt/diesel.git
+
+Once you have a clone, `cd` to the `diesel` directory and install it.::
+
+    pip install .
+
+or::
+
+    python setup.py install
+
+or::
+
+    python setup.py develop
+
+
 Loops
 =====
 
