@@ -43,7 +43,6 @@ Other bundled protocols include MongoDB, Riak, and Redis client libraries.
     },
     install_requires=([
         "greenlet",
-        "pyev",
         "pyopenssl",
         "flask",
         "dnspython",
