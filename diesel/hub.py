@@ -206,7 +206,7 @@ class EPollEventHub(AbstractEventHub):
 
     @property
     def describe(self):
-        return "legacy select.epoll"
+        return "hand-rolled select.epoll"
 
     def handle_events(self):
         '''Run one pass of event handling.
