@@ -19,19 +19,53 @@ except ImportError:
 
 _enc = sys.getdefaultencoding()
 
-class SocketFileLike(diesel.Client):
-    """Enough of a stand-in for a socket/file-like object.
+class SocketLike(diesel.Client):
+    """A socket-like diesel Client.
 
-    At least enough to satisfy the requests test suite.
+    At least enough to satisfy the requests test suite. Its primary job is
+    to return a FileLike instance when `makefile` is called.
 
     """
     def __init__(self, host, port, **kw):
-        super(SocketFileLike, self).__init__(host, port, **kw)
-        self._extra = ""
+        super(SocketLike, self).__init__(host, port, **kw)
         self._timeout = None
 
     def makefile(self, mode, buffering):
-        return self
+        return FileLike(self, mode, buffering, self._timeout)
+
+    def settimeout(self, n):
+        self._timeout = n
+
+    @diesel.call
+    def sendall(self, data):
+        diesel.send(data.encode(_enc))
+
+class FileLike(object):
+    """Gives you a file-like interface from a diesel Client."""
+    def __init__(self, client, mode, buffering, timeout):
+        self._client = client
+        self.mode = mode
+        self.buffering = buffering
+        self._extra = ""
+        self._timeout = timeout
+
+    # Properties To Stand In For diesel Client
+    # ----------------------------------------
+
+    @property
+    def conn(self):
+        return self._client.conn
+
+    @property
+    def connected(self):
+        return self._client.connected
+
+    @property
+    def is_closed(self):
+        return self._client.is_closed
+
+    # File-Like API
+    # -------------
 
     @diesel.call
     def read(self, size=None):
@@ -61,7 +95,6 @@ class SocketFileLike(diesel.Client):
     @diesel.call
     def write(self, data):
         diesel.send(data.encode(_enc))
-    sendall = write
 
     @diesel.call
     def next(self):
@@ -73,13 +106,13 @@ class SocketFileLike(diesel.Client):
     def __iter__(self):
         return self
 
-    def settimeout(self, n):
-        self._timeout = n
+    def close(self):
+        self._client.close()
 
 class HTTPConnection(httplib.HTTPConnection):
     def connect(self):
         try:
-            self.sock = SocketFileLike(self.host, self.port)
+            self.sock = SocketLike(self.host, self.port)
         except DNSResolutionError:
             raise requests.ConnectionError
 
@@ -87,7 +120,7 @@ class HTTPSConnection(httplib.HTTPSConnection):
     def connect(self):
         try:
             kw = {'ssl_ctx': SSL.Context(SSL.SSLv23_METHOD)}
-            self.sock = SocketFileLike(self.host, self.port, **kw)
+            self.sock = SocketLike(self.host, self.port, **kw)
         except DNSResolutionError:
             raise requests.ConnectionError
 
@@ -100,3 +133,4 @@ def enable_requests():
         raise RequestsLibNotFound(msg)
     connectionpool.HTTPConnection = HTTPConnection
     connectionpool.HTTPSConnection = HTTPSConnection
+
