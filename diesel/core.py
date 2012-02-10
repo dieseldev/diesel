@@ -29,9 +29,17 @@ class ClientConnectionClosed(socket.error):
     '''Raised if the remote server (for a Client call)
     closes the connection.
     '''
-    def __init__(self, msg, buffer=None):
+    def __init__(self, msg, buffer=None, addr=None, port=None):
         socket.error.__init__(self, msg)
         self.buffer = buffer
+        self.addr = addr
+        self.port = port
+
+    def __str__(self):
+        s = socket.error.__str__(self)
+        if self.addr and self.port:
+            s += ' (addr=%s, port=%s)' % (self.addr, self.port)
+        return s
 
 class ClientConnectionError(socket.error):
     '''Raised if a client cannot connect.
@@ -128,7 +136,7 @@ class call(object):
             finally:
                 current_loop.connection_stack.pop()
         except ConnectionClosed, e:
-            raise ClientConnectionClosed(str(e))
+            raise ClientConnectionClosed(str(e), addr=self.client.addr, port=self.client.port)
         return r
 
 current_loop = None
