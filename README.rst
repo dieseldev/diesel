@@ -44,16 +44,20 @@ or::
 Loops
 =====
 
-Before we jump into network programming, you should read a bit about loops.
-They are everywhere in diesel. Usually they loop. Sometimes they don't.
+Before we jump into network programming, you should learn a bit about Loops.
+Not the `for` and `while` variety, but the diesel variety. They are everywhere 
+in diesel, lurking behinds the scenes.
 
-Loops run inside of greenlets, which are a great way to implement coroutines in
-Python. At its core, diesel runs a coroutine scheduler. It switches between all
-of your loops and gives each one a chance to run. This is commonly known as
-cooperative multitasking.
+Loops are diesel's combination of your code plus greenlets. What are greenlets,
+you ask? They are lightweight threads that are managed by the Python VM, not
+your operating system.
 
-Now that you know about loops, you can pretty much forget them. Focus on
-functions. Focus on callables. Focus on the code you want to write.
+At its core, diesel runs a Loop scheduler. It switches between all of your
+Loops and gives each one a chance to run. This is commonly known as cooperative
+multitasking.
+
+Now that you know about Loops, you can pretty much forget them and focus on the
+code you want to write.
 
 Here's how you schedule a single function to run in diesel.
 
@@ -67,8 +71,8 @@ Here's how you schedule a single function to run in diesel.
 
     diesel.quickstart(say_hi)
 
-That function falls under the "doesn't loop" category. It gets scheduled,
-prints "hi" and then stops the diesel application. 
+That's pretty much the most boring diesel code ever. It gets wrapped up in a
+Loop, gets scheduled, prints "hi" and then stops the diesel application. 
 
 Here's a slightly more interesting function.
 
@@ -84,9 +88,11 @@ Here's a slightly more interesting function.
     diesel.quickstart(say_hi_forever)
 
 Hey, that one actually loops. It will print "hi" every second, forever - or
-until you hit Ctrl-C. Whichever comes first.
+until you hit Ctrl-C. Whichever comes first. The interesting part is the
+`diesel.sleep` call. That's where this code hands control back to the scheduler
+which will give other Loops a chance to run if they are waiting.
 
-So those are loops. Code you write that you want diesel to schedule.
+So those are Loops. Code you write that you want diesel to schedule.
 
 Services
 ========
@@ -94,10 +100,11 @@ Services
 Now you get to write a server! You'll actually just write a function and pass
 it to a Service and diesel will do the boring stuff for you.
 
-So Services. They come in two flavors. The first is called, um, Service. It's
-used when you want to write a TCP server. Then there's UDPService. Not much
-more to say about that. The naming disparity is due to the historical fact
-that diesel initially only supported TCP, and Service was TCP by default.
+Servers in diesel are composed of one or more Services, which come in two
+flavors. The first is called ... Service! It's used when you want to serve TCP
+clients. Then there's UDPService. You can probably guess what it does. The
+Service/UDPService naming disparity is due to the historical fact that diesel
+initially only supported TCP, and Service was TCP by default.
 
 Enough build-up though. Let's write a TCP server.
 
@@ -287,9 +294,9 @@ Utilities
 
 It takes more than Client and Service classes to knit together anything but a
 trivial example application. Happily diesel provides all sorts of useful
-utilities for composing robust, scalable network applications. Mind your
-pools and queues and read on, while we use them to extend trivial example
-applications.
+utilities for composing robust, scalable network applications. So mind your
+pools and queues and read on, while we use them to build ... trivial example
+applications!
 
 Queues
 ------
