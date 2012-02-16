@@ -621,6 +621,12 @@ class RedisClient(Client):
         resp = self._get_response()
         return dict(resp[x:x+2] for x in xrange(0, len(resp), 2))
 
+    @call
+    def hsetnx(self, key, field, value):
+        self._send('HSETNX', key, field, value)
+        resp = self._get_response()
+        return bool(resp)
+
     ##################################################
     ### Sorting...
     @call
