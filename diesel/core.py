@@ -474,7 +474,7 @@ class Connection(object):
 
     def set_writable(self, val):
         '''Set the associated socket writable.  Called when there is
-        data on the outgoing pipeline ready to be delivered to the 
+        data on the outgoing pipeline ready to be delivered to the
         remote host.
         '''
         if self.closed:
@@ -494,7 +494,7 @@ class Connection(object):
     def close(self):
         self.set_writable(True)
         self.pipeline.close_request()
-        
+
     def shutdown(self, remote_closed=False):
         '''Clean up after a client disconnects or after
         the connection_handler ends (and we disconnect).
@@ -524,7 +524,7 @@ class Connection(object):
                     code, s = e
                     if code in (errno.EAGAIN, errno.EINTR):
                         self.pipeline.backup(data)
-                        return 
+                        return
                     self.shutdown(True)
                 except (SSL.WantReadError, SSL.WantWriteError, SSL.WantX509LookupError):
                     self.pipeline.backup(data)
@@ -543,7 +543,7 @@ class Connection(object):
                         self.pipeline.backup(data[bsent:])
 
                     if not self.pipeline.empty:
-                        return 
+                        return
                     else:
                         self.set_writable(False)
 
@@ -584,8 +584,9 @@ class Connection(object):
 
 class Datagram(str):
     def __new__(self, payload, addr):
-        self.addr = addr
-        return str.__new__(self, payload)
+        inst = str.__new__(self, payload)
+        inst.addr = addr
+        return inst
 
 class UDPSocket(Connection):
     def __init__(self, parent, sock, ip=None, port=None):
@@ -595,6 +596,7 @@ class UDPSocket(Connection):
         del self.buffer
         del self.pipeline
         self.outgoing = deque([])
+        self.incoming = deque([])
 
     def queue_outgoing(self, msg, priority=5):
         dgram = Datagram(msg, self.parent.remote_addr)
@@ -602,6 +604,10 @@ class UDPSocket(Connection):
 
     def check_incoming(self, condition, callback):
         assert condition is datagram, "UDP supports datagram sentinels only"
+        if self.incoming:
+            value = self.incoming.popleft()
+            self.parent.remote_addr = value.addr
+            return value
         def _wrap(value=ContinueNothing):
             if isinstance(value, Datagram):
                 self.parent.remote_addr = value.addr
@@ -620,7 +626,7 @@ class UDPSocket(Connection):
                 code, s = e
                 if code in (errno.EAGAIN, errno.EINTR):
                     self.outgoing.appendleft(dgram)
-                    return 
+                    return
                 self.shutdown(True)
             except (SSL.WantReadError, SSL.WantWriteError, SSL.WantX509LookupError):
                 self.outgoing.appendleft(dgram)
@@ -664,15 +670,17 @@ class UDPSocket(Connection):
 
         if not dgram:
             self.shutdown(True)
-        else:
+        elif self.waiting_callback:
             self.waiting_callback(dgram)
+        else:
+            self.incoming.append(dgram)
 
     def cleanup(self):
         self.waiting_callback = None
 
     def close(self):
         self.set_writable(True)
-        
+
     def shutdown(self, remote_closed=False):
         '''Clean up after the connection_handler ends.'''
         self.hub.unregister(self.sock)
