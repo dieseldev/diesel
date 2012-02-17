@@ -88,7 +88,7 @@ class RedisClient(Client):
     def ttl(self, key):
         self._send('TTL', key)
         resp = self._get_response()
-        resp = None if resp == -1 else resp
+        resp = None if resp == -1 else int(resp)
         return resp
 
     @call
