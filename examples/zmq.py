@@ -18,7 +18,6 @@ def send_message():
     global t
     sleep(0.3)
 
-    print 'yeah?'
     zeromq_send("localhost", 5000, "yo dawg")
     t = time.time()
     for x in xrange(5000):
