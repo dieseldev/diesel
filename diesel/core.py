@@ -300,6 +300,16 @@ class Loop(object):
             if cancel_timer is not None:
                 cancel_timer.cancel()
             self.hub.unregister(sock)
+
+            try:
+                sock.getpeername()
+            except socket.error:
+                self.hub.schedule(
+                lambda: self.wake(
+                        ClientConnectionError("Could not connect to remote host")
+                    ))
+                return
+
             def finish():
                 client.conn = Connection(fsock, ip)
                 client.connected = True
@@ -326,15 +336,7 @@ class Loop(object):
                 ))
 
         def read_callback():
-            self.hub.unregister(sock)
-            try:
-                s = sock.recv(100)
-            except socket.error, e:
-                self.hub.schedule(
-                    lambda: self.wake(
-                        ClientConnectionError(str(e))
-                    ))
-
+            pass # don't slurp up data from the buffer!
 
         cancel_timer = None
         if timeout is not None:
