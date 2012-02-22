@@ -11,7 +11,6 @@ def handle_messages():
     delt = time.time() - t
     print "500000 messages in %ss (%.1f/s)" % (delt, 500000.0 / delt)
     quickstop()
-    pass
 
 def send_message():
     global t
