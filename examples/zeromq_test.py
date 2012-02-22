@@ -1,27 +1,31 @@
-from diesel import quickstart, Service, sleep
-from diesel.protocols.zeromq import ZeroMQSocketHandler, zeromq_send
-from diesel.util.event import Countdown
+from diesel import quickstart, quickstop, sleep
+from diesel.protocols.zeromq import DieselZMQSocket, zctx, zmq
 import time
 
-cd = Countdown(5000)
-t = None
+def handle_messages():
+    insock = DieselZMQSocket(zctx.socket(zmq.DEALER), bind="tcp://*:5000")
 
-def handle_message(identity, envelope, body):
-    assert body == "yo dawg"
-    cd.tick()
-
-def wait():
-    cd.wait()
-    print 'Sent 5000 zeromq messages in', time.time() - t, 'seconds'
+    for x in xrange(500000):
+        msg = insock.recv()
+        assert msg == "yo dawg %s" % x
+    delt = time.time() - t
+    print "500000 messages in %ss (%.1f/s)" % (delt, 500000.0 / delt)
+    quickstop()
+    pass
 
 def send_message():
     global t
-    sleep(0.3)
-
-    zeromq_send("localhost", 5000, "yo dawg")
+    outsock = DieselZMQSocket(zctx.socket(zmq.DEALER), connect="tcp://localhost:5000")
     t = time.time()
-    for x in xrange(5000):
-        zeromq_send("localhost", 5000, "yo dawg")
 
-quickstart(Service(ZeroMQSocketHandler(handle_message), port=5000), send_message, wait)
-#quickstart(send_message)
+    for x in xrange(500000):
+        outsock.send("yo dawg %s" % x)
+        if x % 1000 == 0:
+            sleep()
+
+def tick():
+    while True:
+        print "Other diesel stuff"
+        sleep(1)
+
+quickstart(handle_messages, send_message, tick)

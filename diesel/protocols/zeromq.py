@@ -1,142 +1,77 @@
-from diesel import receive, send, ConnectionClosed, Client, call, sleep
-from diesel.util.pool import ConnectionPool
-from struct import pack, unpack
+import zmq
+from errno import EAGAIN
+from collections import deque
+from diesel.util.queue import Queue
 
-class ZeroMQIdentityAnonymous(object): pass
-class ZeroMQIdentity(str): pass
+zctx = zmq.Context()
 
-class ZeroMQCommon(object):
-    def get_message(self):
-        bacc = []
-        envelope = None
-        while True:
-            n = receive(1)
-            # end of envelope?
-            if n == "\x01":
-                (flags,) = unpack("!B", receive(1))
-                assert flags & 1 == 1
-                envelope = ''.join(bacc)
-                bacc = []
-                continue
-            l = self.handle_length(n)
-            (flags,) = unpack("!B", receive(1))
-            has_more = bool(flags & 1)
-            body = receive(l - 1)
-            if has_more:
-                bacc.append(body)
-            else:
-                if bacc:
-                    whole = ''.join(bacc) + body
-                    bacc = []
+class DieselZMQSocket(object):
+    '''Integrate zmq's super fast event loop with ours.
+    '''
+    def __init__(self, socket, bind=None, connect=None):
+        self.socket = socket
+        from diesel.runtime import current_app
+        from diesel.hub import IntWrap
+
+        if bind:
+            assert not connect
+            self.socket.bind(bind)
+        elif connect:
+            assert not bind
+            self.socket.connect(connect)
+
+        self.hub = current_app.hub
+        self.fd = IntWrap(self.socket.getsockopt(zmq.FD))
+        self.outgoing = deque()
+        self.incoming = Queue()
+
+        self.hub.register(self.fd, self.handle_ready, self.flush_pending, self.error)
+
+    def send(self, message):
+        if self.outgoing:
+            self.outgoing.appendleft(message)
+        else:
+            try:
+                self.socket.send(message, zmq.NOBLOCK)
+            except zmq.ZMQError, e:
+                if e.errno == EAGAIN:
+                    self.outgoing.appendleft(message)
+                    self.hub.enable_write(self.fd)
                 else:
-                    whole = body
-                break
-        return envelope, whole
+                    raise
 
-    def send_identity(self, identity):
-        if isinstance(identity, ZeroMQIdentity):
-            id = str(identity)
-            self.send_length(len(id) + 1)
-            send("\x00" + identity)
-        else:
-            send("\x01\x00")
+    def recv(self):
+        return self.incoming.get()
 
-    def send_response(self, body, envelope):
-        if envelope is not None:
-            self.send_length(len(envelope) + 1)
-            send("\x01" + envelope)
-            if envelope != "":
-                send("\x01\x01") # envelope delimiter
-        self.send_length(len(body) + 1)
-        send("\x00") # final
-        send(body)
+    def handle_ready(self):
+        while True:
+            try:
+                msg = self.socket.recv(zmq.NOBLOCK)
+            except zmq.ZMQError, e:
+                if e.errno == EAGAIN:
+                    return
+                else:
+                    raise
+            else:
+                self.incoming.put(msg)
 
-    def send_length(self, l):
-        if l < 255:
-            send(pack("!B", l))
-        else:
-            send(pack("!BQ", 255, l))
+    def error(self):
+        raise RuntimeError("OH NOES, some weird zeromq FD error callback")
 
-    def handle_greeting(self):
-        b = receive(1)
-        if b == "\x01":
-            raw_flags = receive(1)
-            (flags,) = unpack("!B", raw_flags)
-            assert flags & 1 == 0 # final-ish??
-            # XXX give them the flags, back.  Why?  no clue.
-            return ZeroMQIdentityAnonymous()
-        l = self.handle_length()
-        raw_flags = receive(1)
-        (flags,) = unpack("!B", raw_flags)
-        assert flags & 1 == 0 # final-ish??
-        identity = receive(l - 1)
-        return ZeroMQIdentity(identity)
+    def flush_pending(self):
+        while self.outgoing:
+            i = self.outgoing.pop()
+            try:
+                self.socket.send(i, zmq.NOBLOCK)
+            except zmq.ZMQError, e:
+                self.outgoing.append(i)
+                if e.errno == EAGAIN:
+                    return
+                else:
+                    raise
 
-    def handle_length(self, init=None):
-        if not init:
-            init = receive(1)
+        if not self.outgoing:
+            self.hub.disable_write(self.fd)
 
-        if init != '\xff':
-            return unpack("!B", init)[0]
-
-        rawlen = receive(8)
-        return unpack("!Q", rawlen)[0]
-
-class ZeroMQSocketHandler(ZeroMQCommon):
-    def __init__(self, message_handler):
-        self.message_handler = message_handler
-
-    def __call__(self, addr):
-        try:
-            identity = self.handle_greeting()
-            self.send_identity(ZeroMQIdentityAnonymous())
-            while True:
-                envelope, message = self.get_message()
-                response = self.message_handler(identity, envelope, message)
-                if response:
-                    self.send_response(response, envelope)
-        except ConnectionClosed:
-            pass
-
-class ZeroMQClient(Client, ZeroMQCommon):
-    def __init__(self, *args, **kw):
-        if 'identity' in kw:
-            identity = kw.pop('identity')
-        else:
-            identity = ZeroMQIdentityAnonymous()
-        self.identity = identity
-        self.remote_identity = None
-        Client.__init__(self, *args, **kw)
-
-    @call
-    def on_connect(self):
-        self.send_identity(self.identity)
-        self.remote_identity = self.handle_greeting()
-
-    @call
-    def send(self, envelope, message):
-        self.send_response(message, envelope)
-
-    @call
-    def rpc(self, envelope, message):
-        self.send_response(message, envelope)
-        envelope, message = self.get_message()
-        return envelope, message
-
-zeromq_pools = {}
-
-def zeromq_send(host, port, message, envelope=None):
-    key = (host, port)
-    if key not in zeromq_pools:
-        zeromq_pools[key] = ConnectionPool(lambda: ZeroMQClient(host, port), lambda c: c.close())
-
-    with zeromq_pools[key].connection as conn:
-        conn.send(envelope, message)
-
-def zeromq_rpc(host, port, message, envelope=None):
-    key = (host, port)
-    if key not in zeromq_pools:
-        zeromq_pools[key] = ConnectionPool(lambda: ZeroMQClient(host, port), lambda c: c.close())
-
-    with zeromq_pools[key].connection as conn:
-        return conn.rpc(envelope, message)
+    def __del__(self):
+        self.hub.unregister(self.fd)
