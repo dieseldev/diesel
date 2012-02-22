@@ -71,6 +71,8 @@ class _PipeWrap(object):
     def fileno(self):
         return self.p
 
+class IntWrap(_PipeWrap): pass
+
 class AbstractEventHub(object):
     def __init__(self):
         self.timers = deque()
