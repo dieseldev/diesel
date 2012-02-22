@@ -3,7 +3,7 @@ from diesel.protocols.zeromq import DieselZMQSocket, zctx, zmq
 import time
 
 def handle_messages():
-    insock = DieselZMQSocket(zctx.socket(zmq.DEALER), bind="tcp://*:5000")
+    insock = DieselZMQSocket(zctx.socket(zmq.DEALER), bind="inproc://foo")
 
     for x in xrange(500000):
         msg = insock.recv()
@@ -15,7 +15,7 @@ def handle_messages():
 
 def send_message():
     global t
-    outsock = DieselZMQSocket(zctx.socket(zmq.DEALER), connect="tcp://localhost:5000")
+    outsock = DieselZMQSocket(zctx.socket(zmq.DEALER), connect="inproc://foo")
     t = time.time()
 
     for x in xrange(500000):
