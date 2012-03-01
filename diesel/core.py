@@ -77,6 +77,7 @@ class datagram(object):
 datagram = datagram()
 _datagram = datagram
 
+
 def receive(*args, **kw):
     return current_loop.input_op(*args, **kw)
 
@@ -425,7 +426,7 @@ class Loop(object):
         else:
             self.coroutine.switch()
 
-    def input_op(self, sentinel_or_receive):
+    def input_op(self, sentinel_or_receive=buffer.BufAny):
         v = self._input_op(sentinel_or_receive)
         if v:
             return v

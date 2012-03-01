@@ -1,4 +1,7 @@
 # vim:ts=4:sw=4:expandtab
+class BufAny(object):
+    pass
+
 class Buffer(object):
     '''An input buffer.
 
@@ -39,6 +42,10 @@ class Buffer(object):
         '''
         ind = None
         all = None
+        if self._atterm is BufAny:
+            if self.has_data:
+                return self.pop()
+            return None
         if type(self._atterm) is int:
             if self._atmark >= self._atterm:
                 ind = self._atterm
@@ -66,3 +73,7 @@ class Buffer(object):
         self._atinbuf = []
         self._atmark = 0
         return b
+
+    @property
+    def has_data(self):
+        return bool(self._atinbuf)
