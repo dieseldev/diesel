@@ -115,9 +115,9 @@ WebSocket-Protocol: diesel-generic\r
                             assert opcode == 1, "Currently only opcode 1 is supported (opcode=%s)" % opcode
                             length = b2 & 0x7f
                             if length == 126:
-                                length = unpack('>H', receive(2))
+                                length = unpack('>H', receive(2))[0]
                             elif length == 127:
-                                length = unpack('>L', receive(8))
+                                length = unpack('>L', receive(8))[0]
 
                             mask = unpack('>BBBB', receive(4))
                             payload = array('B', receive(length))

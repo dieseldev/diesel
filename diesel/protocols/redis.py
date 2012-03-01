@@ -88,7 +88,7 @@ class RedisClient(Client):
     def ttl(self, key):
         self._send('TTL', key)
         resp = self._get_response()
-        resp = None if resp == -1 else resp
+        resp = None if resp == -1 else int(resp)
         return resp
 
     @call
@@ -620,6 +620,12 @@ class RedisClient(Client):
         self._send('HGETALL', key)
         resp = self._get_response()
         return dict(resp[x:x+2] for x in xrange(0, len(resp), 2))
+
+    @call
+    def hsetnx(self, key, field, value):
+        self._send('HSETNX', key, field, value)
+        resp = self._get_response()
+        return bool(resp)
 
     ##################################################
     ### Sorting...

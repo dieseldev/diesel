@@ -29,9 +29,17 @@ class ClientConnectionClosed(socket.error):
     '''Raised if the remote server (for a Client call)
     closes the connection.
     '''
-    def __init__(self, msg, buffer=None):
+    def __init__(self, msg, buffer=None, addr=None, port=None):
         socket.error.__init__(self, msg)
         self.buffer = buffer
+        self.addr = addr
+        self.port = port
+
+    def __str__(self):
+        s = socket.error.__str__(self)
+        if self.addr and self.port:
+            s += ' (addr=%s, port=%s)' % (self.addr, self.port)
+        return s
 
 class ClientConnectionError(socket.error):
     '''Raised if a client cannot connect.
@@ -128,7 +136,7 @@ class call(object):
             finally:
                 current_loop.connection_stack.pop()
         except ConnectionClosed, e:
-            raise ClientConnectionClosed(str(e))
+            raise ClientConnectionClosed(str(e), addr=self.client.addr, port=self.client.port)
         return r
 
 current_loop = None
@@ -292,6 +300,16 @@ class Loop(object):
             if cancel_timer is not None:
                 cancel_timer.cancel()
             self.hub.unregister(sock)
+
+            try:
+                sock.getpeername()
+            except socket.error:
+                self.hub.schedule(
+                lambda: self.wake(
+                        ClientConnectionError("Could not connect to remote host")
+                    ))
+                return
+
             def finish():
                 client.conn = Connection(fsock, ip)
                 client.connected = True
@@ -318,15 +336,7 @@ class Loop(object):
                 ))
 
         def read_callback():
-            self.hub.unregister(sock)
-            try:
-                s = sock.recv(100)
-            except socket.error, e:
-                self.hub.schedule(
-                    lambda: self.wake(
-                        ClientConnectionError(str(e))
-                    ))
-
+            pass # don't slurp up data from the buffer!
 
         cancel_timer = None
         if timeout is not None:
@@ -468,7 +478,7 @@ class Connection(object):
 
     def set_writable(self, val):
         '''Set the associated socket writable.  Called when there is
-        data on the outgoing pipeline ready to be delivered to the 
+        data on the outgoing pipeline ready to be delivered to the
         remote host.
         '''
         if self.closed:
@@ -488,7 +498,7 @@ class Connection(object):
     def close(self):
         self.set_writable(True)
         self.pipeline.close_request()
-        
+
     def shutdown(self, remote_closed=False):
         '''Clean up after a client disconnects or after
         the connection_handler ends (and we disconnect).
@@ -518,7 +528,7 @@ class Connection(object):
                     code, s = e
                     if code in (errno.EAGAIN, errno.EINTR):
                         self.pipeline.backup(data)
-                        return 
+                        return
                     self.shutdown(True)
                 except (SSL.WantReadError, SSL.WantWriteError, SSL.WantX509LookupError):
                     self.pipeline.backup(data)
@@ -537,7 +547,7 @@ class Connection(object):
                         self.pipeline.backup(data[bsent:])
 
                     if not self.pipeline.empty:
-                        return 
+                        return
                     else:
                         self.set_writable(False)
 
@@ -578,8 +588,9 @@ class Connection(object):
 
 class Datagram(str):
     def __new__(self, payload, addr):
-        self.addr = addr
-        return str.__new__(self, payload)
+        inst = str.__new__(self, payload)
+        inst.addr = addr
+        return inst
 
 class UDPSocket(Connection):
     def __init__(self, parent, sock, ip=None, port=None):
@@ -589,6 +600,7 @@ class UDPSocket(Connection):
         del self.buffer
         del self.pipeline
         self.outgoing = deque([])
+        self.incoming = deque([])
 
     def queue_outgoing(self, msg, priority=5):
         dgram = Datagram(msg, self.parent.remote_addr)
@@ -596,6 +608,10 @@ class UDPSocket(Connection):
 
     def check_incoming(self, condition, callback):
         assert condition is datagram, "UDP supports datagram sentinels only"
+        if self.incoming:
+            value = self.incoming.popleft()
+            self.parent.remote_addr = value.addr
+            return value
         def _wrap(value=ContinueNothing):
             if isinstance(value, Datagram):
                 self.parent.remote_addr = value.addr
@@ -614,7 +630,7 @@ class UDPSocket(Connection):
                 code, s = e
                 if code in (errno.EAGAIN, errno.EINTR):
                     self.outgoing.appendleft(dgram)
-                    return 
+                    return
                 self.shutdown(True)
             except (SSL.WantReadError, SSL.WantWriteError, SSL.WantX509LookupError):
                 self.outgoing.appendleft(dgram)
@@ -658,15 +674,17 @@ class UDPSocket(Connection):
 
         if not dgram:
             self.shutdown(True)
-        else:
+        elif self.waiting_callback:
             self.waiting_callback(dgram)
+        else:
+            self.incoming.append(dgram)
 
     def cleanup(self):
         self.waiting_callback = None
 
     def close(self):
         self.set_writable(True)
-        
+
     def shutdown(self, remote_closed=False):
         '''Clean up after the connection_handler ends.'''
         self.hub.unregister(self.sock)

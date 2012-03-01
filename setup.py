@@ -1,4 +1,4 @@
-import sys 
+import sys
 assert sys.version_info >= (2, 6), \
 "Diesel requires python 2.6 (or greater 2.X release)"
 
@@ -32,7 +32,7 @@ Other bundled protocols include MongoDB, Riak, and Redis client libraries.
 ''',
     url="http://dieselweb.org",
     download_url="http://jamwt.com/diesel/diesel-%s.tar.gz" % VERSION,
-    packages=["diesel", "diesel.protocols", "diesel.util"],
+    packages=["diesel", "diesel.protocols", "diesel.util", "diesel.util.patches"],
     scripts=["examples/dhttpd"],
     entry_points={
         'console_scripts': [
@@ -42,9 +42,8 @@ Other bundled protocols include MongoDB, Riak, and Redis client libraries.
         ],
     },
     install_requires=([
-        "greenlet", 
-        "pyev", 
-        "pyopenssl", 
+        "greenlet",
+        "pyopenssl",
         "flask",
         "dnspython",
     ] + additional_requires),
