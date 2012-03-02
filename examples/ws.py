@@ -6,7 +6,7 @@ from diesel.util.queue import QueueTimeout
 
 app = DieselFlask(__name__)
 
-LOCATION = "ws://172.16.26.128:8080/ws"
+LOCATION = "ws://localhost:8080/ws"
 
 content = '''
 <html>
