@@ -58,10 +58,11 @@ class ConnContextWrapper(object):
 class ThreadPoolDie(object): pass
 
 class ThreadPool(object):
-    def __init__(self, concurrency, handler, generator):
+    def __init__(self, concurrency, handler, generator, finalizer=None):
         self.concurrency = concurrency
         self.handler = handler
         self.generator = generator
+        self.finalizer = finalizer
 
     def handler_wrap(self):
         try:
@@ -79,10 +80,13 @@ class ThreadPool(object):
             self.running -=1
             if self.waiting == 0:
                 self.trigger.set()
+            if self.running == 0:
+                self.finished.set()
 
     def __call__(self):
         self.q = Queue()
         self.trigger = Event()
+        self.finished = Event()
         self.waiting = 0
         self.running = 0
         try:
@@ -105,3 +109,6 @@ class ThreadPool(object):
         finally:
             for x in xrange(self.concurrency):
                 self.q.put(ThreadPoolDie)
+            if self.finalizer:
+                self.finished.wait()
+                fork(self.finalizer)
