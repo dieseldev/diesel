@@ -16,15 +16,15 @@ if not base_dir.endswith('/'):
 
 assert schema == 'http', 'http only'
 
-from diesel import Application, Loop, log, ConnectionClosed
-from diesel.protocols.http import HttpClient, HttpHeaders
+from diesel import log as glog, quickstart, quickstop
+from diesel.protocols.http import HttpClient
+from diesel.util.pool import ThreadPool, ConnectionPool
 
 CONCURRENCY = 10 # go easy on those apache instances!
-count = 0
-files = 1
 
 url_exp = re.compile(r'(src|href)="([^"]+)', re.MULTILINE | re.IGNORECASE)
-links = None
+
+heads = {'Host' : host}
 
 def get_links(s):
     for mo in url_exp.finditer(s):
@@ -35,11 +35,7 @@ def get_links(s):
             else:
                 yield urljoin(base_dir, lpath)
 
-def get_client():
-    client = HttpClient(host, 80)
-    heads = HttpHeaders()
-    heads.set('Host', host)
-    return client, heads
+conn_pool = ConnectionPool(lambda: HttpClient(host, 80), lambda c: c.close(), pool_size=CONCURRENCY)
 
 def ensure_dirs(lpath):
     def g(lpath):
@@ -51,55 +47,44 @@ def ensure_dirs(lpath):
             os.mkdir(d)
 
 def write_file(lpath, body):
+    bytes.append(len(body))
     lpath = (lpath if not lpath.endswith('/') else (lpath + 'index.html')).lstrip('/')
     lpath = os.path.join(folder, lpath)
     ensure_dirs(lpath)
     open(lpath, 'w').write(body)
 
-def follow_loop():
-    global count
-    global files
-    count += 1
-    client, heads = get_client()
-    while True:
-        try:
-            lpath = links.next()
-        except StopIteration:
-            count -= 1
-            if not count:
-                stop()
-            break
-        log.info(" -> %s" % lpath )
-        for x in xrange(2):
-            try:
-                if client.is_closed:
-                    client, heads = get_client()
-                code, heads, body = client.request('GET', lpath, heads)
-            except ConnectionClosed:
-                pass
-            else:
-                write_file(lpath, body)
-                files +=1
-                break
-    
+def follow_loop(lpath):
+    log.info(" -> %s" % lpath)
+    with conn_pool.connection as client:
+        resp = client.request('GET', lpath, heads)
+        write_file(lpath, resp.data)
+
+bytes = []
+count = None
+log = None
+
 def req_loop():
-    global links
-    client, heads = get_client()
+    global count
+    global log
+
+    log = glog.sublog('http-crawler', glog.info)
+
     log.info(path)
-    code, heads, body = client.request('GET', path, heads)
+    with conn_pool.connection as client:
+        resp = client.request('GET', path, heads)
+    body = resp.data
     write_file(path, body)
-    links = get_links(body)
-    for x in xrange(CONCURRENCY):
-        a.add_loop(Loop(follow_loop))
-
-a = Application()
-a.add_loop(Loop(req_loop))
-
-log = log.sublog('http-crawler', log.info)
+    links = set(get_links(body))
+    for l in links:
+        yield l
+    count = len(links) + 1
 
 def stop():
-    log.info("Fetched %s files in %.3fs with concurrency=%s" % (files, time.time() - t, CONCURRENCY))
-    a.halt() # stop application
+    log.info("Fetched %s files (%s bytes) in %.3fs with concurrency=%s" % (count, sum(bytes), time.time() - t, CONCURRENCY))
+    quickstop()
 
 t = time.time()
-a.run()
+
+pool = ThreadPool(CONCURRENCY, follow_loop, req_loop().next, stop)
+
+quickstart(pool)
