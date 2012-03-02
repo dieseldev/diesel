@@ -6,12 +6,11 @@ many concurrent clients.
 '''
 
 from diesel import Application, Loop, log
-from diesel.protocols.http import HttpClient, HttpHeaders
+from diesel.protocols.http import HttpClient
 
 def req_loop():
     with HttpClient('www.jamwt.com', 80) as client:
-        heads = HttpHeaders()
-        heads.set('Host', 'www.jamwt.com')
+        heads = {'Host' : 'www.jamwt.com'}
         log.info(client.request('GET', '/Py-TOC/', heads))
         log.info(client.request('GET', '/', heads))
     a.halt()
