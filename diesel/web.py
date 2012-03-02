@@ -15,6 +15,9 @@ class DieselFlask(Flask):
         self._logger = self.make_logger()
         self._logger.name = self.logger_name
 
+    def request_class(self, environ):
+        return environ # `id` -- environ IS the existing request.  no need to make another
+
     @classmethod
     def make_application(cls):
         return Application()
@@ -38,6 +41,14 @@ class DieselFlask(Flask):
         elif exc_info:
             self.logger.error(traceback.format_exc())
 
+    def handle_request(self, req):
+        with self.request_context(req):
+            try:
+                response = self.full_dispatch_request()
+            except Exception, e:
+                response = self.make_response(self.handle_exception(e))
+        return response
+
     def run(self, port=8080, iface='', verbosity=LOGLVL_DEBUG, debug=True):
         if debug:
             self.debug = True
@@ -48,6 +59,6 @@ class DieselFlask(Flask):
 
         from diesel.protocols.wsgi import WSGIRequestHandler
         from diesel.protocols.http import HttpServer
-        http_service = Service(HttpServer(WSGIRequestHandler(self.wsgi_app, port)), port, iface)
+        http_service = Service(HttpServer(self.handle_request), port, iface)
         self.diesel_app.add_service(http_service)
         self.diesel_app.run()

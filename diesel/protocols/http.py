@@ -4,7 +4,7 @@
 import cStringIO
 import os
 import urllib
-from werkzeug import Request, Response
+from flask import Request, Response
 from collections import defaultdict
 from OpenSSL import SSL
 
@@ -50,15 +50,6 @@ class HttpServer(object):
         an HttpRequest object and generates a response.
         '''
         self.request_handler = request_handler
-
-    BODY_CHUNKED, BODY_CL, BODY_NONE = range(3)
-
-    def check_for_http_body(self, heads):
-        if heads.get_one('Transfer-Encoding') == 'chunked':
-            return self.BODY_CHUNKED
-        elif 'Content-Length' in heads:
-            return self.BODY_CL
-        return self.BODY_NONE
 
     def __call__(self, addr):
         '''Since an instance of HttpServer is passed to the Service
