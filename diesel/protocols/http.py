@@ -4,6 +4,7 @@
 import cStringIO
 import os
 import urllib
+from urlparse import urlparse
 from flask import Request, Response
 from collections import defaultdict
 from OpenSSL import SSL
@@ -74,13 +75,15 @@ class HttpServer(object):
 
                 env = h.get_wsgi_environ()
 
-                env['wsgi.version'] = (1,0)
-                env['wsgi.url_scheme'] = 'http' # XXX incomplete
-                env['wsgi.input'] = cStringIO.StringIO(''.join(body))
-                env['wsgi.errors'] = FileLikeErrorLogger(log)
-                env['wsgi.multithread'] = False
-                env['wsgi.multiprocess'] = False
-                env['wsgi.run_once'] = False
+                env.update({
+                    'wsgi.version' : (1,0),
+                    'wsgi.url_scheme' : 'http', # XXX incomplete
+                    'wsgi.input' : cStringIO.StringIO(''.join(body)),
+                    'wsgi.errors' : FileLikeErrorLogger(log),
+                    'wsgi.multithread' : False,
+                    'wsgi.multiprocess' : False,
+                    'wsgi.run_once' : False,
+                    })
                 req = Request(env)
 
                 resp = self.request_handler(req)
@@ -116,45 +119,8 @@ class TimeoutHandler(object):
     def timeout(self):
         raise HttpRequestTimeout()
 
-def handle_chunks(headers, timeout=None):
-    '''Generic chunk handling code, used by both client
-    and server.
-
-    Modifies the passed-in HttpHeaders instance.
-    '''
-    timeout_handler = TimeoutHandler(timeout or 60)
-
-    chunks = []
-    while True:
-        ev, val = first(until_eol=True, sleep=timeout_handler.remaining())
-        if ev == 'sleep': timeout_handler.timeout()
-
-        chunk_head = val
-
-        if ';' in chunk_head:
-            # we don't support any chunk extensions
-            chunk_head = chunk_head[:chunk_head.find(';')]
-        size = int(chunk_head, 16)
-        if size == 0:
-            break
-        else:
-            chunks.append(receive(size))
-            _ = receive(2) # ignore trailing CRLF
-
-    while True:
-        ev, val = first(until_eol=True, sleep=timeout_handler.remaining())
-        if ev == 'sleep': timeout_handler.timeout()
-
-        trailer = val
-
-        if trailer.strip():
-            headers.add(*tuple(trailer.split(':', 1)))
-        else:
-            body = ''.join(chunks)
-            headers.set('Content-Length', len(body))
-            headers.remove('Transfer-Encoding')
-            break
-    return body
+def cgi_name(n):
+    return 'HTTP_' + n.upper().replace('-', '_')
 
 class HttpClient(Client):
     '''An HttpClient instance that issues 1.1 requests,
@@ -163,8 +129,9 @@ class HttpClient(Client):
     Does not support sending chunks, yet... body must
     be a string.
     '''
+    url_scheme = "http"
     @call
-    def request(self, method, path, headers, body=None, timeout=None):
+    def request(self, method, url, headers={}, body=None, timeout=None):
         '''Issues a `method` request to `path` on the
         connected server.  Sends along `headers`, and
         body.
@@ -173,67 +140,56 @@ class HttpClient(Client):
         for example.  It will set Content-Length,
         however.
         '''
+        url_info = urlparse(url)
+        fake_wsgi = dict(
+        (cgi_name(n), v) for n, v in headers.iteritems())
+        fake_wsgi.update({
+            'HTTP_METHOD' : method,
+            'SCRIPT_NAME' : '',
+            'PATH_INFO' : url_info[2],
+            'QUERY_STRING' : url_info[4],
+            'wsgi.version' : (1,0),
+            'wsgi.url_scheme' : 'http', # XXX incomplete
+            'wsgi.input' : cStringIO.StringIO(body or ''),
+            'wsgi.errors' : FileLikeErrorLogger(log),
+            'wsgi.multithread' : False,
+            'wsgi.multiprocess' : False,
+            'wsgi.run_once' : False,
+            })
+        req = Request(fake_wsgi)
+
         timeout_handler = TimeoutHandler(timeout or 60)
-        req = HttpRequest(method, path, '1.1')
 
-        if body:
-            headers.set('Content-Length', len(body))
-
-        send('%s\r\n%s\r\n\r\n' % (req.format(),
-        headers.format()))
+        send('%s %s HTTP/1.1\r\n%s' % (req.method, req.url, str(req.headers)))
 
         if body:
             send(body)
 
-        ev, val = first(until_eol=True, sleep=timeout_handler.remaining())
-        if ev == 'sleep': timeout_handler.timeout()
+        h = HttpParser()
+        body = []
+        data = None
+        while True:
+            if data:
+                used = h.execute(data, len(data))
+                if h.is_headers_complete():
+                    body.append(h.recv_body())
+                if h.is_message_complete():
+                    data = data[used:]
+                    break
+            ev, val = first(receive_any=True, sleep=timeout_handler.remaining())
+            if ev == 'sleep': timeout_handler.timeout()
+            data = val
 
-        resp_line = val
+        resp = Response(
+            response=''.join(body),
+            status=h.get_status_code(),
+            headers=h.get_headers(),
+            )
 
-        try:
-            version, code, reason = resp_line.split(None, 2)
-        except ValueError:
-            # empty reason string
-            version, code = resp_line.split(None, 1)
-            reason = ''
-
-        code = int(code)
-
-        ev, val = first(until="\r\n\r\n", sleep=timeout_handler.remaining())
-        if ev == 'sleep': timeout_handler.timeout()
-
-        header_block = val
-
-        heads = HttpHeaders()
-        heads.parse(header_block)
-
-        if method == 'HEAD':
-            body = None
-        elif heads.get_one('Transfer-Encoding') == 'chunked':
-            body = handle_chunks(heads, timeout_handler.remaining())
-        elif heads.get_one('Connection') == 'close' and 'Content-Length' not in heads:
-            body = ''
-            try:
-                while True:
-                    s = receive(2**16)
-                    body += s
-            except ConnectionClosed, e:
-                if e.buffer:
-                    body += e.buffer
-        else:
-            cl = int(heads.get_one('Content-Length', 0))
-            if cl:
-                ev, val = first(receive=cl, sleep=timeout_handler.remaining())
-                if ev == 'sleep': timeout_handler.timeout()
-                body = val
-            else:
-                body = None
-
-        if version < '1.0' or heads.get_one('Connection') == 'close':
-            self.close()
-        return code, heads, body
+        return resp
 
 class HttpsClient(HttpClient):
+    url_scheme = "http"
     def __init__(self, *args, **kw):
         kw['ssl_ctx'] = SSL.Context(SSL.SSLv23_METHOD)
         HttpClient.__init__(self, *args, **kw)
