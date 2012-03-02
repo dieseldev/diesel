@@ -2,7 +2,8 @@ import time
 
 from diesel import Service, Application, sleep, first
 from diesel.web import DieselFlask
-from diesel.util.queue import QueueTimeout, Fanout
+from diesel.protocols.websockets import WebSocketDisconnect
+from diesel.util.queue import Fanout
 
 app = DieselFlask(__name__)
 
@@ -96,15 +97,12 @@ def web_handler():
 def socket_handler(req, inq, outq):
     with f.sub() as group:
         while True:
-            try:
-                q, v = first(waits=[inq, group])
-            except QueueTimeout:
-                pass
-            else:
-                if q == group:
-                    outq.put(dict(message=v['message'], nick=v['nick']))
-                else:
-                    if v.get('nick', '').strip() and v.get('message', '').strip():
-                        f.pub(v)
+            q, v = first(waits=[inq, group])
+            if q == group:
+                outq.put(dict(message=v['message'], nick=v['nick']))
+            elif isinstance(v, WebSocketDisconnect):
+                return
+            elif v.get('nick', '').strip() and v.get('message', '').strip():
+                f.pub(v)
 
 app.run()
