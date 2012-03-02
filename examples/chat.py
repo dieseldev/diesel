@@ -1,4 +1,4 @@
-import time
+import time, cgi
 
 from diesel import Service, Application, sleep, first
 from diesel.web import DieselFlask
@@ -103,6 +103,9 @@ def socket_handler(req, inq, outq):
             elif isinstance(v, WebSocketDisconnect):
                 return
             elif v.get('nick', '').strip() and v.get('message', '').strip():
-                f.pub(v)
+                f.pub({
+                    'nick' : cgi.escape(v['nick'].strip()),
+                    'message' : cgi.escape(v['message'].strip()),
+                    })
 
 app.run()
