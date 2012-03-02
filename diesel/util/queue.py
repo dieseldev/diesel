@@ -1,6 +1,7 @@
 from time import time
 from uuid import uuid4
 from collections import deque
+from contextlib import contextmanager
 
 from diesel import wait, fire, sleep, first
 from diesel.events import Waiter, StopWaitDispatch
@@ -51,3 +52,20 @@ class Queue(Waiter):
 
     def ready_early(self):
         return not self.is_empty
+
+class Fanout(object):
+    def __init__(self):
+        self.subs = set()
+
+    def pub(self, m):
+        for s in self.subs:
+            s.put(m)
+
+    @contextmanager
+    def sub(self):
+        q = Queue()
+        self.subs.add(q)
+        try:
+            yield q
+        finally:
+            self.subs.remove(q)
