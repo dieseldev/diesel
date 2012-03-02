@@ -10,71 +10,33 @@ import mimetypes
 
 from diesel import Application, Service, log
 from diesel.protocols import http
+from diesel.web import send_from_directory, DieselFlask
 
 BASE = '.'
 PORT = 8080
-DEFAULT_FILE = "index.html"
 
-def static_http(req):
-    ct = 'text/plain'
-    if req.method != 'GET':
-        content = 'Method unsupported'
-        code = 501
-    else:
-        assert '..' not in req.url, "Very basic security..."
-        path = (req.url + DEFAULT_FILE) if req.url.endswith('/') else req.url
-        serve_path = os.path.join(BASE, path[1:])
-        if not os.path.exists(serve_path):
-            code = 404
-            content = 'Not found'
-        else:
-            try:
-                content = open(serve_path, 'rb')
-            except IOError:
-                content = 'Permission denied'
-                code = 403
-            else:
-                code = 200
-                ct = mimetypes.guess_type(serve_path)[0] or 'application/octet-stream'
+app = DieselFlask(__file__)
 
-    headers = http.HttpHeaders()
-    if type(content) in (str, unicode):
-        headers.add('Content-Length', len(content))
-    else:
-        headers.add('Connection', 'close')
+@app.route("/<path:file>")
+def static_http(file):
+    return send_from_directory(BASE, file)
 
-    headers.add('Content-Type', ct)
-    
-    log.info('%s %s %s' % (req.method, req.url, code))
-    return http.http_response(req, code, headers, content)
-
-app = None
 def run():
-    global app
-    global log
-
-    app = Application()
-    app.add_service(Service(http.HttpServer(static_http), PORT))
-    log = log.sublog('http', log.info)
     app.run()
 
 def cli():
     global BASE
     global PORT
-    global DEFAULT_FILE
 
     from optparse import OptionParser
 
     parser = OptionParser()
     parser.add_option("-d", "--directory", dest="directory",
-                      help="serve files from DIRECTORY", 
+                      help="serve files from DIRECTORY",
                      metavar="DIRECTORY", default=BASE)
     parser.add_option("-p", "--port", dest="port",
-                      help="listen on port PORT", 
+                      help="listen on port PORT",
                      metavar="PORT", default=PORT, type="int")
-    parser.add_option("-i", "--index-name", dest="index",
-                      help="name of index file", 
-                      default=DEFAULT_FILE)
 
     (options, args) = parser.parse_args()
 
@@ -85,8 +47,6 @@ def cli():
         BASE = options.directory
     if options.port:
         PORT = options.port
-    if options.index:
-        DEFAULT_FILE = options.index
 
     run()
 
