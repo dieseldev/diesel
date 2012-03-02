@@ -246,7 +246,7 @@ class Loop(object):
         self.loop_label = label
 
     def first(self, sleep=None, waits=None,
-            receive=None, until=None, until_eol=None, datagram=None):
+            receive_any=None, receive=None, until=None, until_eol=None, datagram=None):
         def marked_cb(kw):
             def deco(f):
                 def mark(d):
@@ -256,11 +256,14 @@ class Loop(object):
                 return mark
             return deco
 
-        f_sent = filter(None, (receive, until, until_eol, datagram))
+        f_sent = filter(None, (receive_any, receive, until, until_eol, datagram))
         assert len(f_sent) <= 1,(
-        "only 1 of (receive, until, until_eol, datagram) may be provided")
+        "only 1 of (receive_any, receive, until, until_eol, datagram) may be provided")
         sentinel = None
-        if receive:
+        if receive_any:
+            sentinel = buffer.BufAny
+            tok = 'receive_any'
+        elif receive:
             sentinel = receive
             tok = 'receive'
         elif until:
