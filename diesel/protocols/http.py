@@ -87,14 +87,27 @@ class HttpServer(object):
                 req = Request(env)
 
                 resp = self.request_handler(req)
+                if 'X-Sendfile' in resp.headers:
+                    sendfile = resp.headers.pop('X-Sendfile')
+                    size = os.stat(sendfile).st_size
+                    resp.headers.set('Content-Length', str(size))
+                else:
+                    sendfile = None
+
                 assert resp, "HTTP request handler _must_ return a response"
 
-                body = resp.data
                 send("HTTP/%s %s %s\r\n" % (('%s.%s' % h.get_version()), resp.status_code, resp.status))
                 send(str(resp.headers))
-                send(body)
 
-                if (not h.should_keep_alive()) or resp.headers.get('Connection', '').lower() == "close":
+                if sendfile:
+                    send(open(sendfile, 'rb')) # diesel can stream fds
+                else:
+                    for i in resp.iter_encoded():
+                        send(i)
+
+                if (not h.should_keep_alive()) or \
+                    resp.headers.get('Connection', '').lower() == "close" or \
+                    resp.headers.get('Content-Length') == None:
                     return
 
             except ConnectionClosed:

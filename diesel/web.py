@@ -1,4 +1,5 @@
 '''Slight wrapper around flask to fit the diesel
+
 mold.
 '''
 import traceback
@@ -14,6 +15,8 @@ class DieselFlask(Flask):
         Flask.__init__(self, name, *args, **kw)
         self._logger = self.make_logger()
         self._logger.name = self.logger_name
+
+    use_x_sendfile = True
 
     def request_class(self, environ):
         return environ # `id` -- environ IS the existing request.  no need to make another
