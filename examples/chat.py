@@ -1,21 +1,112 @@
-# vim:ts=4:sw=4:expandtab
-'''Simple chat server.
+import time
 
-telnet, type your name, hit enter, then chat.  Invite
-a friend to do the same.
-'''
-from diesel import Application, Service, until_eol, fire, wait, first, send
+from diesel import Service, Application, sleep, first
+from diesel.web import DieselFlask
+from diesel.util.queue import QueueTimeout, Fanout
 
-def chat_server(addr):
-    my_nick = until_eol().strip()
-    while True:
-        ev, val = first(until_eol=True, waits=['chat_message'])
-        if ev == 'until_eol':
-            fire('chat_message', (my_nick, val.strip()))
-        else:
-            nick, message = val
-            send("<%s> %s\r\n"  % (nick, message))
+app = DieselFlask(__name__)
 
-app = Application()
-app.add_service(Service(chat_server, 8000))
+LOCATION = "ws://localhost:8080/ws"
+
+content = '''
+<html>
+<head>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js" type="text/javascript"></script>
+<script>
+
+var chatter = new WebSocket("%s");
+
+chatter.onopen = function (evt) {
+}
+
+chatter.onmessage = function (evt) {
+    var res = JSON.parse(evt.data);
+    var p = $('#the-chat');
+    var add = $('<div class="chat-message"><span class="nick">&lt;' + res.nick +
+    '&gt;</span> ' + res.message + '</div>');
+    p.append(add);
+    if (p.children().length > 15)
+        p.children().first().remove();
+}
+
+function push () {
+    chatter.send(JSON.stringify({
+        message: $('#the-message').val(),
+        nick: $('#the-nick').val()
+    }));
+    $('#the-message').val('');
+    $('#the-message').focus();
+}
+
+$(function() {
+    $('#the-button').click(push);
+    $('#the-message').keyup(function (evt) { if (evt.keyCode == 13) push(); });
+});
+
+</script>
+
+<style>
+
+body {
+    width: 800px;
+    margin: 25px auto;
+}
+
+#the-chat {
+    margin: 15px 8px;
+}
+
+.chat-message {
+    margin: 4px 0;
+}
+
+
+.nick {
+    font-weight: bold;
+    color: #555;
+}
+
+</style>
+
+</head>
+<body>
+
+<h2>Diesel WebSocket Chat</h2>
+
+<div style="font-size: 13px; font-weight: bold; margin-bottom: 10px">
+Nick: <input type="text" size="10" id="the-nick" />&nbsp;&nbsp;
+Message: <input type="text" size="60" id="the-message" />&nbsp;&nbsp;
+<input type="button" value="Send" id="the-button"/>
+</div>
+
+<div id="the-chat">
+</div>
+
+</body>
+</html>
+''' % LOCATION
+
+
+f = Fanout()
+
+@app.route("/")
+def web_handler():
+    return content
+
+@app.route("/ws")
+@app.websocket
+def socket_handler(req, inq, outq):
+    with f.sub() as group:
+        while True:
+            try:
+                q, v = first(waits=[inq, group])
+            except QueueTimeout:
+                pass
+            else:
+                if q == group:
+                    outq.put(dict(message=v['message'], nick=v['nick']))
+                else:
+                    if v.get('nick', '').strip() and v.get('message', '').strip():
+                        f.pub(v)
+
 app.run()
