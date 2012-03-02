@@ -1,9 +1,12 @@
-from diesel.protocols.http import http_response, HttpHeaders
-from diesel.protocols.websockets import WebSocketServer, WebSocketData as WSD
+import time
+
 from diesel import Service, Application, sleep
+from diesel.web import DieselFlask
 from diesel.util.queue import QueueTimeout
 
-LOCATION = "ws://localhost:8091/"
+app = DieselFlask(__name__)
+
+LOCATION = "ws://172.16.26.128:8080/ws"
 
 content = '''
 <html>
@@ -43,15 +46,12 @@ function push () {
 </html>
 ''' % LOCATION
 
-def web_handler(req):
-    heads = HttpHeaders()
-    heads.add('Content-Length', len(content))
-    heads.add('Content-Type', 'text/html')
+@app.route("/")
+def web_handler():
+    return content
 
-    return http_response(req, 200, heads, content)
-
-import time
-
+@app.route("/ws")
+@app.websocket
 def socket_handler(req, inq, outq):
     message = "hello, there!"
     while True:
@@ -62,8 +62,6 @@ def socket_handler(req, inq, outq):
         else:
             message = v['message']
 
-        outq.put(WSD(message=message, time=time.time()))
+        outq.put(dict(message=message, time=time.time()))
 
-a = Application()
-a.add_service(Service(WebSocketServer(web_handler, socket_handler, LOCATION), 8091))
-a.run()
+app.run()

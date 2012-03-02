@@ -87,23 +87,10 @@ class HttpServer(object):
                 req = Request(env)
 
                 resp = self.request_handler(req)
-                if 'X-Sendfile' in resp.headers:
-                    sendfile = resp.headers.pop('X-Sendfile')
-                    size = os.stat(sendfile).st_size
-                    resp.headers.set('Content-Length', str(size))
-                else:
-                    sendfile = None
 
                 assert resp, "HTTP request handler _must_ return a response"
 
-                send("HTTP/%s %s %s\r\n" % (('%s.%s' % h.get_version()), resp.status_code, resp.status))
-                send(str(resp.headers))
-
-                if sendfile:
-                    send(open(sendfile, 'rb')) # diesel can stream fds
-                else:
-                    for i in resp.iter_encoded():
-                        send(i)
+                self.send_response(resp, version=h.get_version())
 
                 if (not h.should_keep_alive()) or \
                     resp.headers.get('Connection', '').lower() == "close" or \
@@ -112,6 +99,23 @@ class HttpServer(object):
 
             except ConnectionClosed:
                 break
+
+    def send_response(self, resp, version=(1,1)):
+        if 'X-Sendfile' in resp.headers:
+            sendfile = resp.headers.pop('X-Sendfile')
+            size = os.stat(sendfile).st_size
+            resp.headers.set('Content-Length', str(size))
+        else:
+            sendfile = None
+
+        send("HTTP/%s %s %s\r\n" % (('%s.%s' % version), resp.status_code, resp.status))
+        send(str(resp.headers))
+
+        if sendfile:
+            send(open(sendfile, 'rb')) # diesel can stream fds
+        else:
+            for i in resp.iter_encoded():
+                send(i)
 
 import time
 from diesel import Client, call, sleep, first

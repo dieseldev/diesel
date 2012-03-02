@@ -5,6 +5,7 @@ mold.
 import traceback
 
 from flask import * # we're essentially republishing
+from diesel.protocols.websockets import WebSocketServer
 
 from app import Application, Service
 from logmod import Logger, LOGLVL_DEBUG
@@ -65,3 +66,12 @@ class DieselFlask(Flask):
         http_service = Service(HttpServer(self.handle_request), port, iface)
         self.diesel_app.add_service(http_service)
         self.diesel_app.run()
+
+    def websocket(self, f):
+        def no_web(req):
+            assert 0, "Only `Upgrade` HTTP requests on a @websocket"
+        ws = WebSocketServer(no_web, f)
+        def ws_call(*args, **kw):
+            assert not args and not kw, "No arguments allowed to websocket routes"
+            ws.do_upgrade(request)
+        return ws_call
