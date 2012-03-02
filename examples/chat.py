@@ -6,15 +6,13 @@ from diesel.util.queue import QueueTimeout, Fanout
 
 app = DieselFlask(__name__)
 
-LOCATION = "ws://localhost:8080/ws"
-
 content = '''
 <html>
 <head>
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js" type="text/javascript"></script>
 <script>
 
-var chatter = new WebSocket("%s");
+var chatter = new WebSocket("ws://" + document.location.host + "/ws");
 
 chatter.onopen = function (evt) {
 }
@@ -84,7 +82,7 @@ Message: <input type="text" size="60" id="the-message" />&nbsp;&nbsp;
 
 </body>
 </html>
-''' % LOCATION
+'''
 
 
 f = Fanout()
