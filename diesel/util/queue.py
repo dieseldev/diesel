@@ -1,5 +1,6 @@
 from time import time
 from uuid import uuid4
+import random
 from collections import deque
 from contextlib import contextmanager
 
@@ -69,3 +70,34 @@ class Fanout(object):
             yield q
         finally:
             self.subs.remove(q)
+
+class Dispatcher(object):
+    def __init__(self):
+        self.subs = {}
+        self.keys = []
+        self.backlog = []
+
+    def dispatch(self, m):
+        if self.subs:
+            k = random.choice(self.keys)
+            self.subs[k].put(m)
+        else:
+            self.backlog.append(m)
+
+    @contextmanager
+    def accept(self):
+        q = Queue()
+        if self.backlog:
+            for b in self.backlog:
+                q.put(b)
+            self.backlog = []
+        id = uuid4()
+        self.subs[id] = q
+        self.keys = list(self.subs)
+        try:
+            yield q
+        finally:
+            del self.subs[id]
+            self.keys = list(self.subs)
+            while not q.is_empty:
+                self.dispatch(q.get())
