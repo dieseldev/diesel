@@ -184,7 +184,8 @@ class Loop(object):
             pass
         except:
             log.error("-- Unhandled Exception in local loop <%s> --" % self.loop_label)
-            log.error(traceback.format_exc())
+            for line in traceback.format_exc().splitlines():
+                log.error("    " + line)
         finally:
             if self.connection_stack:
                 assert len(self.connection_stack) == 1
