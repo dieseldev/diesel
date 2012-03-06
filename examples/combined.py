@@ -1,11 +1,5 @@
-# vim:ts=4:sw=4:expandtab
-'''Combine Client, Server, and Loop, in one crazy app.
-
-Just give it a run and off it goes.
-'''
-
 import time
-from diesel import Application, Service, Client, Loop, send
+from diesel import Service, Client, send, quickstart, quickstop
 from diesel import until, call, log
 
 def handle_echo(remote_addr):
@@ -20,8 +14,7 @@ class EchoClient(Client):
         back = until("\r\n")
         return back
 
-app = Application()
-log = log.sublog('echo-system', log.info)
+log = log.name('echo-system')
 
 def do_echos():
     client = EchoClient('localhost', 8000)
@@ -30,9 +23,7 @@ def do_echos():
         msg = "hello, world #%s!" % x
         echo_result = client.echo(msg)
         assert echo_result.strip() == "you said: %s" % msg
-    log.info('5000 loops in %.2fs' % (time.time() - t))
-    app.halt()
+    log.info('5000 loops in {0:.2f}s', time.time() - t)
+    quickstop()
 
-app.add_service(Service(handle_echo, port=8000))
-app.add_loop(Loop(do_echos))
-app.run()
+quickstart(Service(handle_echo, port=8000), do_echos)

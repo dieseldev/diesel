@@ -3,7 +3,11 @@
 '''
 import time
 import random
-from diesel import Application, Loop, sleep, fire, wait, log
+from diesel import (quickstart, quickstop, sleep, 
+                    fire, wait, log, loglevels,
+                    set_log_level)
+
+set_log_level(loglevels.DEBUG)
 
 def gunner():
     x = 1
@@ -17,14 +21,11 @@ def sieged():
     while True:
         n = wait('bam')
         if n % 10000 == 0:
-            log.info(n)
+            log.info(str(n))
             if n == 50000:
                 delt = time.time() - t
-                log.info("50,000 messages in %.3fs (%.1f/s)" % (delt, 50000 / delt))
-                a.halt()
+                log.debug("50,000 messages in {0:.3f}s {1:.1f}/s)", delt, 50000 / delt)
+                quickstop()
 
-a = Application()
-log = log.sublog('fire-system', log.info)
-a.add_loop(Loop(gunner))
-a.add_loop(Loop(sieged))
-a.run()
+log = log.name('fire-system')
+quickstart(gunner, sieged)

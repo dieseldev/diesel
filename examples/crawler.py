@@ -61,13 +61,10 @@ def follow_loop(lpath):
 
 bytes = []
 count = None
-log = None
+log = glog.name('http-crawler')
 
 def req_loop():
     global count
-    global log
-
-    log = glog.sublog('http-crawler', glog.info)
 
     log.info(path)
     with conn_pool.connection as client:

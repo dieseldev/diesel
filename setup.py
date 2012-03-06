@@ -6,7 +6,7 @@ from setuptools import setup
 
 additional_requires = []
 
-VERSION = "2.1.1"
+VERSION = "3.0b1"
 
 setup(name="diesel",
     version=VERSION,
@@ -43,6 +43,7 @@ Other bundled protocols include MongoDB, Riak, and Redis client libraries.
     },
     install_requires=([
         "greenlet",
+        "twiggy",
         "pyopenssl",
         "flask",
         "http-parser",

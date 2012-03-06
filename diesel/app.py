@@ -8,7 +8,7 @@ import errno
 from greenlet import greenlet
 
 from diesel.hub import EventHub
-from diesel import logmod, log, Connection, UDPSocket, Loop
+from diesel import log, Connection, UDPSocket, Loop
 from diesel.security import ssl_async_handshake
 from diesel import runtime
 from diesel.events import WaitPool
@@ -20,16 +20,12 @@ class Application(object):
     the coordinating entity that runs all Services, Loops,
     Client protocol work, etc.
     '''
-    def __init__(self, logger=None, allow_app_replacement=False):
+    def __init__(self, allow_app_replacement=False):
         assert (allow_app_replacement or runtime.current_app is None), "Only one Application instance per program allowed"
         runtime.current_app = self
         self.hub = EventHub()
         self.waits = WaitPool()
         self._run = False
-        if logger is None:
-            logger = logmod.Logger()
-        self.logger = logger
-        logmod.set_current_application(self)
         self._services = []
         self._loops = []
 
@@ -37,7 +33,7 @@ class Application(object):
 
     def global_bail(self, msg):
         def bail():
-            self.logger.critical("ABORTING: %s" % msg)
+            log.critical("ABORTING: {0}", msg)
             self.halt()
         return bail
 
@@ -46,8 +42,7 @@ class Application(object):
         or .halt() is called.
         '''
         self._run = True
-        log.warn('Starting diesel <%s>'
-                % self.hub.describe)
+        log.warning('Starting diesel <{0}>', self.hub.describe)
 
         for s in self._services:
             s.bind_and_listen()
@@ -62,13 +57,13 @@ class Application(object):
                 try:
                     self.hub.handle_events()
                 except SystemExit:
-                    log.warn("-- SystemExit raised.. exiting main loop --")
+                    log.warning("-- SystemExit raised.. exiting main loop --")
                     break
                 except KeyboardInterrupt:
-                    log.warn("-- KeyboardInterrupt raised.. exiting main loop --")
+                    log.warning("-- KeyboardInterrupt raised.. exiting main loop --")
                     break
                 except ApplicationEnd:
-                    log.warn("-- ApplicationEnd raised.. exiting main loop --")
+                    log.warning("-- ApplicationEnd raised.. exiting main loop --")
                     break
                 except Exception, e:
                     log.error("-- Unhandled Exception rose to main loop --")
@@ -143,8 +138,8 @@ class Service(object):
         self.ssl_ctx = ssl_ctx
 
     def handle_cannot_bind(self, reason):
-        log.critical("service at %s:%s cannot bind: %s" % (self.iface or '*', 
-                self.port, reason))
+        log.critical("service at {0}:{1} cannot bind: {2}", 
+            self.iface or '*', self.port, reason)
         raise
 
     def register(self, app):
@@ -230,8 +225,8 @@ class UDPService(Service):
         pass
 
 
-def quickstart(*args):
-    app = Application()
+def quickstart(*args, **kw):
+    app = Application(**kw)
     args = list(args)
     for a in args:
         if isinstance(a, Thunk):

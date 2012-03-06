@@ -2,7 +2,7 @@
 '''Simple RedisSubHub client example.
 '''
 
-from diesel import Application, Loop, log, sleep
+from diesel import Application, Loop, sleep
 from diesel.protocols.redis import RedisSubHub, RedisClient
 import time, sys
 

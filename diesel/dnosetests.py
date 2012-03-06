@@ -10,24 +10,11 @@ diesel green threads and network-based applications built with diesel.
 import diesel
 import nose
 
-from diesel.logmod import LOGLVL_ERR, Logger
-
-
-class QuietApplication(diesel.Application):
-    """A diesel Application that doesn't log as much.
-    
-    This keeps diesel from spewing its own status to stdout and lets nose
-    run the show.
-    
-    """
-    def __init__(self):
-        log = Logger(verbosity=LOGLVL_ERR)
-        super(QuietApplication, self).__init__(logger=log)
+from diesel.logmod import loglevels, set_log_level
 
 def main():
-    app = QuietApplication()
-    app.add_loop(diesel.Loop(nose.main))
-    app.run()
+    set_log_level(loglevels.ERROR)
+    quickstart(nose.main)
 
 if __name__ == '__main__':
     main()

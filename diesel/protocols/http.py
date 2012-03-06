@@ -16,6 +16,8 @@ except ImportError:
 
 from diesel import until, until_eol, receive, ConnectionClosed, send, log
 
+hlog = log.name("http-error")
+
 HOSTNAME = os.uname()[1] # win32?
 
 def parse_request_line(line):
@@ -79,7 +81,7 @@ class HttpServer(object):
                     'wsgi.version' : (1,0),
                     'wsgi.url_scheme' : 'http', # XXX incomplete
                     'wsgi.input' : cStringIO.StringIO(''.join(body)),
-                    'wsgi.errors' : FileLikeErrorLogger(log),
+                    'wsgi.errors' : FileLikeErrorLogger(hlog),
                     'wsgi.multithread' : False,
                     'wsgi.multiprocess' : False,
                     'wsgi.run_once' : False,
@@ -168,7 +170,7 @@ class HttpClient(Client):
             'wsgi.version' : (1,0),
             'wsgi.url_scheme' : 'http', # XXX incomplete
             'wsgi.input' : cStringIO.StringIO(body or ''),
-            'wsgi.errors' : FileLikeErrorLogger(log),
+            'wsgi.errors' : FileLikeErrorLogger(hlog),
             'wsgi.multithread' : False,
             'wsgi.multiprocess' : False,
             'wsgi.run_once' : False,

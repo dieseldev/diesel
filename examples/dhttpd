@@ -12,13 +12,16 @@ from diesel import Application, Service, log
 from diesel.protocols import http
 from diesel.web import send_from_directory, DieselFlask
 
+log = log.name("dhttpd")
+
 BASE = '.'
 PORT = 8080
 
 app = DieselFlask(__file__)
 
-@app.route("/<path:file>")
+@app.route("/<path:file>", methods=["GET"])
 def static_http(file):
+    log.info("GET {0}", file)
     return send_from_directory(BASE, file)
 
 def run():

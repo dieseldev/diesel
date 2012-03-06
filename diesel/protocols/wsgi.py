@@ -4,7 +4,7 @@ diesel's HTTP module.
 
 Note: not well-tested.  Contributions welcome.
 """
-from diesel import Application, Service, log
+from diesel import Application, Service
 from diesel.protocols.http import HttpServer, Response
 
 import functools

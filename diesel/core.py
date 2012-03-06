@@ -197,7 +197,7 @@ class Loop(object):
             self.parent = None
 
         if self.keep_alive:
-            log.warn("(Keep-Alive loop %s died; restarting)" % self)
+            log.warning("(Keep-Alive loop %s died; restarting)" % self)
             self.reset()
             self.hub.call_later(0.5, self.wake)
 

@@ -6,22 +6,22 @@ q = Queue()
 cd = Countdown(4)
 
 def putter():
-    log = glog.sublog("putter", glog.info)
-    
-    log.info("putting 100000 things on log")
+    log = glog.name("putter")
+
+    log.info("putting 100000 things on queue")
     for x in xrange(100000):
         q.put(x)
         sleep()
 
 def getter():
-    log = glog.sublog("getter", glog.info)
+    log = glog.name("getter")
     got = 0
     while got < 25000:
         try:
             s = q.get(timeout=3)
             sleep()
         except QueueTimeout:
-            log.warn("timeout before getting a value, retrying...")
+            log.warning("timeout before getting a value, retrying...")
             continue
         got += 1
 
