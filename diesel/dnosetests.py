@@ -13,7 +13,7 @@ import nose
 from diesel.logmod import levels, set_log_level
 
 def main():
-    set_log_level(levels.ERROR)
+    set_log_level(levels.CRITICAL)
     diesel.quickstart(nose.main)
 
 if __name__ == '__main__':
