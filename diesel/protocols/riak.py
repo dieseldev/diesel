@@ -18,11 +18,11 @@ from diesel.util.queue import Queue, QueueEmpty
 from diesel.util.event import Event
 
 try:
-    import riak_proto as riak_pb2 # fastproto-enabled
+    import riak_palm
+    from palm import palm
 except ImportError:
     import sys
-    sys.stderr.write("Warning: must use fastproto protocol buffers library.\n")
-    sys.stderr.write("See diesel/tools/riak_fastproto.")
+    sys.stderr.write("Warning: must use the palm (https://github.com/bumptech/palm/)\nprotocol buffers library to generate riak_palm.py\n")
     raise SystemExit(1)
 
 from contextlib import contextmanager
@@ -31,31 +31,31 @@ from contextlib import contextmanager
 # responses that don't have a body.
 
 MESSAGE_CODES = [
-(0, riak_pb2.RpbErrorResp),
-#(1, riak_pb2.RpbPingReq),
-#(2, riak_pb2.RpbPingResp),
-#(3, riak_pb2.RpbGetClientIdReq),
-(4, riak_pb2.RpbGetClientIdResp),
-(5, riak_pb2.RpbSetClientIdReq),
-#(6, riak_pb2.RpbSetClientIdResp),
-#(7, riak_pb2.RpbGetServerInfoReq),
-(8, riak_pb2.RpbGetServerInfoResp),
-(9, riak_pb2.RpbGetReq ),
-(10, riak_pb2.RpbGetResp),
-(11, riak_pb2.RpbPutReq ),
-(12, riak_pb2.RpbPutResp),
-(13, riak_pb2.RpbDelReq ),
-#(14, riak_pb2.RpbDelResp),
-#(15, riak_pb2.RpbListBucketsReq),
-(16, riak_pb2.RpbListBucketsResp),
-(17, riak_pb2.RpbListKeysReq),
-(18, riak_pb2.RpbListKeysResp),
-(19, riak_pb2.RpbGetBucketReq),
-(20, riak_pb2.RpbGetBucketResp),
-(21, riak_pb2.RpbSetBucketReq),
-#(22, riak_pb2.RpbSetBucketResp),
-(23, riak_pb2.RpbMapRedReq),
-(24, riak_pb2.RpbMapRedResp),
+(0, riak_palm.RpbErrorResp),
+#(1, riak_palm.RpbPingReq),
+#(2, riak_palm.RpbPingResp),
+#(3, riak_palm.RpbGetClientIdReq),
+(4, riak_palm.RpbGetClientIdResp),
+(5, riak_palm.RpbSetClientIdReq),
+#(6, riak_palm.RpbSetClientIdResp),
+#(7, riak_palm.RpbGetServerInfoReq),
+(8, riak_palm.RpbGetServerInfoResp),
+(9, riak_palm.RpbGetReq ),
+(10, riak_palm.RpbGetResp),
+(11, riak_palm.RpbPutReq ),
+(12, riak_palm.RpbPutResp),
+(13, riak_palm.RpbDelReq ),
+#(14, riak_palm.RpbDelResp),
+#(15, riak_palm.RpbListBucketsReq),
+(16, riak_palm.RpbListBucketsResp),
+(17, riak_palm.RpbListKeysReq),
+(18, riak_palm.RpbListKeysResp),
+(19, riak_palm.RpbGetBucketReq),
+(20, riak_palm.RpbGetBucketResp),
+(21, riak_palm.RpbSetBucketReq),
+#(22, riak_palm.RpbSetBucketResp),
+(23, riak_palm.RpbMapRedReq),
+(24, riak_palm.RpbMapRedResp),
 ]
 
 resolutions_in_progress = {}
@@ -316,7 +316,7 @@ class RiakClient(diesel.Client):
         and the vector clock (vclock) for the key.
         
         """
-        request = riak_pb2.RpbGetReq(bucket=bucket, key=key)
+        request = riak_palm.RpbGetReq(bucket=bucket, key=key)
         self._send(request)
         response = self._receive()
         if response:
@@ -335,8 +335,8 @@ class RiakClient(diesel.Client):
         dict_content={'value':value}
         if 'extra_content' in params:
             dict_content.update(params.pop('extra_content'))
-        content = riak_pb2.RpbContent(**dict_content)
-        request = riak_pb2.RpbPutReq(
+        content = riak_palm.RpbContent(**dict_content)
+        request = riak_palm.RpbPutReq(
             bucket=bucket,
             key=key,
             content=content,
@@ -351,17 +351,17 @@ class RiakClient(diesel.Client):
     @diesel.call
     def delete(self, bucket, key):
         """Deletes the given key from the named bucket, including all values."""
-        request = riak_pb2.RpbDelReq(bucket=bucket, key=key)
+        request = riak_palm.RpbDelReq(bucket=bucket, key=key)
         self._send(request)
         return self._receive()
 
     @diesel.call
     def keys(self, bucket):
         """Gets the keys for the given bucket, is an iterator"""
-        request = riak_pb2.RpbListKeysReq(bucket=bucket)
+        request = riak_palm.RpbListKeysReq(bucket=bucket)
         self._send(request)
 
-        response = riak_pb2.RpbListKeysResp(done=False) #Do/while?
+        response = riak_palm.RpbListKeysResp(done=False) #Do/while?
         while not response.done:
             response = self._receive()
             for key in response.keys:
@@ -384,8 +384,8 @@ class RiakClient(diesel.Client):
         RpbBucketProps protocol buffer.
         
         """
-        request = riak_pb2.RpbSetBucketReq(bucket=bucket)
-        bucket_props = riak_pb2.RpbBucketProps()
+        request = riak_palm.RpbSetBucketReq(bucket=bucket)
+        bucket_props = riak_palm.RpbBucketProps()
         for name, value in props.iteritems():
             setattr(bucket_props, name, value)
         request.props = bucket_props
@@ -401,7 +401,7 @@ class RiakClient(diesel.Client):
         actors within your system.
 
         """
-        request = riak_pb2.RpbSetClientIdReq(client_id=client_id)
+        request = riak_palm.RpbSetClientIdReq(client_id=client_id)
         self._send(request)
         return self._receive()
 
@@ -409,7 +409,7 @@ class RiakClient(diesel.Client):
     def _send(self, pb):
         # Send a protocol buffer on the wire as a request.
         message_code = PB_TO_MESSAGE_CODE[pb.__class__]
-        message = pb.SerializeToString()
+        message = pb.dumps()
         message_size = len(message)
         total_size = message_size + 1 # plus 1 mc byte
         fmt = "!iB%ds" % message_size
@@ -423,8 +423,8 @@ class RiakClient(diesel.Client):
         message_code, = struct.unpack('B',raw_response[0])
         response = raw_response[1:]
         if response:
-            pb = MESSAGE_CODE_TO_PB[message_code]()
-            pb.ParseFromString(response)
+            pb_cls = MESSAGE_CODE_TO_PB[message_code]
+            pb = pb_cls(response)
             if message_code == 0:
                 # RpbErrorResp - raise an exception
                 raise RiakErrorResp(pb)
@@ -434,28 +434,18 @@ def _to_dict(pb):
     # Takes a protocol buffer (pb) and transforms it into a dict of more
     # common Python types.
     out = {}
-    if hasattr(pb, 'ListFields'):
-        fields = [d.name for (d, _) in pb.ListFields()]
-    else:
-        fields = [f for f in dir(pb) if f[0].islower()]
-    for name in fields:
+    for name in pb.fields():
+        if name not in pb:
+            continue
         value = getattr(pb, name)
-        # Perform a couple sniff tests to see if a value is:
-        # a) A protocol buffer
-        # b) An iterable protocol buffer
-        # c) Neither
-        # Handles all of those situations.
-        try:
-            if type(value) == tuple:
-                value = [_to_dict(v) for v in iter(value)]
-            else:
-                value.ParseFromString
-                try:
-                    value = [_to_dict(v) for v in iter(value)]
-                except TypeError:
-                    value = _to_dict(v)
-        except AttributeError:
-            pass
+        def maybe_recurse(v):
+            if isinstance(v, palm.ProtoBase):
+                return _to_dict(v)
+            return v
+        if isinstance(value, palm.RepeatedSequence):
+            value = [maybe_recurse(v) for v in iter(value)]
+        else:
+            value = maybe_recurse(value)
         out[name] = value
     return out
 
@@ -504,7 +494,8 @@ if __name__ == '__main__':
         b = Bucket('testing', c, resolver=resolve_longest)
         resolved = b.get('bar')
         assert resolved == 'bye', resolved
-        assert len(c.get('testing', 'bar')['content']) == 1
+        #print c.get('testing', 'bar')['content']
+        #assert len(c.get('testing', 'bar')['content']) == 1
 
         # put/get/delete with a Bucket
         assert b.put('lala', 'g'*1024)
@@ -557,6 +548,10 @@ if __name__ == '__main__':
         there = p5.get('there')
         assert (3,7) == (there.x, there.y), (there.x, there.y)
         assert isinstance(there, Point)
+        
+        # resolve on put
+        p5.put('there', Point(1,9)) # should resolve b/c safe=True
+        assert len(c.get('testing.pickles', 'there')['content']) == 1
 
         # Doing stuff with different client ids but the same vector clock.
         c.set_client_id('diff 1')
