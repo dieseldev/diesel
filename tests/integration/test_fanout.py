@@ -3,9 +3,11 @@ import uuid
 import diesel
 
 from diesel.util.queue import Fanout
+from diesel.util.event import Countdown
 
 class FanoutHarness(object):
     def setup(self):
+        self.done = Countdown(10)
         self.fan = Fanout()
         self.subscriber_data = {}
         for x in xrange(10):
@@ -13,13 +15,14 @@ class FanoutHarness(object):
         diesel.sleep()
         for i in xrange(10):
             self.fan.pub(i)
-        diesel.sleep()
+        self.done.wait()
 
     def subscriber(self):
         self.subscriber_data[uuid.uuid4()] = data = []
         with self.fan.sub() as q:
             for i in xrange(10):
                 data.append(q.get())
+        self.done.tick()
 
 class TestFanout(FanoutHarness):
     def test_all_subscribers_get_the_published_messages(self):
