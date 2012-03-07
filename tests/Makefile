@@ -1,8 +1,8 @@
-WV=./wvtestrun ./wvtest.py
-default: test-basic
+default: test-core
 
-test-basic:
-	$(WV) diesel_test_basic_*.py
+test-all:
+	dnosetests unit/ integration/ protocol/
 
-test-short:
-	$(WV) `ls diesel_test_basic_*.py | grep -v _fork`
+test-core:
+	dnosetests unit/ integration/
+
