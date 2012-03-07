@@ -4,10 +4,13 @@
 import cStringIO
 import os
 import urllib
+from datetime import datetime
 from urlparse import urlparse
 from flask import Request, Response
 from collections import defaultdict
 from OpenSSL import SSL
+
+utcnow = datetime.utcnow
 
 try:
     from http_parser.parser import HttpParser
@@ -93,6 +96,8 @@ class HttpServer(object):
                 resp = self.request_handler(req)
                 if 'Server' not in resp.headers:
                     resp.headers.add('Server', SERVER_TAG)
+                if 'Date' not in resp.headers:
+                    resp.headers.add('Date', utcnow().strftime("%a, %d %b %Y %H:%M:%S UTC"))
 
                 assert resp, "HTTP request handler _must_ return a response"
 
