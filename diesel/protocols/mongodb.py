@@ -276,7 +276,13 @@ class MongoCursor(object):
         if self.retrieved:
             raise ValueError("can't count an already started cursor")
         db, col = self.col.split('.', 1)
-        command = SON([('count', col), ('query', self.spec)])
+        l = [('count', col), ('query', self.spec)]
+        if self.skip:
+            l.append(('skip', self.skip))
+        if self.limit:
+            l.append(('limit', self.limit))
+
+        command = SON(l)
         result = self.client._command(db, command)
         return int(result.get('n', 0))
 
