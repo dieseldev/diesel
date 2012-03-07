@@ -21,6 +21,7 @@ class Waiter(object):
         return False
 
 class StringWaiter(str, Waiter):
+    @property
     def wait_id(self):
         return str(self)
 
