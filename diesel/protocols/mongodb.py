@@ -296,10 +296,10 @@ class MongoCursor(object):
 
     def _touch_query(self):
         if self._query_additions:
-            spec = SON({'query': self.spec})
+            spec = SON({'$query': self.spec or {}})
             for k, v in self._query_additions:
                 if k == 'sort':
-                    ordering = spec.setdefault('orderby', SON())
+                    ordering = spec.setdefault('$orderby', SON())
                     ordering.update(v)
             self.spec = spec
         
