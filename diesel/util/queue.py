@@ -1,10 +1,9 @@
-from time import time
 from uuid import uuid4
 import random
 from collections import deque
 from contextlib import contextmanager
 
-from diesel import wait, fire, sleep, first
+from diesel import fire, sleep, first
 from diesel.events import Waiter, StopWaitDispatch
 
 class QueueEmpty(Exception): pass
@@ -20,7 +19,9 @@ class Queue(Waiter):
 
     def get(self, waiting=True, timeout=None):
         if self.inp:
-            return self.inp.popleft()
+            val = self.inp.popleft()
+            sleep()
+            return val
         mark = None
 
         if waiting:

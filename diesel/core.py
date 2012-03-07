@@ -381,7 +381,7 @@ class Loop(object):
     def wait(self, event):
         v = self._wait(event)
         if type(v) is EarlyValue:
-            return v
+            return v.val
         return self.dispatch()
 
     def _wait(self, event, cb_maker=identity):
@@ -392,6 +392,7 @@ class Loop(object):
             self.hub.schedule(call_in)
         v = self.app.waits.wait(self, event)
         if type(v) is EarlyValue:
+            self.sleep()
             return v
         self.fire_handlers[v] = cb
 
