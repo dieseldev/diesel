@@ -16,6 +16,8 @@ except ImportError:
 
 from diesel import until, until_eol, receive, ConnectionClosed, send, log
 
+SERVER_TAG = 'diesel-http-server'
+
 hlog = log.name("http-error")
 
 HOSTNAME = os.uname()[1] # win32?
@@ -89,6 +91,8 @@ class HttpServer(object):
                 req = Request(env)
 
                 resp = self.request_handler(req)
+                if 'Server' not in resp.headers:
+                    resp.headers.add('Server', SERVER_TAG)
 
                 assert resp, "HTTP request handler _must_ return a response"
 
