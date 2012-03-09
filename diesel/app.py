@@ -226,12 +226,15 @@ class UDPService(Service):
 
 
 def quickstart(*args, **kw):
-    app = Application(**kw)
+    if '__app' in kw:
+        app = kw.pop('__app')
+    else:
+        app = Application(**kw)
     args = list(args)
     for a in args:
         if isinstance(a, Thunk):
             a = a.eval()
-        if isinstance(a, list):
+        if isinstance(a, (list, tuple)):
             args.extend(a)
         elif isinstance(a, Service):
             app.add_service(a)

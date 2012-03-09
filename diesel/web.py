@@ -8,12 +8,13 @@ from flask import * # we're essentially republishing
 from werkzeug.debug import tbtools
 from diesel.protocols.websockets import WebSocketServer
 
-from app import Application, Service
+from app import Application, Service, quickstart
 from diesel import log, set_log_level, loglevels
 
 
 class DieselFlask(Flask):
     def __init__(self, name, *args, **kw):
+        self.jobs = []
         self.diesel_app = self.make_application()
         Flask.__init__(self, name, *args, **kw)
         self.make_logger()
@@ -49,6 +50,9 @@ class DieselFlask(Flask):
         for line in o.splitlines():
             self._dlog.error('    ' + line)
 
+    def schedule(self, *args):
+        self.jobs.append(args)
+
     def handle_request(self, req):
         with self.request_context(req):
             try:
@@ -72,10 +76,9 @@ class DieselFlask(Flask):
         from diesel.protocols.wsgi import WSGIRequestHandler
         from diesel.protocols.http import HttpServer
         http_service = Service(HttpServer(self.handle_request), port, iface)
-        self.diesel_app.add_service(http_service)
-        self.diesel_app.run()
+        self.schedule(http_service)
+        quickstart(*self.jobs, __app=self.diesel_app)
 
-    
 
     def websocket(self, f):
         def no_web(req):
