@@ -8,10 +8,10 @@ Why Diesel?
 
 You should write your next network application using diesel.
 
-Thanks to Python the syntax is clean and the development pace is rapid. Thanks
-to non-blocking I/O it's fast and scalable. Thanks to coroutines there's
-unwind(to(callbacks(no))). Thanks to nose it's trivial to test. Thanks to Flask
-you don't need to write a new web framework using it.
+Thanks to Python_ the syntax is clean and the development pace is rapid. Thanks
+to non-blocking I/O it's fast and scalable. Thanks to greenlets_ there's
+unwind(to(callbacks(no))). Thanks to nose_ it's trivial to test. Thanks to
+Flask_ you don't need to write a new web framework using it.
 
 It provides a clean API for writing network clients and servers. TCP and UDP
 supported. It bundles battle-tested clients for HTTP, DNS, Redis, Riak and
@@ -791,3 +791,9 @@ So there's how you insert some data and query for it. The `update` and `delete`
 actions on collections are also supported. Additionally, you can transform
 queries with `sort`, `count` and get a single value with the special method
 `none`.
+
+
+.. _Python: http://www.python.org/
+.. _greenlets: http://readthedocs.org/docs/greenlet/en/latest/
+.. _nose: http://readthedocs.org/docs/nose/en/latest/
+.. _Flask: http://flask.pocoo.org/
