@@ -752,4 +752,42 @@ test suite with the monkeypatch in place (about 4x faster too!).
 MongoDB
 -------
 
-TODO
+MongoDB (http://www.mongodb.org/) is a document database. The MongoDB protocol
+implementation has been around since the first version of diesel. It offers
+support for many common MongoDB operations. The API is modeled after PyMongo
+(http://api.mongodb.org/python/).
+
+::
+
+    from diesel import quickstart, quickstop
+    from diesel.protocols.mongodb import MongoClient
+
+    def main():
+        d = MongoClient('localhost')
+        d.drop_database('dieselsample')
+        langs = [
+            ('Python', 'imperative'), ('Haskell', 'functional'), ('C', 'imperative')
+        ]
+        for lang, ltype in langs:
+            d.dieselsample.test.insert({'language':lang, 'type':ltype})
+
+        print "type == functional"
+        print_all(d, {'type':'functional'})
+
+        print "type == imperative"
+        print_all(d, {'type':'imperative'})
+
+        quickstop()
+
+    def print_all(conn, query):
+        with (conn.dieselsample.test.find(query)) as cursor:
+            while not cursor.finished:
+                for res in cursor.more():
+                    print res['language']
+
+    quickstart(main)
+
+So there's how you insert some data and query for it. The `update` and `delete`
+actions on collections are also supported. Additionally, you can transform
+queries with `sort`, `count` and get a single value with the special method
+`none`.
