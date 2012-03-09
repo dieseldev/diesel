@@ -736,6 +736,32 @@ headers and the body of the response.
             quickstop()
     quickstart(req_loop)
 
+If you don't like that API and you're feeling brave, you can try diesel's
+support for the Requests library (http://docs.python-requests.org/). We had
+to monkeypatch Requests to get it to work nicely with diesel so there might be
+some weird edge cases. On the other hand, we also ran and passed Requests own
+test suite with the monkeypatch in place (about 4x faster too!).
+
+::
+
+    from pprint import pprint
+
+    import requests
+
+    from diesel import quickstart, quickstop
+    from diesel.util.patches import enable_requests
+
+    enable_requests()
+
+    def main():
+        response = requests.get('http://www.google.com/')
+        print response.status_code
+        pprint(response.headers)
+        print response.content[:200] + ' ...'
+        quickstop()
+    quickstart(main)
+
+
 MongoDB
 -------
 
