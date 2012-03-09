@@ -658,54 +658,41 @@ makes simple `get` and `put` operations easier at the expense of requiring you
 to provide a conflict resolution function to handle situations where multiple
 versions of a document are returned.
 
-Brace yourself and read along. The first thing we do is create a bunch of
-conflicts for an object and then use the `Bucket` API to get the version of the
-object we want and save it back to Riak.::
-
-    import random
+::
 
     from diesel import quickstart, quickstop
     from diesel.protocols.riak import RiakClient, Bucket
 
     def main():
         c = RiakClient('localhost')
+        b = Bucket('diesel.testing', c, resolver=resolve_longest)
 
         # A little cleanup in case we've been run before ...
-        c.delete('diesel.testing', 'bar')
+        b.delete('bar')
 
-        # Create some conflicts for the 'bar' key in 'diesel.testing'.
-        assert not c.set_bucket_props('diesel.testing', {'allow_mult':True})
-        maxlen = 0
-        for i in xrange(10):
-            s = 'x' * random.randint(1, 100)
-            maxlen = len(s) if len(s) > maxlen else maxlen
-            c.set_client_id(str(random.random()))
-            c.put('diesel.testing', 'bar', s, return_body=True)
-        num_objects = len(c.get('diesel.testing', 'bar')['content'])
-        assert num_objects == 10, num_objects
-        assert maxlen > 0
-        # We now have 10 random string values stored to the key 'bar'
+        # put an item
+        b.put('bar', 'a test for you!')
 
-        # Here's a silly resolver function that prefers the longest of two
-        # results in a conflict.
-        def resolve_longest(t1, v1, t2, v2):
-            if len(v1) > len(v2):
-                return v1
-            return v2
+        # get an item
+        print b.get('bar')
 
-        # Test that the conflict is resolved, this time using the Bucket
-        # interface.
-        b = Bucket('diesel.testing', c, resolver=resolve_longest)
-        resolved = b.get('bar')
-        assert len(resolved) == maxlen
-        # Put back our resolved object.
-        b.put('bar', resolved)
-
-        # Make sure the raw client sees only one result too.
-        assert len(c.get('diesel.testing', 'bar')['content']) == 1
         quickstop()
 
+    # Here's a silly resolver function that prefers the longest of two
+    # results in a conflict. We don't use it here, but it lets you see the
+    # general structure of a resolver.
+    def resolve_longest(t1, v1, t2, v2):
+        if len(v1) > len(v2):
+            return v1
+        return v2
+
     quickstart(main)
+
+If multiple clients were reading and writing to the 'bar' key in
+'diesel.testing', it's likely that some conflicts would arise and multiple
+versions of a result would be returned. The resolution function would be
+triggered upon fetching the multiple versions and the resolved result could
+be stored with a `put`.
 
 HTTP
 ----
@@ -765,3 +752,4 @@ test suite with the monkeypatch in place (about 4x faster too!).
 MongoDB
 -------
 
+TODO
