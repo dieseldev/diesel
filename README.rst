@@ -510,6 +510,7 @@ that `fire` and `wait` are awesome and that you shouldn't ever design your code
 to count on an actor receiving **every** event that is fired through `fire`.
 
 ::
+
     import random
 
     from diesel import quickstart, fire, wait, sleep, quickstop
