@@ -428,24 +428,312 @@ it on-demand and then discarded since the `pool_size` was exceeded.
 Events
 ------
 
-**TODO**
+What's an event-based async programming environment without Events!? Well, not
+to worry; diesel has those too!
 
+`diesel.util.event.Event` allows any number of actors to wait for some event
+before continuing on their merry way. The event is stateful though, not just a
+one time thing. A latecomer to the party will take note that the event has
+already occurred and not wait around. Like this::
+
+    from diesel import quickstart, sleep, quickstop
+    from diesel.util.event import Event
+
+
+    def coordinator():
+        # Pretend to do something ...
+        sleep(3)
+
+        # Done, fire the event.
+        print "Coordinator done."
+        ev.set()
+
+    def consumer():
+        print "Waiting ..."
+        ev.wait()
+        print "The event was triggered!"
+
+    def late_consumer():
+        sleep(4)
+        consumer()
+        quickstop()
+
+    ev = Event()
+
+    quickstart(coordinator, consumer, consumer, consumer, late_consumer)
+        
+Another type of event is the `diesel.util.event.Countdown`. It is only triggered
+after the counter has been ticked a defined number of times.::
+
+    from diesel import quickstart, quickstop, sleep
+    from diesel.util.event import Countdown
+
+    # This "done" event won't be set until it is ticked 3 times.
+    done = Countdown(3)
+
+    def main():
+        for i in range(3):
+            print "Tick ..."
+            sleep(1)
+            done.tick()
+
+    def stop_when_done():
+        done.wait()
+        print "Boom!"
+        quickstop()
+
+    quickstart(main, stop_when_done)
+
+Like `Event`, any actor that waits on a `Countdown` after it has completed will
+not wait at all. `Event` and `Countdown` instances are more like conditions, in
+that regard. Maybe we should rename them ... awkward.
+
+Bonus Time
+==========
+
+All of the components discussed so far are built from a few lower-level
+primitives. You've met a handlful of them (`send`, `receive`, `sleep`). Here
+are a few more that can come in handy.
+
+Yelling Fire
+------------
+
+If, instead of conditions like `Countdown` and `Event`, you are interested in
+true of-the-moment events, have a look at the `fire` and `wait` diesel
+primitives. An actor that is waiting for a certain event will only act on it if
+is blocked on the `wait` at the time that another actor calls `fire` for the
+event.
+
+In the example below, a message pump periodically fires an event. Handlers are
+sometimes waiting for it, sometimes busy sleeping. The main takeaway should be
+that `fire` and `wait` are awesome and that you shouldn't ever design your code
+to count on an actor receiving **every** event that is fired through `fire`.
+
+::
+    import random
+
+    from diesel import quickstart, fire, wait, sleep, quickstop
+
+    def pump():
+        for i in xrange(5):
+            fire('thing')
+            print "Fired 'thing'"
+            sleep(1)
+        quickstop()
+
+    def on(event):
+        def handle():
+            while True:
+                wait(event)
+                print "Saw %r" % event
+                sleep(3 * random.random())
+        return handle
+
+    quickstart(pump, on('thing'), on('thing'), on('thing'))
+
+Forking Loops
+-------------
+
+A `Loop` can easily spin off another `Loop` using the `fork` primitive. This is
+handy for lots of things. Here's a contrived example that doesn't nearly
+convey the sheer usefulness of `fork`. It's a simple dispatcher that only
+dispatches to a single function.::
+
+    from diesel import quickstart, fork, sleep, quickstop
+
+    def main():
+        was_dispatched = dispatch('x')
+        print "Dispatched:", was_dispatched
+
+    def dispatch(v):
+        fork(work_on, v)
+        return True
+
+    def work_on(v):
+        sleep(2)
+        print "Done working on %r" % v
+        quickstop()
+
+    quickstart(main)
+
+Using `fork_child` you can fork off child loops that will die if their parent
+dies. Poor children. It's a useful feature though.
+    
 Bundled Protocols
 =================
 
-**TODO**
+Not only does diesel come bundled with primitives and higher level components
+for writing async network applications, but for a limited time we're going to
+throw in a selection of protocols for talking to other popular network services.
+Call now! Operators are standing by.
+
+Remember to use the protocol clients in conjunction with a `ConnectionPool` if
+you are planning on doing serious work.
 
 Redis
 -----
 
+Redis (http://redis.io/) is a fantastic data structure server. diesel offers
+nearly full protocol support. See http://redis.io/commands for documentation.
+For most commands, simply use the lowercase of the command name as the method
+name on a diesel `RedisClient`. For example::
+
+    from diesel import quickstart
+    from diesel.protocols.redis import RedisClient
+
+    def main():
+        c = RedisClient('localhost')
+
+        # SET
+        c.set('mykey', 'myvalue')
+        
+        # GET
+        c.get('mykey')
+
+    quickstart(main)
+
+In addition to simple commands, diesel provides a subscription hub for
+handling Redis pub/sub operations. It will receive published messages for all
+subscribed channels and ensure they are delivered to the diesel actors that
+have indicated they would like to consume the published messages.::
+
+    from diesel import quickstart
+    from diesel.protocols.redis import RedisSubHub
+
+    subhub = RedisSubHub('localhost')
+
+    def main():
+        with subhub.sub(['chan.a', 'chan.b']) as messages:
+            while True:
+                chan, message = messages.fetch()
+                if chan == 'chan.a':
+                    act_on_a(message)
+                elif chan == 'chan.b':
+                    act_on_b(message)
+                else:
+                    assert 0, 'aaahhh! should never happen'
+
+The context manager takes care of all the behind the scenes subscribing and
+unsubscribing with Redis and the `RedisSubHub` will buffer the messages as fast
+as it can.
+            
 Riak
 ----
+
+Riak (http://wiki.basho.com/) is an open-source implementation of the ideas
+presented in Amazon's famous Dynamo paper. It allows you to tune the database
+to prioritize two of consistency, availability and partition tolerance.
+
+diesel provides access to the Protocol Buffers API that Riak exposes. The HTTP
+API is not directly supported at this time (but it's HTTP, and diesel does
+that too!).
+
+You can use either the lower-level `RiakClient` API or a `Bucket` API when
+interacting with Riak using diesel.
+
+Here's an example of using the `RiakClient` directly. To store a new object in
+Riak you simply create a client connection and call `put` with three arguments:
+the bucket name, the key name and the value. To retrieve an object you call
+`get` with the bucket name and the key.::
+
+    from diesel import quickstart
+    from diesel.protocols.riak import RiakClient
+
+    def main():
+        c = RiakClient()
+        c.put('testing', 'foo', '1', return_body=True)
+        print c.get('testing', 'foo')
+
+    quickstart(main)
+
+The return value from the `get` call will be a dictionary representation of the
+Riak protocol buffer response. It will contain multiple versions of the object
+if there were conflicts. It's up to your application to decide how it wants to
+deal with those. Consult the Riak PBC API documenation for more details on the
+response (http://wiki.basho.com/PBC-API.html).
+
+If the `RiakClient` is too low-level for you, you can use the `Bucket` API. It
+makes simple `get` and `put` operations easier at the expense of requiring you
+to provide a conflict resolution function to handle situations where multiple
+versions of a document are returned.
+
+Brace yourself and read along. The first thing we do is create a bunch of
+conflicts for an object and then use the `Bucket` API to get the version of the
+object we want and save it back to Riak.::
+
+    import random
+
+    from diesel import quickstart, quickstop
+    from diesel.protocols.riak import RiakClient, Bucket
+
+    def main():
+        c = RiakClient('localhost')
+
+        # A little cleanup in case we've been run before ...
+        c.delete('diesel.testing', 'bar')
+
+        # Create some conflicts for the 'bar' key in 'diesel.testing'.
+        assert not c.set_bucket_props('diesel.testing', {'allow_mult':True})
+        maxlen = 0
+        for i in xrange(10):
+            s = 'x' * random.randint(1, 100)
+            maxlen = len(s) if len(s) > maxlen else maxlen
+            c.set_client_id(str(random.random()))
+            c.put('diesel.testing', 'bar', s, return_body=True)
+        num_objects = len(c.get('diesel.testing', 'bar')['content'])
+        assert num_objects == 10, num_objects
+        assert maxlen > 0
+        # We now have 10 random string values stored to the key 'bar'
+
+        # Here's a silly resolver function that prefers the longest of two
+        # results in a conflict.
+        def resolve_longest(t1, v1, t2, v2):
+            if len(v1) > len(v2):
+                return v1
+            return v2
+
+        # Test that the conflict is resolved, this time using the Bucket
+        # interface.
+        b = Bucket('diesel.testing', c, resolver=resolve_longest)
+        resolved = b.get('bar')
+        assert len(resolved) == maxlen
+        # Put back our resolved object.
+        b.put('bar', resolved)
+
+        # Make sure the raw client sees only one result too.
+        assert len(c.get('diesel.testing', 'bar')['content']) == 1
+        quickstop()
+
+    quickstart(main)
 
 HTTP
 ----
 
-DNS
----
+diesel provides an HTTP client, server and a WSGI compatibility layer. We're
+only going to cover the HTTP client here because the `diesel.web` module that
+wraps Flask (http://flask.pocoo.org/) is your best bet for writing web
+applications.
+
+So `diesel.protocols.http` has an `HttpClient` class. It has exactly one
+method, aptly named `request`. In a simple case, you git it a method, a path,
+maybe some headers, and you get back a tuple of the response status, response
+headers and the body of the response.
+
+::
+
+    from diesel import quickstart, quickstop
+    from diesel.protocols.http import HttpClient, HttpHeaders
+
+    def req_loop():
+        with HttpClient('www.google.com', 80) as client:
+            heads = HttpHeaders()
+            heads.set('Host', 'www.google.com')
+            status, heads, body = client.request('GET', '/', heads)
+            print status
+            print heads
+            print body[:200] + ' ...'
+            quickstop()
+    quickstart(req_loop)
 
 MongoDB
 -------
