@@ -6,7 +6,7 @@ Diesel: An Introduction
 Why Diesel?
 ===========
 
-You should write your next network application using diesel.
+You should write your next network application using diesel_.
 
 Thanks to Python_ the syntax is clean and the development pace is rapid. Thanks
 to non-blocking I/O it's fast and scalable. Thanks to greenlets_ there's
@@ -48,7 +48,7 @@ Before we jump into network programming, you should learn a bit about Loops.
 Not the `for` and `while` variety, but the diesel variety. They are everywhere 
 in diesel, lurking behinds the scenes.
 
-Loops are diesel's combination of your code plus greenlets. What are greenlets,
+Loops are diesel's combination of your code plus greenlets. What are greenlets_,
 you ask? They are lightweight threads that are managed by the Python VM, not
 your operating system.
 
@@ -71,8 +71,9 @@ Here's how you schedule a single function to run in diesel.
 
     diesel.quickstart(say_hi)
 
-That's pretty much the most boring diesel code ever. It gets wrapped up in a
-Loop, gets scheduled, prints "hi" and then stops the diesel application. 
+That's pretty much the most boring diesel code ever. Behind the scenes, it gets
+wrapped up in a Loop, gets scheduled, prints "hi" and then stops the diesel
+application. 
 
 Here's a slightly more interesting function.
 
@@ -87,7 +88,7 @@ Here's a slightly more interesting function.
 
     diesel.quickstart(say_hi_forever)
 
-Hey, that one actually loops. It will print "hi" every second, forever - or
+Hey, that one actually loops! It will print "hi" every second, forever - or
 until you hit Ctrl-C. Whichever comes first. The interesting part is the
 `diesel.sleep` call. That's where this code hands control back to the scheduler
 which will give other Loops a chance to run if they are waiting.
@@ -159,7 +160,7 @@ and in another run::
     telnet localhost 4321
 
 Anything you type in the telnet session will be holla'ed back to you. Press
-Ctrl-] and type 'quit' when you're done. You'll notice that your server throws
+`Ctrl-]` and type 'quit' when you're done. You'll notice that your server throws
 an exception. That's something we could have caught in the `holla_back`
 function if we wanted to do some post-connection cleanup (or simply didn't want
 to log this class of exceptions).
@@ -532,6 +533,18 @@ to count on an actor receiving **every** event that is fired through `fire`.
 
     quickstart(pump, on('thing'), on('thing'), on('thing'))
 
+The first time through you'll see that "Fired 'thing'" string in your console
+with no response. That's because the `pump` is scheduled and run before the
+`on(event)` handlers are scheduled and able to run. On the next iteration of
+the `pump` function all three `on(event)` handlers have been scheduled and are
+waiting for the event to fire. Each of them then randomly sleeps and possibly
+misses one or more of the next few fires.
+
+So that's `wait` and `fire`. In most circumstances `Queue`, `Event` and
+`Countdown` are better places to start building but, in case you are building up
+some new syncronization abstraction or don't need such tight coordination of
+actions, `wait` and `fire` still have their uses.
+
 Forking Loops
 -------------
 
@@ -797,3 +810,4 @@ queries with `sort`, `count` and get a single value with the special method
 .. _greenlets: http://readthedocs.org/docs/greenlet/en/latest/
 .. _nose: http://readthedocs.org/docs/nose/en/latest/
 .. _Flask: http://flask.pocoo.org/
+.. _diesel: http://diesel.io/
