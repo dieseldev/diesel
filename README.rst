@@ -716,23 +716,23 @@ wraps Flask (http://flask.pocoo.org/) is your best bet for writing web
 applications.
 
 So `diesel.protocols.http` has an `HttpClient` class. It has exactly one
-method, aptly named `request`. In a simple case, you git it a method, a path,
-maybe some headers, and you get back a tuple of the response status, response
-headers and the body of the response.
+method, aptly named `request`. In a simple case, you give it a method, a path,
+maybe some headers, and you get back a `Response` object (hint: diesel uses
+Flask's `Request` and `Respose` object internally, so the Flask `Response` object
+is what you'll get).
 
 ::
 
     from diesel import quickstart, quickstop
-    from diesel.protocols.http import HttpClient, HttpHeaders
+    from diesel.protocols.http import HttpClient
 
     def req_loop():
         with HttpClient('www.google.com', 80) as client:
-            heads = HttpHeaders()
-            heads.set('Host', 'www.google.com')
-            status, heads, body = client.request('GET', '/', heads)
-            print status
-            print heads
-            print body[:200] + ' ...'
+            headers = {'Host' : 'www.google.com'}
+            response = client.request('GET', '/', headers)
+            print response.status
+            print response.headers
+            print response.data[:200] + ' ...'
             quickstop()
     quickstart(req_loop)
 
