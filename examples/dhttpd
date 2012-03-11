@@ -25,7 +25,7 @@ def static_http(file):
     return send_from_directory(BASE, file)
 
 def run():
-    app.run()
+    app.run(port=PORT)
 
 def cli():
     global BASE
