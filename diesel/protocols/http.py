@@ -232,7 +232,10 @@ def http_response(req, code, heads, body):
     req.version, code, status_strings.get(code, "Unknown Status"),
     heads.format()))
     if body:
-        send(body)
+        if isinstance(body, basestring):
+            body = [body]
+        for part in body:
+            send(body)
     if close:
         return False
     return True

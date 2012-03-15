@@ -8,7 +8,7 @@ import urlparse
 import os
 import cStringIO
 
-from diesel import Application, Service, log
+from diesel import Application, Service, log, send
 from diesel.protocols.http import HttpServer, HttpHeaders, http_response
 
 HOSTNAME = os.uname()[1] # win32?
@@ -79,28 +79,31 @@ class WSGIRequestHandler(object):
         else:
             env['diesel.status'] = status
             env['diesel.response_headers'] = response_headers
-        return env['diesel.output'].append
+        return send
 
     def __call__(self, req):
         env = build_wsgi_env(req, self.port)
-        buf = []
-        env['diesel.output'] = buf
         env['diesel.status'] = None
         env['diesel.response_headers'] = None
-        for output in self.wsgi_callable(env, 
-                functools.partial(self._start_response, env)):
-            buf.append(output)
-        return self.finalize_request(req, env)
+        body = self.wsgi_callable(env, functools.partial(self._start_response, env))
+        return self.finalize_request(req, env, body)
 
-    def finalize_request(self, req, env):
+    def finalize_request(self, req, env, body):
+        flattened = False
+        if not env['diesel.status']:
+            # The entire app is a lazy generator. We've got to force it to
+            # execute in order to render a response.
+            body = ''.join(body)
+            flattened = True
         code = int(env['diesel.status'].split()[0])
         heads = HttpHeaders()
         for n, v in env['diesel.response_headers']:
             heads.add(n, v)
-        body = ''.join(env['diesel.output'])
         if 'Content-Length' not in heads:
+            if not flattened:
+                body = ''.join(body)
             heads.set('Content-Length', len(body))
-        
+
         return http_response(req, code, heads, body)
 
 class WSGIApplication(Application):
