@@ -8,6 +8,9 @@ from flask import * # we're essentially republishing
 from app import Application, Service
 from logmod import Logger, LOGLVL_DEBUG
 
+from diesel.protocols.websockets import WebSocketServer
+
+
 class DieselFlask(Flask):
     def __init__(self, name, *args, **kw):
         self.diesel_app = self.make_application()
@@ -38,7 +41,7 @@ class DieselFlask(Flask):
         elif exc_info:
             self.logger.error(traceback.format_exc())
 
-    def run(self, port=8080, iface='', verbosity=LOGLVL_DEBUG, debug=True):
+    def run(self, port=8080, iface='', verbosity=LOGLVL_DEBUG, debug=True, ws_data=None):
         if debug:
             self.debug = True
             from werkzeug.debug import DebuggedApplication
@@ -47,7 +50,13 @@ class DieselFlask(Flask):
         self.logger.verbosity = LOGLVL_DEBUG
 
         from diesel.protocols.wsgi import WSGIRequestHandler
-        from diesel.protocols.http import HttpServer
-        http_service = Service(HttpServer(WSGIRequestHandler(self.wsgi_app, port)), port, iface)
-        self.diesel_app.add_service(http_service)
+        wsgi_handler = WSGIRequestHandler(self.wsgi_app, port)
+        if ws_data is not None:
+            ws_handler, ws_location = ws_data
+            server = WebSocketServer(wsgi_handler, ws_handler, ws_location)
+        else:
+            from diesel.protocols.http import HttpServer
+            server = HttpServer(wsgi_handler)
+
+        self.diesel_app.add_service(Service(server, port, iface))
         self.diesel_app.run()
