@@ -6,7 +6,7 @@ import traceback
 from flask import * # we're essentially republishing
 
 from app import Application, Service
-from logmod import Logger, LOGLVL_DEBUG
+from logmod import LOGLVL_DEBUG
 
 from diesel.protocols.websockets import WebSocketServer
 
@@ -15,8 +15,6 @@ class DieselFlask(Flask):
     def __init__(self, name, *args, **kw):
         self.diesel_app = self.make_application()
         Flask.__init__(self, name, *args, **kw)
-        self._logger = self.make_logger()
-        self._logger.name = self.logger_name
 
     @classmethod
     def make_application(cls):
@@ -42,6 +40,8 @@ class DieselFlask(Flask):
             self.logger.error(traceback.format_exc())
 
     def run(self, port=8080, iface='', verbosity=LOGLVL_DEBUG, debug=True, ws_data=None):
+        self._logger = self.make_logger()
+        self._logger.name = self.logger_name
         if debug:
             self.debug = True
             from werkzeug.debug import DebuggedApplication
