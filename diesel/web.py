@@ -39,7 +39,7 @@ class DieselFlask(Flask):
         elif exc_info:
             self.logger.error(traceback.format_exc())
 
-    def run(self, port=8080, iface='', verbosity=LOGLVL_DEBUG, debug=True, ws_data=None):
+    def make_service(self, port=8080, iface='', verbosity=LOGLVL_DEBUG, debug=True, ws_data=None):
         self._logger = self.make_logger()
         self._logger.name = self.logger_name
         if debug:
@@ -57,6 +57,9 @@ class DieselFlask(Flask):
         else:
             from diesel.protocols.http import HttpServer
             server = HttpServer(wsgi_handler)
+        return Service(server, port, iface)
 
-        self.diesel_app.add_service(Service(server, port, iface))
+    def run(self, *args, **params):
+        service = self.make_service(*args, **params)
+        self.diesel_app.add_service(service)
         self.diesel_app.run()
