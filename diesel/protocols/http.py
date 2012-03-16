@@ -235,7 +235,7 @@ def http_response(req, code, heads, body):
         if isinstance(body, basestring):
             body = [body]
         for part in body:
-            send(body)
+            send(part)
     if close:
         return False
     return True
