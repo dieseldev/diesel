@@ -30,7 +30,7 @@ class Client(object):
             sock.connect(remote_addr)
         except socket.error, e:
             if e.args[0] == errno.EINPROGRESS:
-                _private_connect(self, ip, sock, timeout=timeout)
+                _private_connect(self, ip, sock, self.addr, self.port, timeout=timeout)
             else:
                 raise
 

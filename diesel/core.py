@@ -288,12 +288,12 @@ class Loop(object):
                     return w, v.val
         return self.dispatch()
 
-    def connect(self, client, ip, sock, timeout=None):
+    def connect(self, client, ip, sock, host, port, timeout=None):
         def cancel_callback(sock):
             self.hub.unregister(sock)
             sock.close()
             self.hub.schedule(lambda: self.wake(
-                ClientConnectionTimeout("connection timeout")
+                ClientConnectionTimeout("connection timeout (%s:%s)" % (host, port))
                 ))
 
         def connect_callback():
@@ -306,7 +306,7 @@ class Loop(object):
             except socket.error:
                 self.hub.schedule(
                 lambda: self.wake(
-                        ClientConnectionError("Could not connect to remote host")
+                    ClientConnectionError("Could not connect to remote host (%s:%s)" % (host, port))
                     ))
                 return
 
@@ -332,11 +332,29 @@ class Loop(object):
             self.hub.unregister(sock)
             self.hub.schedule(
             lambda: self.wake(
-                    ClientConnectionError("odd error on connect()!")
+                ClientConnectionError("odd error on connect() (%s:%s)" % (host, port))
                 ))
 
         def read_callback():
-            pass # don't slurp up data from the buffer!
+            try:
+                sock.getpeername()
+            except socket.error:
+                try:
+                    d = sock.recv(1)
+                except:
+                    d = None
+
+                if d != '':
+                    log.error("internal error: expected empty read on disconnected socket")
+
+                if cancel_timer is not None:
+                    cancel_timer.cancel()
+                self.hub.unregister(sock)
+                self.hub.schedule(
+                lambda: self.wake(
+                    ClientConnectionError("Could not connect to remote host (%s:%s)" % (host, port))
+                    ))
+                return
 
         cancel_timer = None
         if timeout is not None:
