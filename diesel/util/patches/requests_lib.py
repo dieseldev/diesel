@@ -4,7 +4,6 @@ It's a hack.
 
 """
 import httplib
-import sys
 
 import diesel
 from diesel.resolver import DNSResolutionError
@@ -16,8 +15,6 @@ try:
 except ImportError:
     connectionpool = None
 
-
-_enc = sys.getdefaultencoding()
 
 class SocketLike(diesel.Client):
     """A socket-like diesel Client.
