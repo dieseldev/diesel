@@ -38,7 +38,10 @@ class SocketLike(diesel.Client):
 
     @diesel.call
     def sendall(self, data):
-        diesel.send(data.encode(_enc))
+        diesel.send(data)
+
+    def fileno(self):
+        return id(self)
 
 class FileLike(object):
     """Gives you a file-like interface from a diesel Client."""
@@ -94,7 +97,7 @@ class FileLike(object):
 
     @diesel.call
     def write(self, data):
-        diesel.send(data.encode(_enc))
+        diesel.send(data)
 
     @diesel.call
     def next(self):
