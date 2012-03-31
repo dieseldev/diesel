@@ -48,7 +48,6 @@ class WebSocketServer(HttpServer):
             accept = b64encode(hashlib.sha1(key + self.GUID).digest())
             send(server_handshake_hybi % accept)
             if protocol:
-                print "orot"
                 send("Sec-WebSocket-Protocol: %s\r\n" % protocol)
             send("\r\n")
             hybi = True
