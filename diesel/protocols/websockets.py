@@ -14,7 +14,8 @@ server_handshake_hybi = \
 '''HTTP/1.1 101 Switching Protocols\r
 Upgrade: websocket\r
 Connection: Upgrade\r
-Sec-WebSocket-Accept: %s\r'''
+Sec-WebSocket-Accept: %s\r
+'''
 
 class WebSocketServer(HttpServer):
     '''Very simple Web Socket server.
@@ -47,8 +48,9 @@ class WebSocketServer(HttpServer):
             accept = b64encode(hashlib.sha1(key + self.GUID).digest())
             send(server_handshake_hybi % accept)
             if protocol:
-                send("Sec-WebSocket-Protocol: %s\r" % protocol)
-            send("\r\n\r\n")
+                print "orot"
+                send("Sec-WebSocket-Protocol: %s\r\n" % protocol)
+            send("\r\n")
             hybi = True
 
         elif 'Sec-WebSocket-Key1' in req.headers:
