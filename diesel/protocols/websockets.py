@@ -57,13 +57,6 @@ class WebSocketServer(HttpServer):
                         if 'Sec-WebSocket-Protocol' in req.headers else None)
             key1 = req.headers.get_one('Sec-WebSocket-Key1')
             key2 = req.headers.get_one('Sec-WebSocket-Key2')
-            key3 = receive(8)
-            num1 = int(''.join(c for c in key1 if c in '0123456789'))
-            num2 = int(''.join(c for c in key2 if c in '0123456789'))
-            assert num1 % key1.count(' ') == 0
-            assert num2 % key2.count(' ') == 0
-            final = pack('!II8s', num1 / key1.count(' '), num2 / key2.count(' '), key3)
-            secure_response = hashlib.md5(final).digest()
             send(
 '''HTTP/1.1 101 Web Socket Protocol Handshake\r
 Upgrade: WebSocket\r
@@ -74,6 +67,13 @@ Sec-WebSocket-Location: %s\r
             if protocol:
                 send("Sec-WebSocket-Protocol: %s\r\n" % (protocol,))
             send("\r\n")
+            key3 = receive(8)
+            num1 = int(''.join(c for c in key1 if c in '0123456789'))
+            num2 = int(''.join(c for c in key2 if c in '0123456789'))
+            assert num1 % key1.count(' ') == 0
+            assert num2 % key2.count(' ') == 0
+            final = pack('!II8s', num1 / key1.count(' '), num2 / key2.count(' '), key3)
+            secure_response = hashlib.md5(final).digest()
             send(secure_response)
 
         else:
