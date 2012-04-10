@@ -861,6 +861,45 @@ class RedisTransaction(object):
 
 class RedisTransactionError(Exception): pass
 
+
+class LockNotAquired(Exception):
+    pass
+
+class RedisLock(object):
+    def __init__(self, client, key, timeout=30):
+        assert timeout >= 2, 'Timeout must be greater than 2 to guarantee the transaction'
+        self.client = client
+        self.key = key
+        self.timeout = timeout
+        self.me = str(uuid4())
+
+    def __enter__(self):
+        trans = self.client.transaction(watch=[self.key])
+        v = self.client.get(self.key)
+        if v:
+            raise LockNotAquired()
+        else:
+            try:
+                with trans as t:
+                    t.setex(self.key, self.timeout, self.me)
+
+                def touch():
+                    c = RedisClient(self.client.addr, self.client.port)
+                    while self.in_block:
+                        c.expire(self.key, self.timeout)
+                        sleep(self.timeout / 2)
+                self.in_block = True
+                fork(touch)
+            except RedisTransactionError:
+                raise LockNotAquired()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        val = self.client.get(self.key)
+        assert val == self.me, 'Someone else took the lock, panic (val=%s, expected=%s, wha=%s)' % (val, self.me, self.client.get(self.key))
+        self.in_block = False
+        self.client.delete(self.key)
+
+
 #########################################
 ## Hub, an abstraction of sub behavior, etc
 class RedisSubHub(object):
