@@ -1,6 +1,6 @@
 from contextlib import contextmanager
 from diesel import (Client, call, until_eol, receive,
-                    fire, send, first)
+                    fire, send, first, fork, sleep)
 from diesel.util.queue import Queue, QueueTimeout
 import time
 import operator as op
@@ -862,7 +862,7 @@ class RedisTransaction(object):
 class RedisTransactionError(Exception): pass
 
 
-class LockNotAquired(Exception):
+class LockNotAcquired(Exception):
     pass
 
 class RedisLock(object):
@@ -871,13 +871,13 @@ class RedisLock(object):
         self.client = client
         self.key = key
         self.timeout = timeout
-        self.me = str(uuid4())
+        self.me = str(uuid.uuid4())
 
     def __enter__(self):
         trans = self.client.transaction(watch=[self.key])
         v = self.client.get(self.key)
         if v:
-            raise LockNotAquired()
+            raise LockNotAcquired()
         else:
             try:
                 with trans as t:
@@ -891,7 +891,7 @@ class RedisLock(object):
                 self.in_block = True
                 fork(touch)
             except RedisTransactionError:
-                raise LockNotAquired()
+                raise LockNotAcquired()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         val = self.client.get(self.key)
