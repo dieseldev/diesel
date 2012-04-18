@@ -209,12 +209,12 @@ class Bucket(object):
         if response:
             return self._handle_response(key, response)
 
-    def delete(self, key):
+    def delete(self, key, vclock=None):
         """Deletes all values for the given key from the bucket."""
         with self.make_client_context() as client:
             if self.client_id:
                 client.set_client_id(self.client_id)
-            client.delete(self.name, key)
+            client.delete(self.name, key, vclock)
 
     def keys(self):
         """Get all the keys for a given bucket, is an iterator."""
@@ -349,9 +349,9 @@ class RiakClient(diesel.Client):
             return _to_dict(response)
 
     @diesel.call
-    def delete(self, bucket, key):
+    def delete(self, bucket, key, vclock=None):
         """Deletes the given key from the named bucket, including all values."""
-        request = riak_pb2.RpbDelReq(bucket=bucket, key=key)
+        request = riak_pb2.RpbDelReq(bucket=bucket, key=key, vclock=vclock)
         self._send(request)
         return self._receive()
 
