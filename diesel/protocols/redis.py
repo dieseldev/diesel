@@ -894,9 +894,9 @@ class RedisLock(object):
                 raise LockNotAcquired()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        self.in_block = False
         val = self.client.get(self.key)
         assert val == self.me, 'Someone else took the lock, panic (val=%s, expected=%s, wha=%s)' % (val, self.me, self.client.get(self.key))
-        self.in_block = False
         self.client.delete(self.key)
 
 
