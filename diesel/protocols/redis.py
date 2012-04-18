@@ -694,16 +694,16 @@ class RedisClient(Client):
     @call
     def get_from_subscriptions(self, wake_sig=None):
         '''Wait for a published message on a subscribed channel.
-        
+
         Returns a tuple consisting of:
-        
+
             * The subscription pattern which matched
                 (the same as the channel for non-glob subscriptions)
             * The channel the message was received from.
             * The message itself.
 
         -- OR -- None, if wake_sig was fired
-        
+
         NOTE: The message will always be a string.  Handle this as you see fit.
         NOTE: subscribe/unsubscribe acks are ignored here
         '''
@@ -721,7 +721,7 @@ class RedisClient(Client):
     @call
     def publish(self, channel, message):
         '''Publish a message on the given channel.
-        
+
         Returns the number of clients that received the message.
         '''
         self._send('PUBLISH', channel, message)
@@ -884,10 +884,10 @@ class RedisLock(object):
                     t.setex(self.key, self.timeout, self.me)
 
                 def touch():
-                    c = RedisClient(self.client.addr, self.client.port)
-                    while self.in_block:
-                        c.expire(self.key, self.timeout)
-                        sleep(self.timeout / 2)
+                    with RedisClient(self.client.addr, self.client.port) as c:
+                        while self.in_block:
+                            c.expire(self.key, self.timeout)
+                            sleep(self.timeout / 2)
                 self.in_block = True
                 fork(touch)
             except RedisTransactionError:
@@ -913,7 +913,7 @@ class RedisSubHub(object):
 
     def make_client(self):
         client = RedisClient(self.host, self.port)
-        return  client 
+        return  client
 
     def __isglob(self, glob):
         return '*' in glob or '?' in glob or ('[' in glob and ']' and glob)
@@ -984,7 +984,7 @@ class RedisSubHub(object):
                     hb.sub_adds.append((cls, q))
 
                 fire(hb.sub_wake_signal)
-        
+
             def fetch(self, timeout=None):
                 try:
                     qn, msg = q.get(timeout=timeout)
