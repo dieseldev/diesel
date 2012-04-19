@@ -3,12 +3,11 @@ from errno import EAGAIN
 from collections import deque
 from diesel.util.queue import Queue
 
-zctx = zmq.Context()
-
 class DieselZMQSocket(object):
     '''Integrate zmq's super fast event loop with ours.
     '''
-    def __init__(self, socket, bind=None, connect=None):
+    def __init__(self, socket, bind=None, connect=None, context=None):
+        self.zctx = context or zmq.Context.instance()
         self.socket = socket
         from diesel.runtime import current_app
         from diesel.hub import IntWrap
