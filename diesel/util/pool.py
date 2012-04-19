@@ -2,31 +2,56 @@
 '''
 from collections import deque
 from diesel import *
-from diesel.util.queue import Queue
+from diesel.util.queue import Queue, QueueTimeout
 from diesel.util.event import Event
+
+
+class ConnectionPoolFull(Exception): pass
+
+class InfiniteQueue(object):
+    def get(self, timeout):
+        pass
+
+    def put(self):
+        pass
 
 class ConnectionPool(object):
     '''A connection pool that holds `pool_size` connected instances,
     calls init_callable() when it needs more, and passes
     to close_callable() connections that will not fit on the pool.
     '''
-    
-    def __init__(self, init_callable, close_callable, pool_size=5):
+
+    def __init__(self, init_callable, close_callable, pool_size=5, pool_max=None, poll_max_timeout=5):
         self.init_callable = init_callable
         self.close_callable = close_callable
         self.pool_size = pool_size
+        self.poll_max_timeout = poll_max_timeout
+        if pool_max:
+            self.remaining_conns = Queue()
+            for _ in xrange(pool_max):
+                self.remaining_conns.put()
+        else:
+            self.remaining_conns = InfiniteQueue()
         self.connections = deque()
 
     def get(self):
+        try:
+            self.remaining_conns.get(timeout=self.poll_max_timeout)
+        except QueueTimeout:
+            raise ConnectionPoolFull()
+
         if not self.connections:
             self.connections.append(self.init_callable())
         conn = self.connections.pop()
+
         if not conn.is_closed:
             return conn
         else:
+            self.remaining_conns.put()
             return self.get()
 
     def release(self, conn, error=False):
+        self.remaining_conns.put()
         if not conn.is_closed:
             if not error and len(self.connections) < self.pool_size:
                 self.connections.append(conn)
