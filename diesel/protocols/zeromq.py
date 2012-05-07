@@ -31,11 +31,11 @@ class DieselZMQSocket(object):
         self.handle_transition()
         self.destroyed = False
 
-    def send(self, message):
+    def send(self, message, flags=0):
         while True:
             self.write_gate.wait()
             try:
-                self.socket.send(message, zmq.NOBLOCK)
+                self.socket.send(message, zmq.NOBLOCK | flags)
             except zmq.ZMQError, e:
                 if e.errno == EAGAIN:
                     self.handle_transition() # force re-evaluation of EVENTS
