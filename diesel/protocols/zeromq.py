@@ -44,11 +44,11 @@ class DieselZMQSocket(object):
             else:
                 break
 
-    def recv(self):
+    def recv(self, copy=True):
         while True:
             self.read_gate.wait()
             try:
-                m = self.socket.recv(zmq.NOBLOCK)
+                m = self.socket.recv(zmq.NOBLOCK, copy=copy)
             except zmq.ZMQError, e:
                 if e.errno == EAGAIN:
                     self.handle_transition() # force re-evaluation of EVENTS
