@@ -30,6 +30,8 @@ class DieselZMQSocket(object):
         self.hub.register(self.fd, self.handle_transition, self.error, self.error)
         self.handle_transition()
         self.destroyed = False
+        self.sent = 0
+        self.received = 0
 
     def send(self, message, flags=0):
         while True:
@@ -42,6 +44,7 @@ class DieselZMQSocket(object):
                 else:
                     raise
             else:
+                self.sent += 1
                 break
 
     def recv(self, copy=True):
@@ -55,6 +58,7 @@ class DieselZMQSocket(object):
                 else:
                     raise
             else:
+                self.received += 1
                 return m
 
     def handle_transition(self):
