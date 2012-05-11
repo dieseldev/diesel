@@ -2,7 +2,7 @@ import zmq
 from errno import EAGAIN
 from collections import deque
 from diesel.util.queue import Queue
-from diesel.util.event import Event
+from diesel.util.event import Event, EventTimeout
 
 zctx = zmq.Context()
 
@@ -35,7 +35,10 @@ class DieselZMQSocket(object):
 
     def send(self, message, flags=0):
         while True:
-            self.write_gate.wait()
+            try:
+                self.write_gate.wait(timeout=0.1)
+            except EventTimeout:
+                pass
             try:
                 self.socket.send(message, zmq.NOBLOCK | flags)
             except zmq.ZMQError, e:
@@ -49,7 +52,10 @@ class DieselZMQSocket(object):
 
     def recv(self, copy=True):
         while True:
-            self.read_gate.wait()
+            try:
+                self.read_gate.wait(timeout=0.1)
+            except EventTimeout:
+                pass
             try:
                 m = self.socket.recv(zmq.NOBLOCK, copy=copy)
             except zmq.ZMQError, e:
