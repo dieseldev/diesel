@@ -36,14 +36,11 @@ class DieselZMQSocket(object):
     def send(self, message, flags=0):
         while True:
             try:
-                self.write_gate.wait(timeout=0.1)
-            except EventTimeout:
-                pass
-            try:
                 self.socket.send(message, zmq.NOBLOCK | flags)
             except zmq.ZMQError, e:
                 if e.errno == EAGAIN:
                     self.handle_transition() # force re-evaluation of EVENTS
+                    self.write_gate.wait()
                 else:
                     raise
             else:
@@ -53,14 +50,11 @@ class DieselZMQSocket(object):
     def recv(self, copy=True):
         while True:
             try:
-                self.read_gate.wait(timeout=0.1)
-            except EventTimeout:
-                pass
-            try:
                 m = self.socket.recv(zmq.NOBLOCK, copy=copy)
             except zmq.ZMQError, e:
                 if e.errno == EAGAIN:
                     self.handle_transition() # force re-evaluation of EVENTS
+                    self.read_gate.wait()
                 else:
                     raise
             else:
