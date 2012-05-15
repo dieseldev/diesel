@@ -2,6 +2,9 @@
 
 #define INTERNAL_SUPPRESS_PROTOBUF_FIELD_DEPRECATION
 #include "riak.pb.h"
+
+#include <algorithm>
+
 #include <google/protobuf/stubs/once.h>
 #include <google/protobuf/io/coded_stream.h>
 #include <google/protobuf/wire_format_lite_inl.h>
@@ -661,7 +664,6 @@ struct StaticDescriptorInitializer_riak_2eproto {
 
 // ===================================================================
 
-const ::std::string RpbErrorResp::_default_errmsg_;
 #ifndef _MSC_VER
 const int RpbErrorResp::kErrmsgFieldNumber;
 const int RpbErrorResp::kErrcodeFieldNumber;
@@ -683,7 +685,7 @@ RpbErrorResp::RpbErrorResp(const RpbErrorResp& from)
 
 void RpbErrorResp::SharedCtor() {
   _cached_size_ = 0;
-  errmsg_ = const_cast< ::std::string*>(&_default_errmsg_);
+  errmsg_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
   errcode_ = 0u;
   ::memset(_has_bits_, 0, sizeof(_has_bits_));
 }
@@ -693,7 +695,7 @@ RpbErrorResp::~RpbErrorResp() {
 }
 
 void RpbErrorResp::SharedDtor() {
-  if (errmsg_ != &_default_errmsg_) {
+  if (errmsg_ != &::google::protobuf::internal::kEmptyString) {
     delete errmsg_;
   }
   if (this != default_instance_) {
@@ -722,8 +724,8 @@ RpbErrorResp* RpbErrorResp::New() const {
 
 void RpbErrorResp::Clear() {
   if (_has_bits_[0 / 32] & (0xffu << (0 % 32))) {
-    if (_has_bit(0)) {
-      if (errmsg_ != &_default_errmsg_) {
+    if (has_errmsg()) {
+      if (errmsg_ != &::google::protobuf::internal::kEmptyString) {
         errmsg_->clear();
       }
     }
@@ -760,7 +762,7 @@ bool RpbErrorResp::MergePartialFromCodedStream(
           DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
                    ::google::protobuf::uint32, ::google::protobuf::internal::WireFormatLite::TYPE_UINT32>(
                  input, &errcode_)));
-          _set_bit(1);
+          set_has_errcode();
         } else {
           goto handle_uninterpreted;
         }
@@ -787,13 +789,13 @@ bool RpbErrorResp::MergePartialFromCodedStream(
 void RpbErrorResp::SerializeWithCachedSizes(
     ::google::protobuf::io::CodedOutputStream* output) const {
   // required bytes errmsg = 1;
-  if (_has_bit(0)) {
+  if (has_errmsg()) {
     ::google::protobuf::internal::WireFormatLite::WriteBytes(
       1, this->errmsg(), output);
   }
   
   // required uint32 errcode = 2;
-  if (_has_bit(1)) {
+  if (has_errcode()) {
     ::google::protobuf::internal::WireFormatLite::WriteUInt32(2, this->errcode(), output);
   }
   
@@ -806,14 +808,14 @@ void RpbErrorResp::SerializeWithCachedSizes(
 ::google::protobuf::uint8* RpbErrorResp::SerializeWithCachedSizesToArray(
     ::google::protobuf::uint8* target) const {
   // required bytes errmsg = 1;
-  if (_has_bit(0)) {
+  if (has_errmsg()) {
     target =
       ::google::protobuf::internal::WireFormatLite::WriteBytesToArray(
         1, this->errmsg(), target);
   }
   
   // required uint32 errcode = 2;
-  if (_has_bit(1)) {
+  if (has_errcode()) {
     target = ::google::protobuf::internal::WireFormatLite::WriteUInt32ToArray(2, this->errcode(), target);
   }
   
@@ -869,10 +871,10 @@ void RpbErrorResp::MergeFrom(const ::google::protobuf::Message& from) {
 void RpbErrorResp::MergeFrom(const RpbErrorResp& from) {
   GOOGLE_CHECK_NE(&from, this);
   if (from._has_bits_[0 / 32] & (0xffu << (0 % 32))) {
-    if (from._has_bit(0)) {
+    if (from.has_errmsg()) {
       set_errmsg(from.errmsg());
     }
-    if (from._has_bit(1)) {
+    if (from.has_errcode()) {
       set_errcode(from.errcode());
     }
   }
@@ -918,7 +920,6 @@ void RpbErrorResp::Swap(RpbErrorResp* other) {
 
 // ===================================================================
 
-const ::std::string RpbGetClientIdResp::_default_client_id_;
 #ifndef _MSC_VER
 const int RpbGetClientIdResp::kClientIdFieldNumber;
 #endif  // !_MSC_VER
@@ -939,7 +940,7 @@ RpbGetClientIdResp::RpbGetClientIdResp(const RpbGetClientIdResp& from)
 
 void RpbGetClientIdResp::SharedCtor() {
   _cached_size_ = 0;
-  client_id_ = const_cast< ::std::string*>(&_default_client_id_);
+  client_id_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
   ::memset(_has_bits_, 0, sizeof(_has_bits_));
 }
 
@@ -948,7 +949,7 @@ RpbGetClientIdResp::~RpbGetClientIdResp() {
 }
 
 void RpbGetClientIdResp::SharedDtor() {
-  if (client_id_ != &_default_client_id_) {
+  if (client_id_ != &::google::protobuf::internal::kEmptyString) {
     delete client_id_;
   }
   if (this != default_instance_) {
@@ -977,8 +978,8 @@ RpbGetClientIdResp* RpbGetClientIdResp::New() const {
 
 void RpbGetClientIdResp::Clear() {
   if (_has_bits_[0 / 32] & (0xffu << (0 % 32))) {
-    if (_has_bit(0)) {
-      if (client_id_ != &_default_client_id_) {
+    if (has_client_id()) {
+      if (client_id_ != &::google::protobuf::internal::kEmptyString) {
         client_id_->clear();
       }
     }
@@ -1025,7 +1026,7 @@ bool RpbGetClientIdResp::MergePartialFromCodedStream(
 void RpbGetClientIdResp::SerializeWithCachedSizes(
     ::google::protobuf::io::CodedOutputStream* output) const {
   // required bytes client_id = 1;
-  if (_has_bit(0)) {
+  if (has_client_id()) {
     ::google::protobuf::internal::WireFormatLite::WriteBytes(
       1, this->client_id(), output);
   }
@@ -1039,7 +1040,7 @@ void RpbGetClientIdResp::SerializeWithCachedSizes(
 ::google::protobuf::uint8* RpbGetClientIdResp::SerializeWithCachedSizesToArray(
     ::google::protobuf::uint8* target) const {
   // required bytes client_id = 1;
-  if (_has_bit(0)) {
+  if (has_client_id()) {
     target =
       ::google::protobuf::internal::WireFormatLite::WriteBytesToArray(
         1, this->client_id(), target);
@@ -1090,7 +1091,7 @@ void RpbGetClientIdResp::MergeFrom(const ::google::protobuf::Message& from) {
 void RpbGetClientIdResp::MergeFrom(const RpbGetClientIdResp& from) {
   GOOGLE_CHECK_NE(&from, this);
   if (from._has_bits_[0 / 32] & (0xffu << (0 % 32))) {
-    if (from._has_bit(0)) {
+    if (from.has_client_id()) {
       set_client_id(from.client_id());
     }
   }
@@ -1135,7 +1136,6 @@ void RpbGetClientIdResp::Swap(RpbGetClientIdResp* other) {
 
 // ===================================================================
 
-const ::std::string RpbSetClientIdReq::_default_client_id_;
 #ifndef _MSC_VER
 const int RpbSetClientIdReq::kClientIdFieldNumber;
 #endif  // !_MSC_VER
@@ -1156,7 +1156,7 @@ RpbSetClientIdReq::RpbSetClientIdReq(const RpbSetClientIdReq& from)
 
 void RpbSetClientIdReq::SharedCtor() {
   _cached_size_ = 0;
-  client_id_ = const_cast< ::std::string*>(&_default_client_id_);
+  client_id_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
   ::memset(_has_bits_, 0, sizeof(_has_bits_));
 }
 
@@ -1165,7 +1165,7 @@ RpbSetClientIdReq::~RpbSetClientIdReq() {
 }
 
 void RpbSetClientIdReq::SharedDtor() {
-  if (client_id_ != &_default_client_id_) {
+  if (client_id_ != &::google::protobuf::internal::kEmptyString) {
     delete client_id_;
   }
   if (this != default_instance_) {
@@ -1194,8 +1194,8 @@ RpbSetClientIdReq* RpbSetClientIdReq::New() const {
 
 void RpbSetClientIdReq::Clear() {
   if (_has_bits_[0 / 32] & (0xffu << (0 % 32))) {
-    if (_has_bit(0)) {
-      if (client_id_ != &_default_client_id_) {
+    if (has_client_id()) {
+      if (client_id_ != &::google::protobuf::internal::kEmptyString) {
         client_id_->clear();
       }
     }
@@ -1242,7 +1242,7 @@ bool RpbSetClientIdReq::MergePartialFromCodedStream(
 void RpbSetClientIdReq::SerializeWithCachedSizes(
     ::google::protobuf::io::CodedOutputStream* output) const {
   // required bytes client_id = 1;
-  if (_has_bit(0)) {
+  if (has_client_id()) {
     ::google::protobuf::internal::WireFormatLite::WriteBytes(
       1, this->client_id(), output);
   }
@@ -1256,7 +1256,7 @@ void RpbSetClientIdReq::SerializeWithCachedSizes(
 ::google::protobuf::uint8* RpbSetClientIdReq::SerializeWithCachedSizesToArray(
     ::google::protobuf::uint8* target) const {
   // required bytes client_id = 1;
-  if (_has_bit(0)) {
+  if (has_client_id()) {
     target =
       ::google::protobuf::internal::WireFormatLite::WriteBytesToArray(
         1, this->client_id(), target);
@@ -1307,7 +1307,7 @@ void RpbSetClientIdReq::MergeFrom(const ::google::protobuf::Message& from) {
 void RpbSetClientIdReq::MergeFrom(const RpbSetClientIdReq& from) {
   GOOGLE_CHECK_NE(&from, this);
   if (from._has_bits_[0 / 32] & (0xffu << (0 % 32))) {
-    if (from._has_bit(0)) {
+    if (from.has_client_id()) {
       set_client_id(from.client_id());
     }
   }
@@ -1352,8 +1352,6 @@ void RpbSetClientIdReq::Swap(RpbSetClientIdReq* other) {
 
 // ===================================================================
 
-const ::std::string RpbGetServerInfoResp::_default_node_;
-const ::std::string RpbGetServerInfoResp::_default_server_version_;
 #ifndef _MSC_VER
 const int RpbGetServerInfoResp::kNodeFieldNumber;
 const int RpbGetServerInfoResp::kServerVersionFieldNumber;
@@ -1375,8 +1373,8 @@ RpbGetServerInfoResp::RpbGetServerInfoResp(const RpbGetServerInfoResp& from)
 
 void RpbGetServerInfoResp::SharedCtor() {
   _cached_size_ = 0;
-  node_ = const_cast< ::std::string*>(&_default_node_);
-  server_version_ = const_cast< ::std::string*>(&_default_server_version_);
+  node_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
+  server_version_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
   ::memset(_has_bits_, 0, sizeof(_has_bits_));
 }
 
@@ -1385,10 +1383,10 @@ RpbGetServerInfoResp::~RpbGetServerInfoResp() {
 }
 
 void RpbGetServerInfoResp::SharedDtor() {
-  if (node_ != &_default_node_) {
+  if (node_ != &::google::protobuf::internal::kEmptyString) {
     delete node_;
   }
-  if (server_version_ != &_default_server_version_) {
+  if (server_version_ != &::google::protobuf::internal::kEmptyString) {
     delete server_version_;
   }
   if (this != default_instance_) {
@@ -1417,13 +1415,13 @@ RpbGetServerInfoResp* RpbGetServerInfoResp::New() const {
 
 void RpbGetServerInfoResp::Clear() {
   if (_has_bits_[0 / 32] & (0xffu << (0 % 32))) {
-    if (_has_bit(0)) {
-      if (node_ != &_default_node_) {
+    if (has_node()) {
+      if (node_ != &::google::protobuf::internal::kEmptyString) {
         node_->clear();
       }
     }
-    if (_has_bit(1)) {
-      if (server_version_ != &_default_server_version_) {
+    if (has_server_version()) {
+      if (server_version_ != &::google::protobuf::internal::kEmptyString) {
         server_version_->clear();
       }
     }
@@ -1484,13 +1482,13 @@ bool RpbGetServerInfoResp::MergePartialFromCodedStream(
 void RpbGetServerInfoResp::SerializeWithCachedSizes(
     ::google::protobuf::io::CodedOutputStream* output) const {
   // optional bytes node = 1;
-  if (_has_bit(0)) {
+  if (has_node()) {
     ::google::protobuf::internal::WireFormatLite::WriteBytes(
       1, this->node(), output);
   }
   
   // optional bytes server_version = 2;
-  if (_has_bit(1)) {
+  if (has_server_version()) {
     ::google::protobuf::internal::WireFormatLite::WriteBytes(
       2, this->server_version(), output);
   }
@@ -1504,14 +1502,14 @@ void RpbGetServerInfoResp::SerializeWithCachedSizes(
 ::google::protobuf::uint8* RpbGetServerInfoResp::SerializeWithCachedSizesToArray(
     ::google::protobuf::uint8* target) const {
   // optional bytes node = 1;
-  if (_has_bit(0)) {
+  if (has_node()) {
     target =
       ::google::protobuf::internal::WireFormatLite::WriteBytesToArray(
         1, this->node(), target);
   }
   
   // optional bytes server_version = 2;
-  if (_has_bit(1)) {
+  if (has_server_version()) {
     target =
       ::google::protobuf::internal::WireFormatLite::WriteBytesToArray(
         2, this->server_version(), target);
@@ -1569,10 +1567,10 @@ void RpbGetServerInfoResp::MergeFrom(const ::google::protobuf::Message& from) {
 void RpbGetServerInfoResp::MergeFrom(const RpbGetServerInfoResp& from) {
   GOOGLE_CHECK_NE(&from, this);
   if (from._has_bits_[0 / 32] & (0xffu << (0 % 32))) {
-    if (from._has_bit(0)) {
+    if (from.has_node()) {
       set_node(from.node());
     }
-    if (from._has_bit(1)) {
+    if (from.has_server_version()) {
       set_server_version(from.server_version());
     }
   }
@@ -1617,9 +1615,6 @@ void RpbGetServerInfoResp::Swap(RpbGetServerInfoResp* other) {
 
 // ===================================================================
 
-const ::std::string RpbGetReq::_default_bucket_;
-const ::std::string RpbGetReq::_default_key_;
-const ::std::string RpbGetReq::_default_if_modified_;
 #ifndef _MSC_VER
 const int RpbGetReq::kBucketFieldNumber;
 const int RpbGetReq::kKeyFieldNumber;
@@ -1648,13 +1643,13 @@ RpbGetReq::RpbGetReq(const RpbGetReq& from)
 
 void RpbGetReq::SharedCtor() {
   _cached_size_ = 0;
-  bucket_ = const_cast< ::std::string*>(&_default_bucket_);
-  key_ = const_cast< ::std::string*>(&_default_key_);
+  bucket_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
+  key_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
   r_ = 0u;
   pr_ = 0u;
   basic_quorum_ = false;
   notfound_ok_ = false;
-  if_modified_ = const_cast< ::std::string*>(&_default_if_modified_);
+  if_modified_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
   head_ = false;
   deletedvclock_ = false;
   ::memset(_has_bits_, 0, sizeof(_has_bits_));
@@ -1665,13 +1660,13 @@ RpbGetReq::~RpbGetReq() {
 }
 
 void RpbGetReq::SharedDtor() {
-  if (bucket_ != &_default_bucket_) {
+  if (bucket_ != &::google::protobuf::internal::kEmptyString) {
     delete bucket_;
   }
-  if (key_ != &_default_key_) {
+  if (key_ != &::google::protobuf::internal::kEmptyString) {
     delete key_;
   }
-  if (if_modified_ != &_default_if_modified_) {
+  if (if_modified_ != &::google::protobuf::internal::kEmptyString) {
     delete if_modified_;
   }
   if (this != default_instance_) {
@@ -1700,13 +1695,13 @@ RpbGetReq* RpbGetReq::New() const {
 
 void RpbGetReq::Clear() {
   if (_has_bits_[0 / 32] & (0xffu << (0 % 32))) {
-    if (_has_bit(0)) {
-      if (bucket_ != &_default_bucket_) {
+    if (has_bucket()) {
+      if (bucket_ != &::google::protobuf::internal::kEmptyString) {
         bucket_->clear();
       }
     }
-    if (_has_bit(1)) {
-      if (key_ != &_default_key_) {
+    if (has_key()) {
+      if (key_ != &::google::protobuf::internal::kEmptyString) {
         key_->clear();
       }
     }
@@ -1714,8 +1709,8 @@ void RpbGetReq::Clear() {
     pr_ = 0u;
     basic_quorum_ = false;
     notfound_ok_ = false;
-    if (_has_bit(6)) {
-      if (if_modified_ != &_default_if_modified_) {
+    if (has_if_modified()) {
+      if (if_modified_ != &::google::protobuf::internal::kEmptyString) {
         if_modified_->clear();
       }
     }
@@ -1769,7 +1764,7 @@ bool RpbGetReq::MergePartialFromCodedStream(
           DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
                    ::google::protobuf::uint32, ::google::protobuf::internal::WireFormatLite::TYPE_UINT32>(
                  input, &r_)));
-          _set_bit(2);
+          set_has_r();
         } else {
           goto handle_uninterpreted;
         }
@@ -1785,7 +1780,7 @@ bool RpbGetReq::MergePartialFromCodedStream(
           DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
                    ::google::protobuf::uint32, ::google::protobuf::internal::WireFormatLite::TYPE_UINT32>(
                  input, &pr_)));
-          _set_bit(3);
+          set_has_pr();
         } else {
           goto handle_uninterpreted;
         }
@@ -1801,7 +1796,7 @@ bool RpbGetReq::MergePartialFromCodedStream(
           DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
                    bool, ::google::protobuf::internal::WireFormatLite::TYPE_BOOL>(
                  input, &basic_quorum_)));
-          _set_bit(4);
+          set_has_basic_quorum();
         } else {
           goto handle_uninterpreted;
         }
@@ -1817,7 +1812,7 @@ bool RpbGetReq::MergePartialFromCodedStream(
           DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
                    bool, ::google::protobuf::internal::WireFormatLite::TYPE_BOOL>(
                  input, &notfound_ok_)));
-          _set_bit(5);
+          set_has_notfound_ok();
         } else {
           goto handle_uninterpreted;
         }
@@ -1847,7 +1842,7 @@ bool RpbGetReq::MergePartialFromCodedStream(
           DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
                    bool, ::google::protobuf::internal::WireFormatLite::TYPE_BOOL>(
                  input, &head_)));
-          _set_bit(7);
+          set_has_head();
         } else {
           goto handle_uninterpreted;
         }
@@ -1863,7 +1858,7 @@ bool RpbGetReq::MergePartialFromCodedStream(
           DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
                    bool, ::google::protobuf::internal::WireFormatLite::TYPE_BOOL>(
                  input, &deletedvclock_)));
-          _set_bit(8);
+          set_has_deletedvclock();
         } else {
           goto handle_uninterpreted;
         }
@@ -1890,50 +1885,50 @@ bool RpbGetReq::MergePartialFromCodedStream(
 void RpbGetReq::SerializeWithCachedSizes(
     ::google::protobuf::io::CodedOutputStream* output) const {
   // required bytes bucket = 1;
-  if (_has_bit(0)) {
+  if (has_bucket()) {
     ::google::protobuf::internal::WireFormatLite::WriteBytes(
       1, this->bucket(), output);
   }
   
   // required bytes key = 2;
-  if (_has_bit(1)) {
+  if (has_key()) {
     ::google::protobuf::internal::WireFormatLite::WriteBytes(
       2, this->key(), output);
   }
   
   // optional uint32 r = 3;
-  if (_has_bit(2)) {
+  if (has_r()) {
     ::google::protobuf::internal::WireFormatLite::WriteUInt32(3, this->r(), output);
   }
   
   // optional uint32 pr = 4;
-  if (_has_bit(3)) {
+  if (has_pr()) {
     ::google::protobuf::internal::WireFormatLite::WriteUInt32(4, this->pr(), output);
   }
   
   // optional bool basic_quorum = 5;
-  if (_has_bit(4)) {
+  if (has_basic_quorum()) {
     ::google::protobuf::internal::WireFormatLite::WriteBool(5, this->basic_quorum(), output);
   }
   
   // optional bool notfound_ok = 6;
-  if (_has_bit(5)) {
+  if (has_notfound_ok()) {
     ::google::protobuf::internal::WireFormatLite::WriteBool(6, this->notfound_ok(), output);
   }
   
   // optional bytes if_modified = 7;
-  if (_has_bit(6)) {
+  if (has_if_modified()) {
     ::google::protobuf::internal::WireFormatLite::WriteBytes(
       7, this->if_modified(), output);
   }
   
   // optional bool head = 8;
-  if (_has_bit(7)) {
+  if (has_head()) {
     ::google::protobuf::internal::WireFormatLite::WriteBool(8, this->head(), output);
   }
   
   // optional bool deletedvclock = 9;
-  if (_has_bit(8)) {
+  if (has_deletedvclock()) {
     ::google::protobuf::internal::WireFormatLite::WriteBool(9, this->deletedvclock(), output);
   }
   
@@ -1946,53 +1941,53 @@ void RpbGetReq::SerializeWithCachedSizes(
 ::google::protobuf::uint8* RpbGetReq::SerializeWithCachedSizesToArray(
     ::google::protobuf::uint8* target) const {
   // required bytes bucket = 1;
-  if (_has_bit(0)) {
+  if (has_bucket()) {
     target =
       ::google::protobuf::internal::WireFormatLite::WriteBytesToArray(
         1, this->bucket(), target);
   }
   
   // required bytes key = 2;
-  if (_has_bit(1)) {
+  if (has_key()) {
     target =
       ::google::protobuf::internal::WireFormatLite::WriteBytesToArray(
         2, this->key(), target);
   }
   
   // optional uint32 r = 3;
-  if (_has_bit(2)) {
+  if (has_r()) {
     target = ::google::protobuf::internal::WireFormatLite::WriteUInt32ToArray(3, this->r(), target);
   }
   
   // optional uint32 pr = 4;
-  if (_has_bit(3)) {
+  if (has_pr()) {
     target = ::google::protobuf::internal::WireFormatLite::WriteUInt32ToArray(4, this->pr(), target);
   }
   
   // optional bool basic_quorum = 5;
-  if (_has_bit(4)) {
+  if (has_basic_quorum()) {
     target = ::google::protobuf::internal::WireFormatLite::WriteBoolToArray(5, this->basic_quorum(), target);
   }
   
   // optional bool notfound_ok = 6;
-  if (_has_bit(5)) {
+  if (has_notfound_ok()) {
     target = ::google::protobuf::internal::WireFormatLite::WriteBoolToArray(6, this->notfound_ok(), target);
   }
   
   // optional bytes if_modified = 7;
-  if (_has_bit(6)) {
+  if (has_if_modified()) {
     target =
       ::google::protobuf::internal::WireFormatLite::WriteBytesToArray(
         7, this->if_modified(), target);
   }
   
   // optional bool head = 8;
-  if (_has_bit(7)) {
+  if (has_head()) {
     target = ::google::protobuf::internal::WireFormatLite::WriteBoolToArray(8, this->head(), target);
   }
   
   // optional bool deletedvclock = 9;
-  if (_has_bit(8)) {
+  if (has_deletedvclock()) {
     target = ::google::protobuf::internal::WireFormatLite::WriteBoolToArray(9, this->deletedvclock(), target);
   }
   
@@ -2091,33 +2086,33 @@ void RpbGetReq::MergeFrom(const ::google::protobuf::Message& from) {
 void RpbGetReq::MergeFrom(const RpbGetReq& from) {
   GOOGLE_CHECK_NE(&from, this);
   if (from._has_bits_[0 / 32] & (0xffu << (0 % 32))) {
-    if (from._has_bit(0)) {
+    if (from.has_bucket()) {
       set_bucket(from.bucket());
     }
-    if (from._has_bit(1)) {
+    if (from.has_key()) {
       set_key(from.key());
     }
-    if (from._has_bit(2)) {
+    if (from.has_r()) {
       set_r(from.r());
     }
-    if (from._has_bit(3)) {
+    if (from.has_pr()) {
       set_pr(from.pr());
     }
-    if (from._has_bit(4)) {
+    if (from.has_basic_quorum()) {
       set_basic_quorum(from.basic_quorum());
     }
-    if (from._has_bit(5)) {
+    if (from.has_notfound_ok()) {
       set_notfound_ok(from.notfound_ok());
     }
-    if (from._has_bit(6)) {
+    if (from.has_if_modified()) {
       set_if_modified(from.if_modified());
     }
-    if (from._has_bit(7)) {
+    if (from.has_head()) {
       set_head(from.head());
     }
   }
   if (from._has_bits_[8 / 32] & (0xffu << (8 % 32))) {
-    if (from._has_bit(8)) {
+    if (from.has_deletedvclock()) {
       set_deletedvclock(from.deletedvclock());
     }
   }
@@ -2170,7 +2165,6 @@ void RpbGetReq::Swap(RpbGetReq* other) {
 
 // ===================================================================
 
-const ::std::string RpbGetResp::_default_vclock_;
 #ifndef _MSC_VER
 const int RpbGetResp::kContentFieldNumber;
 const int RpbGetResp::kVclockFieldNumber;
@@ -2193,7 +2187,7 @@ RpbGetResp::RpbGetResp(const RpbGetResp& from)
 
 void RpbGetResp::SharedCtor() {
   _cached_size_ = 0;
-  vclock_ = const_cast< ::std::string*>(&_default_vclock_);
+  vclock_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
   unchanged_ = false;
   ::memset(_has_bits_, 0, sizeof(_has_bits_));
 }
@@ -2203,7 +2197,7 @@ RpbGetResp::~RpbGetResp() {
 }
 
 void RpbGetResp::SharedDtor() {
-  if (vclock_ != &_default_vclock_) {
+  if (vclock_ != &::google::protobuf::internal::kEmptyString) {
     delete vclock_;
   }
   if (this != default_instance_) {
@@ -2232,8 +2226,8 @@ RpbGetResp* RpbGetResp::New() const {
 
 void RpbGetResp::Clear() {
   if (_has_bits_[1 / 32] & (0xffu << (1 % 32))) {
-    if (_has_bit(1)) {
-      if (vclock_ != &_default_vclock_) {
+    if (has_vclock()) {
+      if (vclock_ != &::google::protobuf::internal::kEmptyString) {
         vclock_->clear();
       }
     }
@@ -2287,7 +2281,7 @@ bool RpbGetResp::MergePartialFromCodedStream(
           DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
                    bool, ::google::protobuf::internal::WireFormatLite::TYPE_BOOL>(
                  input, &unchanged_)));
-          _set_bit(2);
+          set_has_unchanged();
         } else {
           goto handle_uninterpreted;
         }
@@ -2320,13 +2314,13 @@ void RpbGetResp::SerializeWithCachedSizes(
   }
   
   // optional bytes vclock = 2;
-  if (_has_bit(1)) {
+  if (has_vclock()) {
     ::google::protobuf::internal::WireFormatLite::WriteBytes(
       2, this->vclock(), output);
   }
   
   // optional bool unchanged = 3;
-  if (_has_bit(2)) {
+  if (has_unchanged()) {
     ::google::protobuf::internal::WireFormatLite::WriteBool(3, this->unchanged(), output);
   }
   
@@ -2346,14 +2340,14 @@ void RpbGetResp::SerializeWithCachedSizes(
   }
   
   // optional bytes vclock = 2;
-  if (_has_bit(1)) {
+  if (has_vclock()) {
     target =
       ::google::protobuf::internal::WireFormatLite::WriteBytesToArray(
         2, this->vclock(), target);
   }
   
   // optional bool unchanged = 3;
-  if (_has_bit(2)) {
+  if (has_unchanged()) {
     target = ::google::protobuf::internal::WireFormatLite::WriteBoolToArray(3, this->unchanged(), target);
   }
   
@@ -2416,10 +2410,10 @@ void RpbGetResp::MergeFrom(const RpbGetResp& from) {
   GOOGLE_CHECK_NE(&from, this);
   content_.MergeFrom(from.content_);
   if (from._has_bits_[1 / 32] & (0xffu << (1 % 32))) {
-    if (from._has_bit(1)) {
+    if (from.has_vclock()) {
       set_vclock(from.vclock());
     }
-    if (from._has_bit(2)) {
+    if (from.has_unchanged()) {
       set_unchanged(from.unchanged());
     }
   }
@@ -2468,9 +2462,6 @@ void RpbGetResp::Swap(RpbGetResp* other) {
 
 // ===================================================================
 
-const ::std::string RpbPutReq::_default_bucket_;
-const ::std::string RpbPutReq::_default_key_;
-const ::std::string RpbPutReq::_default_vclock_;
 #ifndef _MSC_VER
 const int RpbPutReq::kBucketFieldNumber;
 const int RpbPutReq::kKeyFieldNumber;
@@ -2502,9 +2493,9 @@ RpbPutReq::RpbPutReq(const RpbPutReq& from)
 
 void RpbPutReq::SharedCtor() {
   _cached_size_ = 0;
-  bucket_ = const_cast< ::std::string*>(&_default_bucket_);
-  key_ = const_cast< ::std::string*>(&_default_key_);
-  vclock_ = const_cast< ::std::string*>(&_default_vclock_);
+  bucket_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
+  key_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
+  vclock_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
   content_ = NULL;
   w_ = 0u;
   dw_ = 0u;
@@ -2521,13 +2512,13 @@ RpbPutReq::~RpbPutReq() {
 }
 
 void RpbPutReq::SharedDtor() {
-  if (bucket_ != &_default_bucket_) {
+  if (bucket_ != &::google::protobuf::internal::kEmptyString) {
     delete bucket_;
   }
-  if (key_ != &_default_key_) {
+  if (key_ != &::google::protobuf::internal::kEmptyString) {
     delete key_;
   }
-  if (vclock_ != &_default_vclock_) {
+  if (vclock_ != &::google::protobuf::internal::kEmptyString) {
     delete vclock_;
   }
   if (this != default_instance_) {
@@ -2557,22 +2548,22 @@ RpbPutReq* RpbPutReq::New() const {
 
 void RpbPutReq::Clear() {
   if (_has_bits_[0 / 32] & (0xffu << (0 % 32))) {
-    if (_has_bit(0)) {
-      if (bucket_ != &_default_bucket_) {
+    if (has_bucket()) {
+      if (bucket_ != &::google::protobuf::internal::kEmptyString) {
         bucket_->clear();
       }
     }
-    if (_has_bit(1)) {
-      if (key_ != &_default_key_) {
+    if (has_key()) {
+      if (key_ != &::google::protobuf::internal::kEmptyString) {
         key_->clear();
       }
     }
-    if (_has_bit(2)) {
-      if (vclock_ != &_default_vclock_) {
+    if (has_vclock()) {
+      if (vclock_ != &::google::protobuf::internal::kEmptyString) {
         vclock_->clear();
       }
     }
-    if (_has_bit(3)) {
+    if (has_content()) {
       if (content_ != NULL) content_->::riak_proto::RpbContent::Clear();
     }
     w_ = 0u;
@@ -2658,7 +2649,7 @@ bool RpbPutReq::MergePartialFromCodedStream(
           DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
                    ::google::protobuf::uint32, ::google::protobuf::internal::WireFormatLite::TYPE_UINT32>(
                  input, &w_)));
-          _set_bit(4);
+          set_has_w();
         } else {
           goto handle_uninterpreted;
         }
@@ -2674,7 +2665,7 @@ bool RpbPutReq::MergePartialFromCodedStream(
           DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
                    ::google::protobuf::uint32, ::google::protobuf::internal::WireFormatLite::TYPE_UINT32>(
                  input, &dw_)));
-          _set_bit(5);
+          set_has_dw();
         } else {
           goto handle_uninterpreted;
         }
@@ -2690,7 +2681,7 @@ bool RpbPutReq::MergePartialFromCodedStream(
           DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
                    bool, ::google::protobuf::internal::WireFormatLite::TYPE_BOOL>(
                  input, &return_body_)));
-          _set_bit(6);
+          set_has_return_body();
         } else {
           goto handle_uninterpreted;
         }
@@ -2706,7 +2697,7 @@ bool RpbPutReq::MergePartialFromCodedStream(
           DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
                    ::google::protobuf::uint32, ::google::protobuf::internal::WireFormatLite::TYPE_UINT32>(
                  input, &pw_)));
-          _set_bit(7);
+          set_has_pw();
         } else {
           goto handle_uninterpreted;
         }
@@ -2722,7 +2713,7 @@ bool RpbPutReq::MergePartialFromCodedStream(
           DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
                    bool, ::google::protobuf::internal::WireFormatLite::TYPE_BOOL>(
                  input, &if_not_modified_)));
-          _set_bit(8);
+          set_has_if_not_modified();
         } else {
           goto handle_uninterpreted;
         }
@@ -2738,7 +2729,7 @@ bool RpbPutReq::MergePartialFromCodedStream(
           DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
                    bool, ::google::protobuf::internal::WireFormatLite::TYPE_BOOL>(
                  input, &if_none_match_)));
-          _set_bit(9);
+          set_has_if_none_match();
         } else {
           goto handle_uninterpreted;
         }
@@ -2754,7 +2745,7 @@ bool RpbPutReq::MergePartialFromCodedStream(
           DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
                    bool, ::google::protobuf::internal::WireFormatLite::TYPE_BOOL>(
                  input, &return_head_)));
-          _set_bit(10);
+          set_has_return_head();
         } else {
           goto handle_uninterpreted;
         }
@@ -2781,61 +2772,61 @@ bool RpbPutReq::MergePartialFromCodedStream(
 void RpbPutReq::SerializeWithCachedSizes(
     ::google::protobuf::io::CodedOutputStream* output) const {
   // required bytes bucket = 1;
-  if (_has_bit(0)) {
+  if (has_bucket()) {
     ::google::protobuf::internal::WireFormatLite::WriteBytes(
       1, this->bucket(), output);
   }
   
   // optional bytes key = 2;
-  if (_has_bit(1)) {
+  if (has_key()) {
     ::google::protobuf::internal::WireFormatLite::WriteBytes(
       2, this->key(), output);
   }
   
   // optional bytes vclock = 3;
-  if (_has_bit(2)) {
+  if (has_vclock()) {
     ::google::protobuf::internal::WireFormatLite::WriteBytes(
       3, this->vclock(), output);
   }
   
   // required .riak_proto.RpbContent content = 4;
-  if (_has_bit(3)) {
+  if (has_content()) {
     ::google::protobuf::internal::WireFormatLite::WriteMessageMaybeToArray(
       4, this->content(), output);
   }
   
   // optional uint32 w = 5;
-  if (_has_bit(4)) {
+  if (has_w()) {
     ::google::protobuf::internal::WireFormatLite::WriteUInt32(5, this->w(), output);
   }
   
   // optional uint32 dw = 6;
-  if (_has_bit(5)) {
+  if (has_dw()) {
     ::google::protobuf::internal::WireFormatLite::WriteUInt32(6, this->dw(), output);
   }
   
   // optional bool return_body = 7;
-  if (_has_bit(6)) {
+  if (has_return_body()) {
     ::google::protobuf::internal::WireFormatLite::WriteBool(7, this->return_body(), output);
   }
   
   // optional uint32 pw = 8;
-  if (_has_bit(7)) {
+  if (has_pw()) {
     ::google::protobuf::internal::WireFormatLite::WriteUInt32(8, this->pw(), output);
   }
   
   // optional bool if_not_modified = 9;
-  if (_has_bit(8)) {
+  if (has_if_not_modified()) {
     ::google::protobuf::internal::WireFormatLite::WriteBool(9, this->if_not_modified(), output);
   }
   
   // optional bool if_none_match = 10;
-  if (_has_bit(9)) {
+  if (has_if_none_match()) {
     ::google::protobuf::internal::WireFormatLite::WriteBool(10, this->if_none_match(), output);
   }
   
   // optional bool return_head = 11;
-  if (_has_bit(10)) {
+  if (has_return_head()) {
     ::google::protobuf::internal::WireFormatLite::WriteBool(11, this->return_head(), output);
   }
   
@@ -2848,65 +2839,65 @@ void RpbPutReq::SerializeWithCachedSizes(
 ::google::protobuf::uint8* RpbPutReq::SerializeWithCachedSizesToArray(
     ::google::protobuf::uint8* target) const {
   // required bytes bucket = 1;
-  if (_has_bit(0)) {
+  if (has_bucket()) {
     target =
       ::google::protobuf::internal::WireFormatLite::WriteBytesToArray(
         1, this->bucket(), target);
   }
   
   // optional bytes key = 2;
-  if (_has_bit(1)) {
+  if (has_key()) {
     target =
       ::google::protobuf::internal::WireFormatLite::WriteBytesToArray(
         2, this->key(), target);
   }
   
   // optional bytes vclock = 3;
-  if (_has_bit(2)) {
+  if (has_vclock()) {
     target =
       ::google::protobuf::internal::WireFormatLite::WriteBytesToArray(
         3, this->vclock(), target);
   }
   
   // required .riak_proto.RpbContent content = 4;
-  if (_has_bit(3)) {
+  if (has_content()) {
     target = ::google::protobuf::internal::WireFormatLite::
       WriteMessageNoVirtualToArray(
         4, this->content(), target);
   }
   
   // optional uint32 w = 5;
-  if (_has_bit(4)) {
+  if (has_w()) {
     target = ::google::protobuf::internal::WireFormatLite::WriteUInt32ToArray(5, this->w(), target);
   }
   
   // optional uint32 dw = 6;
-  if (_has_bit(5)) {
+  if (has_dw()) {
     target = ::google::protobuf::internal::WireFormatLite::WriteUInt32ToArray(6, this->dw(), target);
   }
   
   // optional bool return_body = 7;
-  if (_has_bit(6)) {
+  if (has_return_body()) {
     target = ::google::protobuf::internal::WireFormatLite::WriteBoolToArray(7, this->return_body(), target);
   }
   
   // optional uint32 pw = 8;
-  if (_has_bit(7)) {
+  if (has_pw()) {
     target = ::google::protobuf::internal::WireFormatLite::WriteUInt32ToArray(8, this->pw(), target);
   }
   
   // optional bool if_not_modified = 9;
-  if (_has_bit(8)) {
+  if (has_if_not_modified()) {
     target = ::google::protobuf::internal::WireFormatLite::WriteBoolToArray(9, this->if_not_modified(), target);
   }
   
   // optional bool if_none_match = 10;
-  if (_has_bit(9)) {
+  if (has_if_none_match()) {
     target = ::google::protobuf::internal::WireFormatLite::WriteBoolToArray(10, this->if_none_match(), target);
   }
   
   // optional bool return_head = 11;
-  if (_has_bit(10)) {
+  if (has_return_head()) {
     target = ::google::protobuf::internal::WireFormatLite::WriteBoolToArray(11, this->return_head(), target);
   }
   
@@ -3019,39 +3010,39 @@ void RpbPutReq::MergeFrom(const ::google::protobuf::Message& from) {
 void RpbPutReq::MergeFrom(const RpbPutReq& from) {
   GOOGLE_CHECK_NE(&from, this);
   if (from._has_bits_[0 / 32] & (0xffu << (0 % 32))) {
-    if (from._has_bit(0)) {
+    if (from.has_bucket()) {
       set_bucket(from.bucket());
     }
-    if (from._has_bit(1)) {
+    if (from.has_key()) {
       set_key(from.key());
     }
-    if (from._has_bit(2)) {
+    if (from.has_vclock()) {
       set_vclock(from.vclock());
     }
-    if (from._has_bit(3)) {
+    if (from.has_content()) {
       mutable_content()->::riak_proto::RpbContent::MergeFrom(from.content());
     }
-    if (from._has_bit(4)) {
+    if (from.has_w()) {
       set_w(from.w());
     }
-    if (from._has_bit(5)) {
+    if (from.has_dw()) {
       set_dw(from.dw());
     }
-    if (from._has_bit(6)) {
+    if (from.has_return_body()) {
       set_return_body(from.return_body());
     }
-    if (from._has_bit(7)) {
+    if (from.has_pw()) {
       set_pw(from.pw());
     }
   }
   if (from._has_bits_[8 / 32] & (0xffu << (8 % 32))) {
-    if (from._has_bit(8)) {
+    if (from.has_if_not_modified()) {
       set_if_not_modified(from.if_not_modified());
     }
-    if (from._has_bit(9)) {
+    if (from.has_if_none_match()) {
       set_if_none_match(from.if_none_match());
     }
-    if (from._has_bit(10)) {
+    if (from.has_return_head()) {
       set_return_head(from.return_head());
     }
   }
@@ -3109,8 +3100,6 @@ void RpbPutReq::Swap(RpbPutReq* other) {
 
 // ===================================================================
 
-const ::std::string RpbPutResp::_default_vclock_;
-const ::std::string RpbPutResp::_default_key_;
 #ifndef _MSC_VER
 const int RpbPutResp::kContentFieldNumber;
 const int RpbPutResp::kVclockFieldNumber;
@@ -3133,8 +3122,8 @@ RpbPutResp::RpbPutResp(const RpbPutResp& from)
 
 void RpbPutResp::SharedCtor() {
   _cached_size_ = 0;
-  vclock_ = const_cast< ::std::string*>(&_default_vclock_);
-  key_ = const_cast< ::std::string*>(&_default_key_);
+  vclock_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
+  key_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
   ::memset(_has_bits_, 0, sizeof(_has_bits_));
 }
 
@@ -3143,10 +3132,10 @@ RpbPutResp::~RpbPutResp() {
 }
 
 void RpbPutResp::SharedDtor() {
-  if (vclock_ != &_default_vclock_) {
+  if (vclock_ != &::google::protobuf::internal::kEmptyString) {
     delete vclock_;
   }
-  if (key_ != &_default_key_) {
+  if (key_ != &::google::protobuf::internal::kEmptyString) {
     delete key_;
   }
   if (this != default_instance_) {
@@ -3175,13 +3164,13 @@ RpbPutResp* RpbPutResp::New() const {
 
 void RpbPutResp::Clear() {
   if (_has_bits_[1 / 32] & (0xffu << (1 % 32))) {
-    if (_has_bit(1)) {
-      if (vclock_ != &_default_vclock_) {
+    if (has_vclock()) {
+      if (vclock_ != &::google::protobuf::internal::kEmptyString) {
         vclock_->clear();
       }
     }
-    if (_has_bit(2)) {
-      if (key_ != &_default_key_) {
+    if (has_key()) {
+      if (key_ != &::google::protobuf::internal::kEmptyString) {
         key_->clear();
       }
     }
@@ -3265,13 +3254,13 @@ void RpbPutResp::SerializeWithCachedSizes(
   }
   
   // optional bytes vclock = 2;
-  if (_has_bit(1)) {
+  if (has_vclock()) {
     ::google::protobuf::internal::WireFormatLite::WriteBytes(
       2, this->vclock(), output);
   }
   
   // optional bytes key = 3;
-  if (_has_bit(2)) {
+  if (has_key()) {
     ::google::protobuf::internal::WireFormatLite::WriteBytes(
       3, this->key(), output);
   }
@@ -3292,14 +3281,14 @@ void RpbPutResp::SerializeWithCachedSizes(
   }
   
   // optional bytes vclock = 2;
-  if (_has_bit(1)) {
+  if (has_vclock()) {
     target =
       ::google::protobuf::internal::WireFormatLite::WriteBytesToArray(
         2, this->vclock(), target);
   }
   
   // optional bytes key = 3;
-  if (_has_bit(2)) {
+  if (has_key()) {
     target =
       ::google::protobuf::internal::WireFormatLite::WriteBytesToArray(
         3, this->key(), target);
@@ -3366,10 +3355,10 @@ void RpbPutResp::MergeFrom(const RpbPutResp& from) {
   GOOGLE_CHECK_NE(&from, this);
   content_.MergeFrom(from.content_);
   if (from._has_bits_[1 / 32] & (0xffu << (1 % 32))) {
-    if (from._has_bit(1)) {
+    if (from.has_vclock()) {
       set_vclock(from.vclock());
     }
-    if (from._has_bit(2)) {
+    if (from.has_key()) {
       set_key(from.key());
     }
   }
@@ -3418,9 +3407,6 @@ void RpbPutResp::Swap(RpbPutResp* other) {
 
 // ===================================================================
 
-const ::std::string RpbDelReq::_default_bucket_;
-const ::std::string RpbDelReq::_default_key_;
-const ::std::string RpbDelReq::_default_vclock_;
 #ifndef _MSC_VER
 const int RpbDelReq::kBucketFieldNumber;
 const int RpbDelReq::kKeyFieldNumber;
@@ -3449,10 +3435,10 @@ RpbDelReq::RpbDelReq(const RpbDelReq& from)
 
 void RpbDelReq::SharedCtor() {
   _cached_size_ = 0;
-  bucket_ = const_cast< ::std::string*>(&_default_bucket_);
-  key_ = const_cast< ::std::string*>(&_default_key_);
+  bucket_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
+  key_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
   rw_ = 0u;
-  vclock_ = const_cast< ::std::string*>(&_default_vclock_);
+  vclock_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
   r_ = 0u;
   w_ = 0u;
   pr_ = 0u;
@@ -3466,13 +3452,13 @@ RpbDelReq::~RpbDelReq() {
 }
 
 void RpbDelReq::SharedDtor() {
-  if (bucket_ != &_default_bucket_) {
+  if (bucket_ != &::google::protobuf::internal::kEmptyString) {
     delete bucket_;
   }
-  if (key_ != &_default_key_) {
+  if (key_ != &::google::protobuf::internal::kEmptyString) {
     delete key_;
   }
-  if (vclock_ != &_default_vclock_) {
+  if (vclock_ != &::google::protobuf::internal::kEmptyString) {
     delete vclock_;
   }
   if (this != default_instance_) {
@@ -3501,19 +3487,19 @@ RpbDelReq* RpbDelReq::New() const {
 
 void RpbDelReq::Clear() {
   if (_has_bits_[0 / 32] & (0xffu << (0 % 32))) {
-    if (_has_bit(0)) {
-      if (bucket_ != &_default_bucket_) {
+    if (has_bucket()) {
+      if (bucket_ != &::google::protobuf::internal::kEmptyString) {
         bucket_->clear();
       }
     }
-    if (_has_bit(1)) {
-      if (key_ != &_default_key_) {
+    if (has_key()) {
+      if (key_ != &::google::protobuf::internal::kEmptyString) {
         key_->clear();
       }
     }
     rw_ = 0u;
-    if (_has_bit(3)) {
-      if (vclock_ != &_default_vclock_) {
+    if (has_vclock()) {
+      if (vclock_ != &::google::protobuf::internal::kEmptyString) {
         vclock_->clear();
       }
     }
@@ -3570,7 +3556,7 @@ bool RpbDelReq::MergePartialFromCodedStream(
           DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
                    ::google::protobuf::uint32, ::google::protobuf::internal::WireFormatLite::TYPE_UINT32>(
                  input, &rw_)));
-          _set_bit(2);
+          set_has_rw();
         } else {
           goto handle_uninterpreted;
         }
@@ -3600,7 +3586,7 @@ bool RpbDelReq::MergePartialFromCodedStream(
           DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
                    ::google::protobuf::uint32, ::google::protobuf::internal::WireFormatLite::TYPE_UINT32>(
                  input, &r_)));
-          _set_bit(4);
+          set_has_r();
         } else {
           goto handle_uninterpreted;
         }
@@ -3616,7 +3602,7 @@ bool RpbDelReq::MergePartialFromCodedStream(
           DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
                    ::google::protobuf::uint32, ::google::protobuf::internal::WireFormatLite::TYPE_UINT32>(
                  input, &w_)));
-          _set_bit(5);
+          set_has_w();
         } else {
           goto handle_uninterpreted;
         }
@@ -3632,7 +3618,7 @@ bool RpbDelReq::MergePartialFromCodedStream(
           DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
                    ::google::protobuf::uint32, ::google::protobuf::internal::WireFormatLite::TYPE_UINT32>(
                  input, &pr_)));
-          _set_bit(6);
+          set_has_pr();
         } else {
           goto handle_uninterpreted;
         }
@@ -3648,7 +3634,7 @@ bool RpbDelReq::MergePartialFromCodedStream(
           DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
                    ::google::protobuf::uint32, ::google::protobuf::internal::WireFormatLite::TYPE_UINT32>(
                  input, &pw_)));
-          _set_bit(7);
+          set_has_pw();
         } else {
           goto handle_uninterpreted;
         }
@@ -3664,7 +3650,7 @@ bool RpbDelReq::MergePartialFromCodedStream(
           DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
                    ::google::protobuf::uint32, ::google::protobuf::internal::WireFormatLite::TYPE_UINT32>(
                  input, &dw_)));
-          _set_bit(8);
+          set_has_dw();
         } else {
           goto handle_uninterpreted;
         }
@@ -3691,50 +3677,50 @@ bool RpbDelReq::MergePartialFromCodedStream(
 void RpbDelReq::SerializeWithCachedSizes(
     ::google::protobuf::io::CodedOutputStream* output) const {
   // required bytes bucket = 1;
-  if (_has_bit(0)) {
+  if (has_bucket()) {
     ::google::protobuf::internal::WireFormatLite::WriteBytes(
       1, this->bucket(), output);
   }
   
   // required bytes key = 2;
-  if (_has_bit(1)) {
+  if (has_key()) {
     ::google::protobuf::internal::WireFormatLite::WriteBytes(
       2, this->key(), output);
   }
   
   // optional uint32 rw = 3;
-  if (_has_bit(2)) {
+  if (has_rw()) {
     ::google::protobuf::internal::WireFormatLite::WriteUInt32(3, this->rw(), output);
   }
   
   // optional bytes vclock = 4;
-  if (_has_bit(3)) {
+  if (has_vclock()) {
     ::google::protobuf::internal::WireFormatLite::WriteBytes(
       4, this->vclock(), output);
   }
   
   // optional uint32 r = 5;
-  if (_has_bit(4)) {
+  if (has_r()) {
     ::google::protobuf::internal::WireFormatLite::WriteUInt32(5, this->r(), output);
   }
   
   // optional uint32 w = 6;
-  if (_has_bit(5)) {
+  if (has_w()) {
     ::google::protobuf::internal::WireFormatLite::WriteUInt32(6, this->w(), output);
   }
   
   // optional uint32 pr = 7;
-  if (_has_bit(6)) {
+  if (has_pr()) {
     ::google::protobuf::internal::WireFormatLite::WriteUInt32(7, this->pr(), output);
   }
   
   // optional uint32 pw = 8;
-  if (_has_bit(7)) {
+  if (has_pw()) {
     ::google::protobuf::internal::WireFormatLite::WriteUInt32(8, this->pw(), output);
   }
   
   // optional uint32 dw = 9;
-  if (_has_bit(8)) {
+  if (has_dw()) {
     ::google::protobuf::internal::WireFormatLite::WriteUInt32(9, this->dw(), output);
   }
   
@@ -3747,53 +3733,53 @@ void RpbDelReq::SerializeWithCachedSizes(
 ::google::protobuf::uint8* RpbDelReq::SerializeWithCachedSizesToArray(
     ::google::protobuf::uint8* target) const {
   // required bytes bucket = 1;
-  if (_has_bit(0)) {
+  if (has_bucket()) {
     target =
       ::google::protobuf::internal::WireFormatLite::WriteBytesToArray(
         1, this->bucket(), target);
   }
   
   // required bytes key = 2;
-  if (_has_bit(1)) {
+  if (has_key()) {
     target =
       ::google::protobuf::internal::WireFormatLite::WriteBytesToArray(
         2, this->key(), target);
   }
   
   // optional uint32 rw = 3;
-  if (_has_bit(2)) {
+  if (has_rw()) {
     target = ::google::protobuf::internal::WireFormatLite::WriteUInt32ToArray(3, this->rw(), target);
   }
   
   // optional bytes vclock = 4;
-  if (_has_bit(3)) {
+  if (has_vclock()) {
     target =
       ::google::protobuf::internal::WireFormatLite::WriteBytesToArray(
         4, this->vclock(), target);
   }
   
   // optional uint32 r = 5;
-  if (_has_bit(4)) {
+  if (has_r()) {
     target = ::google::protobuf::internal::WireFormatLite::WriteUInt32ToArray(5, this->r(), target);
   }
   
   // optional uint32 w = 6;
-  if (_has_bit(5)) {
+  if (has_w()) {
     target = ::google::protobuf::internal::WireFormatLite::WriteUInt32ToArray(6, this->w(), target);
   }
   
   // optional uint32 pr = 7;
-  if (_has_bit(6)) {
+  if (has_pr()) {
     target = ::google::protobuf::internal::WireFormatLite::WriteUInt32ToArray(7, this->pr(), target);
   }
   
   // optional uint32 pw = 8;
-  if (_has_bit(7)) {
+  if (has_pw()) {
     target = ::google::protobuf::internal::WireFormatLite::WriteUInt32ToArray(8, this->pw(), target);
   }
   
   // optional uint32 dw = 9;
-  if (_has_bit(8)) {
+  if (has_dw()) {
     target = ::google::protobuf::internal::WireFormatLite::WriteUInt32ToArray(9, this->dw(), target);
   }
   
@@ -3900,33 +3886,33 @@ void RpbDelReq::MergeFrom(const ::google::protobuf::Message& from) {
 void RpbDelReq::MergeFrom(const RpbDelReq& from) {
   GOOGLE_CHECK_NE(&from, this);
   if (from._has_bits_[0 / 32] & (0xffu << (0 % 32))) {
-    if (from._has_bit(0)) {
+    if (from.has_bucket()) {
       set_bucket(from.bucket());
     }
-    if (from._has_bit(1)) {
+    if (from.has_key()) {
       set_key(from.key());
     }
-    if (from._has_bit(2)) {
+    if (from.has_rw()) {
       set_rw(from.rw());
     }
-    if (from._has_bit(3)) {
+    if (from.has_vclock()) {
       set_vclock(from.vclock());
     }
-    if (from._has_bit(4)) {
+    if (from.has_r()) {
       set_r(from.r());
     }
-    if (from._has_bit(5)) {
+    if (from.has_w()) {
       set_w(from.w());
     }
-    if (from._has_bit(6)) {
+    if (from.has_pr()) {
       set_pr(from.pr());
     }
-    if (from._has_bit(7)) {
+    if (from.has_pw()) {
       set_pw(from.pw());
     }
   }
   if (from._has_bits_[8 / 32] & (0xffu << (8 % 32))) {
-    if (from._has_bit(8)) {
+    if (from.has_dw()) {
       set_dw(from.dw());
     }
   }
@@ -4179,7 +4165,6 @@ void RpbListBucketsResp::Swap(RpbListBucketsResp* other) {
 
 // ===================================================================
 
-const ::std::string RpbListKeysReq::_default_bucket_;
 #ifndef _MSC_VER
 const int RpbListKeysReq::kBucketFieldNumber;
 #endif  // !_MSC_VER
@@ -4200,7 +4185,7 @@ RpbListKeysReq::RpbListKeysReq(const RpbListKeysReq& from)
 
 void RpbListKeysReq::SharedCtor() {
   _cached_size_ = 0;
-  bucket_ = const_cast< ::std::string*>(&_default_bucket_);
+  bucket_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
   ::memset(_has_bits_, 0, sizeof(_has_bits_));
 }
 
@@ -4209,7 +4194,7 @@ RpbListKeysReq::~RpbListKeysReq() {
 }
 
 void RpbListKeysReq::SharedDtor() {
-  if (bucket_ != &_default_bucket_) {
+  if (bucket_ != &::google::protobuf::internal::kEmptyString) {
     delete bucket_;
   }
   if (this != default_instance_) {
@@ -4238,8 +4223,8 @@ RpbListKeysReq* RpbListKeysReq::New() const {
 
 void RpbListKeysReq::Clear() {
   if (_has_bits_[0 / 32] & (0xffu << (0 % 32))) {
-    if (_has_bit(0)) {
-      if (bucket_ != &_default_bucket_) {
+    if (has_bucket()) {
+      if (bucket_ != &::google::protobuf::internal::kEmptyString) {
         bucket_->clear();
       }
     }
@@ -4286,7 +4271,7 @@ bool RpbListKeysReq::MergePartialFromCodedStream(
 void RpbListKeysReq::SerializeWithCachedSizes(
     ::google::protobuf::io::CodedOutputStream* output) const {
   // required bytes bucket = 1;
-  if (_has_bit(0)) {
+  if (has_bucket()) {
     ::google::protobuf::internal::WireFormatLite::WriteBytes(
       1, this->bucket(), output);
   }
@@ -4300,7 +4285,7 @@ void RpbListKeysReq::SerializeWithCachedSizes(
 ::google::protobuf::uint8* RpbListKeysReq::SerializeWithCachedSizesToArray(
     ::google::protobuf::uint8* target) const {
   // required bytes bucket = 1;
-  if (_has_bit(0)) {
+  if (has_bucket()) {
     target =
       ::google::protobuf::internal::WireFormatLite::WriteBytesToArray(
         1, this->bucket(), target);
@@ -4351,7 +4336,7 @@ void RpbListKeysReq::MergeFrom(const ::google::protobuf::Message& from) {
 void RpbListKeysReq::MergeFrom(const RpbListKeysReq& from) {
   GOOGLE_CHECK_NE(&from, this);
   if (from._has_bits_[0 / 32] & (0xffu << (0 % 32))) {
-    if (from._has_bit(0)) {
+    if (from.has_bucket()) {
       set_bucket(from.bucket());
     }
   }
@@ -4488,7 +4473,7 @@ bool RpbListKeysResp::MergePartialFromCodedStream(
           DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
                    bool, ::google::protobuf::internal::WireFormatLite::TYPE_BOOL>(
                  input, &done_)));
-          _set_bit(1);
+          set_has_done();
         } else {
           goto handle_uninterpreted;
         }
@@ -4521,7 +4506,7 @@ void RpbListKeysResp::SerializeWithCachedSizes(
   }
   
   // optional bool done = 2;
-  if (_has_bit(1)) {
+  if (has_done()) {
     ::google::protobuf::internal::WireFormatLite::WriteBool(2, this->done(), output);
   }
   
@@ -4540,7 +4525,7 @@ void RpbListKeysResp::SerializeWithCachedSizes(
   }
   
   // optional bool done = 2;
-  if (_has_bit(1)) {
+  if (has_done()) {
     target = ::google::protobuf::internal::WireFormatLite::WriteBoolToArray(2, this->done(), target);
   }
   
@@ -4595,7 +4580,7 @@ void RpbListKeysResp::MergeFrom(const RpbListKeysResp& from) {
   GOOGLE_CHECK_NE(&from, this);
   keys_.MergeFrom(from.keys_);
   if (from._has_bits_[1 / 32] & (0xffu << (1 % 32))) {
-    if (from._has_bit(1)) {
+    if (from.has_done()) {
       set_done(from.done());
     }
   }
@@ -4640,7 +4625,6 @@ void RpbListKeysResp::Swap(RpbListKeysResp* other) {
 
 // ===================================================================
 
-const ::std::string RpbGetBucketReq::_default_bucket_;
 #ifndef _MSC_VER
 const int RpbGetBucketReq::kBucketFieldNumber;
 #endif  // !_MSC_VER
@@ -4661,7 +4645,7 @@ RpbGetBucketReq::RpbGetBucketReq(const RpbGetBucketReq& from)
 
 void RpbGetBucketReq::SharedCtor() {
   _cached_size_ = 0;
-  bucket_ = const_cast< ::std::string*>(&_default_bucket_);
+  bucket_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
   ::memset(_has_bits_, 0, sizeof(_has_bits_));
 }
 
@@ -4670,7 +4654,7 @@ RpbGetBucketReq::~RpbGetBucketReq() {
 }
 
 void RpbGetBucketReq::SharedDtor() {
-  if (bucket_ != &_default_bucket_) {
+  if (bucket_ != &::google::protobuf::internal::kEmptyString) {
     delete bucket_;
   }
   if (this != default_instance_) {
@@ -4699,8 +4683,8 @@ RpbGetBucketReq* RpbGetBucketReq::New() const {
 
 void RpbGetBucketReq::Clear() {
   if (_has_bits_[0 / 32] & (0xffu << (0 % 32))) {
-    if (_has_bit(0)) {
-      if (bucket_ != &_default_bucket_) {
+    if (has_bucket()) {
+      if (bucket_ != &::google::protobuf::internal::kEmptyString) {
         bucket_->clear();
       }
     }
@@ -4747,7 +4731,7 @@ bool RpbGetBucketReq::MergePartialFromCodedStream(
 void RpbGetBucketReq::SerializeWithCachedSizes(
     ::google::protobuf::io::CodedOutputStream* output) const {
   // required bytes bucket = 1;
-  if (_has_bit(0)) {
+  if (has_bucket()) {
     ::google::protobuf::internal::WireFormatLite::WriteBytes(
       1, this->bucket(), output);
   }
@@ -4761,7 +4745,7 @@ void RpbGetBucketReq::SerializeWithCachedSizes(
 ::google::protobuf::uint8* RpbGetBucketReq::SerializeWithCachedSizesToArray(
     ::google::protobuf::uint8* target) const {
   // required bytes bucket = 1;
-  if (_has_bit(0)) {
+  if (has_bucket()) {
     target =
       ::google::protobuf::internal::WireFormatLite::WriteBytesToArray(
         1, this->bucket(), target);
@@ -4812,7 +4796,7 @@ void RpbGetBucketReq::MergeFrom(const ::google::protobuf::Message& from) {
 void RpbGetBucketReq::MergeFrom(const RpbGetBucketReq& from) {
   GOOGLE_CHECK_NE(&from, this);
   if (from._has_bits_[0 / 32] & (0xffu << (0 % 32))) {
-    if (from._has_bit(0)) {
+    if (from.has_bucket()) {
       set_bucket(from.bucket());
     }
   }
@@ -4914,7 +4898,7 @@ RpbGetBucketResp* RpbGetBucketResp::New() const {
 
 void RpbGetBucketResp::Clear() {
   if (_has_bits_[0 / 32] & (0xffu << (0 % 32))) {
-    if (_has_bit(0)) {
+    if (has_props()) {
       if (props_ != NULL) props_->::riak_proto::RpbBucketProps::Clear();
     }
   }
@@ -4960,7 +4944,7 @@ bool RpbGetBucketResp::MergePartialFromCodedStream(
 void RpbGetBucketResp::SerializeWithCachedSizes(
     ::google::protobuf::io::CodedOutputStream* output) const {
   // required .riak_proto.RpbBucketProps props = 1;
-  if (_has_bit(0)) {
+  if (has_props()) {
     ::google::protobuf::internal::WireFormatLite::WriteMessageMaybeToArray(
       1, this->props(), output);
   }
@@ -4974,7 +4958,7 @@ void RpbGetBucketResp::SerializeWithCachedSizes(
 ::google::protobuf::uint8* RpbGetBucketResp::SerializeWithCachedSizesToArray(
     ::google::protobuf::uint8* target) const {
   // required .riak_proto.RpbBucketProps props = 1;
-  if (_has_bit(0)) {
+  if (has_props()) {
     target = ::google::protobuf::internal::WireFormatLite::
       WriteMessageNoVirtualToArray(
         1, this->props(), target);
@@ -5025,7 +5009,7 @@ void RpbGetBucketResp::MergeFrom(const ::google::protobuf::Message& from) {
 void RpbGetBucketResp::MergeFrom(const RpbGetBucketResp& from) {
   GOOGLE_CHECK_NE(&from, this);
   if (from._has_bits_[0 / 32] & (0xffu << (0 % 32))) {
-    if (from._has_bit(0)) {
+    if (from.has_props()) {
       mutable_props()->::riak_proto::RpbBucketProps::MergeFrom(from.props());
     }
   }
@@ -5070,7 +5054,6 @@ void RpbGetBucketResp::Swap(RpbGetBucketResp* other) {
 
 // ===================================================================
 
-const ::std::string RpbSetBucketReq::_default_bucket_;
 #ifndef _MSC_VER
 const int RpbSetBucketReq::kBucketFieldNumber;
 const int RpbSetBucketReq::kPropsFieldNumber;
@@ -5093,7 +5076,7 @@ RpbSetBucketReq::RpbSetBucketReq(const RpbSetBucketReq& from)
 
 void RpbSetBucketReq::SharedCtor() {
   _cached_size_ = 0;
-  bucket_ = const_cast< ::std::string*>(&_default_bucket_);
+  bucket_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
   props_ = NULL;
   ::memset(_has_bits_, 0, sizeof(_has_bits_));
 }
@@ -5103,7 +5086,7 @@ RpbSetBucketReq::~RpbSetBucketReq() {
 }
 
 void RpbSetBucketReq::SharedDtor() {
-  if (bucket_ != &_default_bucket_) {
+  if (bucket_ != &::google::protobuf::internal::kEmptyString) {
     delete bucket_;
   }
   if (this != default_instance_) {
@@ -5133,12 +5116,12 @@ RpbSetBucketReq* RpbSetBucketReq::New() const {
 
 void RpbSetBucketReq::Clear() {
   if (_has_bits_[0 / 32] & (0xffu << (0 % 32))) {
-    if (_has_bit(0)) {
-      if (bucket_ != &_default_bucket_) {
+    if (has_bucket()) {
+      if (bucket_ != &::google::protobuf::internal::kEmptyString) {
         bucket_->clear();
       }
     }
-    if (_has_bit(1)) {
+    if (has_props()) {
       if (props_ != NULL) props_->::riak_proto::RpbBucketProps::Clear();
     }
   }
@@ -5198,13 +5181,13 @@ bool RpbSetBucketReq::MergePartialFromCodedStream(
 void RpbSetBucketReq::SerializeWithCachedSizes(
     ::google::protobuf::io::CodedOutputStream* output) const {
   // required bytes bucket = 1;
-  if (_has_bit(0)) {
+  if (has_bucket()) {
     ::google::protobuf::internal::WireFormatLite::WriteBytes(
       1, this->bucket(), output);
   }
   
   // required .riak_proto.RpbBucketProps props = 2;
-  if (_has_bit(1)) {
+  if (has_props()) {
     ::google::protobuf::internal::WireFormatLite::WriteMessageMaybeToArray(
       2, this->props(), output);
   }
@@ -5218,14 +5201,14 @@ void RpbSetBucketReq::SerializeWithCachedSizes(
 ::google::protobuf::uint8* RpbSetBucketReq::SerializeWithCachedSizesToArray(
     ::google::protobuf::uint8* target) const {
   // required bytes bucket = 1;
-  if (_has_bit(0)) {
+  if (has_bucket()) {
     target =
       ::google::protobuf::internal::WireFormatLite::WriteBytesToArray(
         1, this->bucket(), target);
   }
   
   // required .riak_proto.RpbBucketProps props = 2;
-  if (_has_bit(1)) {
+  if (has_props()) {
     target = ::google::protobuf::internal::WireFormatLite::
       WriteMessageNoVirtualToArray(
         2, this->props(), target);
@@ -5283,10 +5266,10 @@ void RpbSetBucketReq::MergeFrom(const ::google::protobuf::Message& from) {
 void RpbSetBucketReq::MergeFrom(const RpbSetBucketReq& from) {
   GOOGLE_CHECK_NE(&from, this);
   if (from._has_bits_[0 / 32] & (0xffu << (0 % 32))) {
-    if (from._has_bit(0)) {
+    if (from.has_bucket()) {
       set_bucket(from.bucket());
     }
-    if (from._has_bit(1)) {
+    if (from.has_props()) {
       mutable_props()->::riak_proto::RpbBucketProps::MergeFrom(from.props());
     }
   }
@@ -5332,8 +5315,6 @@ void RpbSetBucketReq::Swap(RpbSetBucketReq* other) {
 
 // ===================================================================
 
-const ::std::string RpbMapRedReq::_default_request_;
-const ::std::string RpbMapRedReq::_default_content_type_;
 #ifndef _MSC_VER
 const int RpbMapRedReq::kRequestFieldNumber;
 const int RpbMapRedReq::kContentTypeFieldNumber;
@@ -5355,8 +5336,8 @@ RpbMapRedReq::RpbMapRedReq(const RpbMapRedReq& from)
 
 void RpbMapRedReq::SharedCtor() {
   _cached_size_ = 0;
-  request_ = const_cast< ::std::string*>(&_default_request_);
-  content_type_ = const_cast< ::std::string*>(&_default_content_type_);
+  request_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
+  content_type_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
   ::memset(_has_bits_, 0, sizeof(_has_bits_));
 }
 
@@ -5365,10 +5346,10 @@ RpbMapRedReq::~RpbMapRedReq() {
 }
 
 void RpbMapRedReq::SharedDtor() {
-  if (request_ != &_default_request_) {
+  if (request_ != &::google::protobuf::internal::kEmptyString) {
     delete request_;
   }
-  if (content_type_ != &_default_content_type_) {
+  if (content_type_ != &::google::protobuf::internal::kEmptyString) {
     delete content_type_;
   }
   if (this != default_instance_) {
@@ -5397,13 +5378,13 @@ RpbMapRedReq* RpbMapRedReq::New() const {
 
 void RpbMapRedReq::Clear() {
   if (_has_bits_[0 / 32] & (0xffu << (0 % 32))) {
-    if (_has_bit(0)) {
-      if (request_ != &_default_request_) {
+    if (has_request()) {
+      if (request_ != &::google::protobuf::internal::kEmptyString) {
         request_->clear();
       }
     }
-    if (_has_bit(1)) {
-      if (content_type_ != &_default_content_type_) {
+    if (has_content_type()) {
+      if (content_type_ != &::google::protobuf::internal::kEmptyString) {
         content_type_->clear();
       }
     }
@@ -5464,13 +5445,13 @@ bool RpbMapRedReq::MergePartialFromCodedStream(
 void RpbMapRedReq::SerializeWithCachedSizes(
     ::google::protobuf::io::CodedOutputStream* output) const {
   // required bytes request = 1;
-  if (_has_bit(0)) {
+  if (has_request()) {
     ::google::protobuf::internal::WireFormatLite::WriteBytes(
       1, this->request(), output);
   }
   
   // required bytes content_type = 2;
-  if (_has_bit(1)) {
+  if (has_content_type()) {
     ::google::protobuf::internal::WireFormatLite::WriteBytes(
       2, this->content_type(), output);
   }
@@ -5484,14 +5465,14 @@ void RpbMapRedReq::SerializeWithCachedSizes(
 ::google::protobuf::uint8* RpbMapRedReq::SerializeWithCachedSizesToArray(
     ::google::protobuf::uint8* target) const {
   // required bytes request = 1;
-  if (_has_bit(0)) {
+  if (has_request()) {
     target =
       ::google::protobuf::internal::WireFormatLite::WriteBytesToArray(
         1, this->request(), target);
   }
   
   // required bytes content_type = 2;
-  if (_has_bit(1)) {
+  if (has_content_type()) {
     target =
       ::google::protobuf::internal::WireFormatLite::WriteBytesToArray(
         2, this->content_type(), target);
@@ -5549,10 +5530,10 @@ void RpbMapRedReq::MergeFrom(const ::google::protobuf::Message& from) {
 void RpbMapRedReq::MergeFrom(const RpbMapRedReq& from) {
   GOOGLE_CHECK_NE(&from, this);
   if (from._has_bits_[0 / 32] & (0xffu << (0 % 32))) {
-    if (from._has_bit(0)) {
+    if (from.has_request()) {
       set_request(from.request());
     }
-    if (from._has_bit(1)) {
+    if (from.has_content_type()) {
       set_content_type(from.content_type());
     }
   }
@@ -5598,7 +5579,6 @@ void RpbMapRedReq::Swap(RpbMapRedReq* other) {
 
 // ===================================================================
 
-const ::std::string RpbMapRedResp::_default_response_;
 #ifndef _MSC_VER
 const int RpbMapRedResp::kPhaseFieldNumber;
 const int RpbMapRedResp::kResponseFieldNumber;
@@ -5622,7 +5602,7 @@ RpbMapRedResp::RpbMapRedResp(const RpbMapRedResp& from)
 void RpbMapRedResp::SharedCtor() {
   _cached_size_ = 0;
   phase_ = 0u;
-  response_ = const_cast< ::std::string*>(&_default_response_);
+  response_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
   done_ = false;
   ::memset(_has_bits_, 0, sizeof(_has_bits_));
 }
@@ -5632,7 +5612,7 @@ RpbMapRedResp::~RpbMapRedResp() {
 }
 
 void RpbMapRedResp::SharedDtor() {
-  if (response_ != &_default_response_) {
+  if (response_ != &::google::protobuf::internal::kEmptyString) {
     delete response_;
   }
   if (this != default_instance_) {
@@ -5662,8 +5642,8 @@ RpbMapRedResp* RpbMapRedResp::New() const {
 void RpbMapRedResp::Clear() {
   if (_has_bits_[0 / 32] & (0xffu << (0 % 32))) {
     phase_ = 0u;
-    if (_has_bit(1)) {
-      if (response_ != &_default_response_) {
+    if (has_response()) {
+      if (response_ != &::google::protobuf::internal::kEmptyString) {
         response_->clear();
       }
     }
@@ -5686,7 +5666,7 @@ bool RpbMapRedResp::MergePartialFromCodedStream(
           DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
                    ::google::protobuf::uint32, ::google::protobuf::internal::WireFormatLite::TYPE_UINT32>(
                  input, &phase_)));
-          _set_bit(0);
+          set_has_phase();
         } else {
           goto handle_uninterpreted;
         }
@@ -5716,7 +5696,7 @@ bool RpbMapRedResp::MergePartialFromCodedStream(
           DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
                    bool, ::google::protobuf::internal::WireFormatLite::TYPE_BOOL>(
                  input, &done_)));
-          _set_bit(2);
+          set_has_done();
         } else {
           goto handle_uninterpreted;
         }
@@ -5743,18 +5723,18 @@ bool RpbMapRedResp::MergePartialFromCodedStream(
 void RpbMapRedResp::SerializeWithCachedSizes(
     ::google::protobuf::io::CodedOutputStream* output) const {
   // optional uint32 phase = 1;
-  if (_has_bit(0)) {
+  if (has_phase()) {
     ::google::protobuf::internal::WireFormatLite::WriteUInt32(1, this->phase(), output);
   }
   
   // optional bytes response = 2;
-  if (_has_bit(1)) {
+  if (has_response()) {
     ::google::protobuf::internal::WireFormatLite::WriteBytes(
       2, this->response(), output);
   }
   
   // optional bool done = 3;
-  if (_has_bit(2)) {
+  if (has_done()) {
     ::google::protobuf::internal::WireFormatLite::WriteBool(3, this->done(), output);
   }
   
@@ -5767,19 +5747,19 @@ void RpbMapRedResp::SerializeWithCachedSizes(
 ::google::protobuf::uint8* RpbMapRedResp::SerializeWithCachedSizesToArray(
     ::google::protobuf::uint8* target) const {
   // optional uint32 phase = 1;
-  if (_has_bit(0)) {
+  if (has_phase()) {
     target = ::google::protobuf::internal::WireFormatLite::WriteUInt32ToArray(1, this->phase(), target);
   }
   
   // optional bytes response = 2;
-  if (_has_bit(1)) {
+  if (has_response()) {
     target =
       ::google::protobuf::internal::WireFormatLite::WriteBytesToArray(
         2, this->response(), target);
   }
   
   // optional bool done = 3;
-  if (_has_bit(2)) {
+  if (has_done()) {
     target = ::google::protobuf::internal::WireFormatLite::WriteBoolToArray(3, this->done(), target);
   }
   
@@ -5840,13 +5820,13 @@ void RpbMapRedResp::MergeFrom(const ::google::protobuf::Message& from) {
 void RpbMapRedResp::MergeFrom(const RpbMapRedResp& from) {
   GOOGLE_CHECK_NE(&from, this);
   if (from._has_bits_[0 / 32] & (0xffu << (0 % 32))) {
-    if (from._has_bit(0)) {
+    if (from.has_phase()) {
       set_phase(from.phase());
     }
-    if (from._has_bit(1)) {
+    if (from.has_response()) {
       set_response(from.response());
     }
-    if (from._has_bit(2)) {
+    if (from.has_done()) {
       set_done(from.done());
     }
   }
@@ -5892,11 +5872,6 @@ void RpbMapRedResp::Swap(RpbMapRedResp* other) {
 
 // ===================================================================
 
-const ::std::string RpbContent::_default_value_;
-const ::std::string RpbContent::_default_content_type_;
-const ::std::string RpbContent::_default_charset_;
-const ::std::string RpbContent::_default_content_encoding_;
-const ::std::string RpbContent::_default_vtag_;
 #ifndef _MSC_VER
 const int RpbContent::kValueFieldNumber;
 const int RpbContent::kContentTypeFieldNumber;
@@ -5925,11 +5900,11 @@ RpbContent::RpbContent(const RpbContent& from)
 
 void RpbContent::SharedCtor() {
   _cached_size_ = 0;
-  value_ = const_cast< ::std::string*>(&_default_value_);
-  content_type_ = const_cast< ::std::string*>(&_default_content_type_);
-  charset_ = const_cast< ::std::string*>(&_default_charset_);
-  content_encoding_ = const_cast< ::std::string*>(&_default_content_encoding_);
-  vtag_ = const_cast< ::std::string*>(&_default_vtag_);
+  value_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
+  content_type_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
+  charset_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
+  content_encoding_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
+  vtag_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
   last_mod_ = 0u;
   last_mod_usecs_ = 0u;
   ::memset(_has_bits_, 0, sizeof(_has_bits_));
@@ -5940,19 +5915,19 @@ RpbContent::~RpbContent() {
 }
 
 void RpbContent::SharedDtor() {
-  if (value_ != &_default_value_) {
+  if (value_ != &::google::protobuf::internal::kEmptyString) {
     delete value_;
   }
-  if (content_type_ != &_default_content_type_) {
+  if (content_type_ != &::google::protobuf::internal::kEmptyString) {
     delete content_type_;
   }
-  if (charset_ != &_default_charset_) {
+  if (charset_ != &::google::protobuf::internal::kEmptyString) {
     delete charset_;
   }
-  if (content_encoding_ != &_default_content_encoding_) {
+  if (content_encoding_ != &::google::protobuf::internal::kEmptyString) {
     delete content_encoding_;
   }
-  if (vtag_ != &_default_vtag_) {
+  if (vtag_ != &::google::protobuf::internal::kEmptyString) {
     delete vtag_;
   }
   if (this != default_instance_) {
@@ -5981,28 +5956,28 @@ RpbContent* RpbContent::New() const {
 
 void RpbContent::Clear() {
   if (_has_bits_[0 / 32] & (0xffu << (0 % 32))) {
-    if (_has_bit(0)) {
-      if (value_ != &_default_value_) {
+    if (has_value()) {
+      if (value_ != &::google::protobuf::internal::kEmptyString) {
         value_->clear();
       }
     }
-    if (_has_bit(1)) {
-      if (content_type_ != &_default_content_type_) {
+    if (has_content_type()) {
+      if (content_type_ != &::google::protobuf::internal::kEmptyString) {
         content_type_->clear();
       }
     }
-    if (_has_bit(2)) {
-      if (charset_ != &_default_charset_) {
+    if (has_charset()) {
+      if (charset_ != &::google::protobuf::internal::kEmptyString) {
         charset_->clear();
       }
     }
-    if (_has_bit(3)) {
-      if (content_encoding_ != &_default_content_encoding_) {
+    if (has_content_encoding()) {
+      if (content_encoding_ != &::google::protobuf::internal::kEmptyString) {
         content_encoding_->clear();
       }
     }
-    if (_has_bit(4)) {
-      if (vtag_ != &_default_vtag_) {
+    if (has_vtag()) {
+      if (vtag_ != &::google::protobuf::internal::kEmptyString) {
         vtag_->clear();
       }
     }
@@ -6113,7 +6088,7 @@ bool RpbContent::MergePartialFromCodedStream(
           DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
                    ::google::protobuf::uint32, ::google::protobuf::internal::WireFormatLite::TYPE_UINT32>(
                  input, &last_mod_)));
-          _set_bit(6);
+          set_has_last_mod();
         } else {
           goto handle_uninterpreted;
         }
@@ -6129,7 +6104,7 @@ bool RpbContent::MergePartialFromCodedStream(
           DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
                    ::google::protobuf::uint32, ::google::protobuf::internal::WireFormatLite::TYPE_UINT32>(
                  input, &last_mod_usecs_)));
-          _set_bit(7);
+          set_has_last_mod_usecs();
         } else {
           goto handle_uninterpreted;
         }
@@ -6171,31 +6146,31 @@ bool RpbContent::MergePartialFromCodedStream(
 void RpbContent::SerializeWithCachedSizes(
     ::google::protobuf::io::CodedOutputStream* output) const {
   // required bytes value = 1;
-  if (_has_bit(0)) {
+  if (has_value()) {
     ::google::protobuf::internal::WireFormatLite::WriteBytes(
       1, this->value(), output);
   }
   
   // optional bytes content_type = 2;
-  if (_has_bit(1)) {
+  if (has_content_type()) {
     ::google::protobuf::internal::WireFormatLite::WriteBytes(
       2, this->content_type(), output);
   }
   
   // optional bytes charset = 3;
-  if (_has_bit(2)) {
+  if (has_charset()) {
     ::google::protobuf::internal::WireFormatLite::WriteBytes(
       3, this->charset(), output);
   }
   
   // optional bytes content_encoding = 4;
-  if (_has_bit(3)) {
+  if (has_content_encoding()) {
     ::google::protobuf::internal::WireFormatLite::WriteBytes(
       4, this->content_encoding(), output);
   }
   
   // optional bytes vtag = 5;
-  if (_has_bit(4)) {
+  if (has_vtag()) {
     ::google::protobuf::internal::WireFormatLite::WriteBytes(
       5, this->vtag(), output);
   }
@@ -6207,12 +6182,12 @@ void RpbContent::SerializeWithCachedSizes(
   }
   
   // optional uint32 last_mod = 7;
-  if (_has_bit(6)) {
+  if (has_last_mod()) {
     ::google::protobuf::internal::WireFormatLite::WriteUInt32(7, this->last_mod(), output);
   }
   
   // optional uint32 last_mod_usecs = 8;
-  if (_has_bit(7)) {
+  if (has_last_mod_usecs()) {
     ::google::protobuf::internal::WireFormatLite::WriteUInt32(8, this->last_mod_usecs(), output);
   }
   
@@ -6231,35 +6206,35 @@ void RpbContent::SerializeWithCachedSizes(
 ::google::protobuf::uint8* RpbContent::SerializeWithCachedSizesToArray(
     ::google::protobuf::uint8* target) const {
   // required bytes value = 1;
-  if (_has_bit(0)) {
+  if (has_value()) {
     target =
       ::google::protobuf::internal::WireFormatLite::WriteBytesToArray(
         1, this->value(), target);
   }
   
   // optional bytes content_type = 2;
-  if (_has_bit(1)) {
+  if (has_content_type()) {
     target =
       ::google::protobuf::internal::WireFormatLite::WriteBytesToArray(
         2, this->content_type(), target);
   }
   
   // optional bytes charset = 3;
-  if (_has_bit(2)) {
+  if (has_charset()) {
     target =
       ::google::protobuf::internal::WireFormatLite::WriteBytesToArray(
         3, this->charset(), target);
   }
   
   // optional bytes content_encoding = 4;
-  if (_has_bit(3)) {
+  if (has_content_encoding()) {
     target =
       ::google::protobuf::internal::WireFormatLite::WriteBytesToArray(
         4, this->content_encoding(), target);
   }
   
   // optional bytes vtag = 5;
-  if (_has_bit(4)) {
+  if (has_vtag()) {
     target =
       ::google::protobuf::internal::WireFormatLite::WriteBytesToArray(
         5, this->vtag(), target);
@@ -6273,12 +6248,12 @@ void RpbContent::SerializeWithCachedSizes(
   }
   
   // optional uint32 last_mod = 7;
-  if (_has_bit(6)) {
+  if (has_last_mod()) {
     target = ::google::protobuf::internal::WireFormatLite::WriteUInt32ToArray(7, this->last_mod(), target);
   }
   
   // optional uint32 last_mod_usecs = 8;
-  if (_has_bit(7)) {
+  if (has_last_mod_usecs()) {
     target = ::google::protobuf::internal::WireFormatLite::WriteUInt32ToArray(8, this->last_mod_usecs(), target);
   }
   
@@ -6394,25 +6369,25 @@ void RpbContent::MergeFrom(const RpbContent& from) {
   links_.MergeFrom(from.links_);
   usermeta_.MergeFrom(from.usermeta_);
   if (from._has_bits_[0 / 32] & (0xffu << (0 % 32))) {
-    if (from._has_bit(0)) {
+    if (from.has_value()) {
       set_value(from.value());
     }
-    if (from._has_bit(1)) {
+    if (from.has_content_type()) {
       set_content_type(from.content_type());
     }
-    if (from._has_bit(2)) {
+    if (from.has_charset()) {
       set_charset(from.charset());
     }
-    if (from._has_bit(3)) {
+    if (from.has_content_encoding()) {
       set_content_encoding(from.content_encoding());
     }
-    if (from._has_bit(4)) {
+    if (from.has_vtag()) {
       set_vtag(from.vtag());
     }
-    if (from._has_bit(6)) {
+    if (from.has_last_mod()) {
       set_last_mod(from.last_mod());
     }
-    if (from._has_bit(7)) {
+    if (from.has_last_mod_usecs()) {
       set_last_mod_usecs(from.last_mod_usecs());
     }
   }
@@ -6468,8 +6443,6 @@ void RpbContent::Swap(RpbContent* other) {
 
 // ===================================================================
 
-const ::std::string RpbPair::_default_key_;
-const ::std::string RpbPair::_default_value_;
 #ifndef _MSC_VER
 const int RpbPair::kKeyFieldNumber;
 const int RpbPair::kValueFieldNumber;
@@ -6491,8 +6464,8 @@ RpbPair::RpbPair(const RpbPair& from)
 
 void RpbPair::SharedCtor() {
   _cached_size_ = 0;
-  key_ = const_cast< ::std::string*>(&_default_key_);
-  value_ = const_cast< ::std::string*>(&_default_value_);
+  key_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
+  value_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
   ::memset(_has_bits_, 0, sizeof(_has_bits_));
 }
 
@@ -6501,10 +6474,10 @@ RpbPair::~RpbPair() {
 }
 
 void RpbPair::SharedDtor() {
-  if (key_ != &_default_key_) {
+  if (key_ != &::google::protobuf::internal::kEmptyString) {
     delete key_;
   }
-  if (value_ != &_default_value_) {
+  if (value_ != &::google::protobuf::internal::kEmptyString) {
     delete value_;
   }
   if (this != default_instance_) {
@@ -6533,13 +6506,13 @@ RpbPair* RpbPair::New() const {
 
 void RpbPair::Clear() {
   if (_has_bits_[0 / 32] & (0xffu << (0 % 32))) {
-    if (_has_bit(0)) {
-      if (key_ != &_default_key_) {
+    if (has_key()) {
+      if (key_ != &::google::protobuf::internal::kEmptyString) {
         key_->clear();
       }
     }
-    if (_has_bit(1)) {
-      if (value_ != &_default_value_) {
+    if (has_value()) {
+      if (value_ != &::google::protobuf::internal::kEmptyString) {
         value_->clear();
       }
     }
@@ -6600,13 +6573,13 @@ bool RpbPair::MergePartialFromCodedStream(
 void RpbPair::SerializeWithCachedSizes(
     ::google::protobuf::io::CodedOutputStream* output) const {
   // required bytes key = 1;
-  if (_has_bit(0)) {
+  if (has_key()) {
     ::google::protobuf::internal::WireFormatLite::WriteBytes(
       1, this->key(), output);
   }
   
   // optional bytes value = 2;
-  if (_has_bit(1)) {
+  if (has_value()) {
     ::google::protobuf::internal::WireFormatLite::WriteBytes(
       2, this->value(), output);
   }
@@ -6620,14 +6593,14 @@ void RpbPair::SerializeWithCachedSizes(
 ::google::protobuf::uint8* RpbPair::SerializeWithCachedSizesToArray(
     ::google::protobuf::uint8* target) const {
   // required bytes key = 1;
-  if (_has_bit(0)) {
+  if (has_key()) {
     target =
       ::google::protobuf::internal::WireFormatLite::WriteBytesToArray(
         1, this->key(), target);
   }
   
   // optional bytes value = 2;
-  if (_has_bit(1)) {
+  if (has_value()) {
     target =
       ::google::protobuf::internal::WireFormatLite::WriteBytesToArray(
         2, this->value(), target);
@@ -6685,10 +6658,10 @@ void RpbPair::MergeFrom(const ::google::protobuf::Message& from) {
 void RpbPair::MergeFrom(const RpbPair& from) {
   GOOGLE_CHECK_NE(&from, this);
   if (from._has_bits_[0 / 32] & (0xffu << (0 % 32))) {
-    if (from._has_bit(0)) {
+    if (from.has_key()) {
       set_key(from.key());
     }
-    if (from._has_bit(1)) {
+    if (from.has_value()) {
       set_value(from.value());
     }
   }
@@ -6734,9 +6707,6 @@ void RpbPair::Swap(RpbPair* other) {
 
 // ===================================================================
 
-const ::std::string RpbLink::_default_bucket_;
-const ::std::string RpbLink::_default_key_;
-const ::std::string RpbLink::_default_tag_;
 #ifndef _MSC_VER
 const int RpbLink::kBucketFieldNumber;
 const int RpbLink::kKeyFieldNumber;
@@ -6759,9 +6729,9 @@ RpbLink::RpbLink(const RpbLink& from)
 
 void RpbLink::SharedCtor() {
   _cached_size_ = 0;
-  bucket_ = const_cast< ::std::string*>(&_default_bucket_);
-  key_ = const_cast< ::std::string*>(&_default_key_);
-  tag_ = const_cast< ::std::string*>(&_default_tag_);
+  bucket_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
+  key_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
+  tag_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
   ::memset(_has_bits_, 0, sizeof(_has_bits_));
 }
 
@@ -6770,13 +6740,13 @@ RpbLink::~RpbLink() {
 }
 
 void RpbLink::SharedDtor() {
-  if (bucket_ != &_default_bucket_) {
+  if (bucket_ != &::google::protobuf::internal::kEmptyString) {
     delete bucket_;
   }
-  if (key_ != &_default_key_) {
+  if (key_ != &::google::protobuf::internal::kEmptyString) {
     delete key_;
   }
-  if (tag_ != &_default_tag_) {
+  if (tag_ != &::google::protobuf::internal::kEmptyString) {
     delete tag_;
   }
   if (this != default_instance_) {
@@ -6805,18 +6775,18 @@ RpbLink* RpbLink::New() const {
 
 void RpbLink::Clear() {
   if (_has_bits_[0 / 32] & (0xffu << (0 % 32))) {
-    if (_has_bit(0)) {
-      if (bucket_ != &_default_bucket_) {
+    if (has_bucket()) {
+      if (bucket_ != &::google::protobuf::internal::kEmptyString) {
         bucket_->clear();
       }
     }
-    if (_has_bit(1)) {
-      if (key_ != &_default_key_) {
+    if (has_key()) {
+      if (key_ != &::google::protobuf::internal::kEmptyString) {
         key_->clear();
       }
     }
-    if (_has_bit(2)) {
-      if (tag_ != &_default_tag_) {
+    if (has_tag()) {
+      if (tag_ != &::google::protobuf::internal::kEmptyString) {
         tag_->clear();
       }
     }
@@ -6891,19 +6861,19 @@ bool RpbLink::MergePartialFromCodedStream(
 void RpbLink::SerializeWithCachedSizes(
     ::google::protobuf::io::CodedOutputStream* output) const {
   // optional bytes bucket = 1;
-  if (_has_bit(0)) {
+  if (has_bucket()) {
     ::google::protobuf::internal::WireFormatLite::WriteBytes(
       1, this->bucket(), output);
   }
   
   // optional bytes key = 2;
-  if (_has_bit(1)) {
+  if (has_key()) {
     ::google::protobuf::internal::WireFormatLite::WriteBytes(
       2, this->key(), output);
   }
   
   // optional bytes tag = 3;
-  if (_has_bit(2)) {
+  if (has_tag()) {
     ::google::protobuf::internal::WireFormatLite::WriteBytes(
       3, this->tag(), output);
   }
@@ -6917,21 +6887,21 @@ void RpbLink::SerializeWithCachedSizes(
 ::google::protobuf::uint8* RpbLink::SerializeWithCachedSizesToArray(
     ::google::protobuf::uint8* target) const {
   // optional bytes bucket = 1;
-  if (_has_bit(0)) {
+  if (has_bucket()) {
     target =
       ::google::protobuf::internal::WireFormatLite::WriteBytesToArray(
         1, this->bucket(), target);
   }
   
   // optional bytes key = 2;
-  if (_has_bit(1)) {
+  if (has_key()) {
     target =
       ::google::protobuf::internal::WireFormatLite::WriteBytesToArray(
         2, this->key(), target);
   }
   
   // optional bytes tag = 3;
-  if (_has_bit(2)) {
+  if (has_tag()) {
     target =
       ::google::protobuf::internal::WireFormatLite::WriteBytesToArray(
         3, this->tag(), target);
@@ -6996,13 +6966,13 @@ void RpbLink::MergeFrom(const ::google::protobuf::Message& from) {
 void RpbLink::MergeFrom(const RpbLink& from) {
   GOOGLE_CHECK_NE(&from, this);
   if (from._has_bits_[0 / 32] & (0xffu << (0 % 32))) {
-    if (from._has_bit(0)) {
+    if (from.has_bucket()) {
       set_bucket(from.bucket());
     }
-    if (from._has_bit(1)) {
+    if (from.has_key()) {
       set_key(from.key());
     }
-    if (from._has_bit(2)) {
+    if (from.has_tag()) {
       set_tag(from.tag());
     }
   }
@@ -7125,7 +7095,7 @@ bool RpbBucketProps::MergePartialFromCodedStream(
           DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
                    ::google::protobuf::uint32, ::google::protobuf::internal::WireFormatLite::TYPE_UINT32>(
                  input, &n_val_)));
-          _set_bit(0);
+          set_has_n_val();
         } else {
           goto handle_uninterpreted;
         }
@@ -7141,7 +7111,7 @@ bool RpbBucketProps::MergePartialFromCodedStream(
           DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
                    bool, ::google::protobuf::internal::WireFormatLite::TYPE_BOOL>(
                  input, &allow_mult_)));
-          _set_bit(1);
+          set_has_allow_mult();
         } else {
           goto handle_uninterpreted;
         }
@@ -7168,12 +7138,12 @@ bool RpbBucketProps::MergePartialFromCodedStream(
 void RpbBucketProps::SerializeWithCachedSizes(
     ::google::protobuf::io::CodedOutputStream* output) const {
   // optional uint32 n_val = 1;
-  if (_has_bit(0)) {
+  if (has_n_val()) {
     ::google::protobuf::internal::WireFormatLite::WriteUInt32(1, this->n_val(), output);
   }
   
   // optional bool allow_mult = 2;
-  if (_has_bit(1)) {
+  if (has_allow_mult()) {
     ::google::protobuf::internal::WireFormatLite::WriteBool(2, this->allow_mult(), output);
   }
   
@@ -7186,12 +7156,12 @@ void RpbBucketProps::SerializeWithCachedSizes(
 ::google::protobuf::uint8* RpbBucketProps::SerializeWithCachedSizesToArray(
     ::google::protobuf::uint8* target) const {
   // optional uint32 n_val = 1;
-  if (_has_bit(0)) {
+  if (has_n_val()) {
     target = ::google::protobuf::internal::WireFormatLite::WriteUInt32ToArray(1, this->n_val(), target);
   }
   
   // optional bool allow_mult = 2;
-  if (_has_bit(1)) {
+  if (has_allow_mult()) {
     target = ::google::protobuf::internal::WireFormatLite::WriteBoolToArray(2, this->allow_mult(), target);
   }
   
@@ -7245,10 +7215,10 @@ void RpbBucketProps::MergeFrom(const ::google::protobuf::Message& from) {
 void RpbBucketProps::MergeFrom(const RpbBucketProps& from) {
   GOOGLE_CHECK_NE(&from, this);
   if (from._has_bits_[0 / 32] & (0xffu << (0 % 32))) {
-    if (from._has_bit(0)) {
+    if (from.has_n_val()) {
       set_n_val(from.n_val());
     }
-    if (from._has_bit(1)) {
+    if (from.has_allow_mult()) {
       set_allow_mult(from.allow_mult());
     }
   }
