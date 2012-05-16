@@ -44,6 +44,7 @@ class DieselZMQSocket(object):
                 else:
                     raise
             else:
+                self.handle_transition()
                 self.sent += 1
                 break
 
@@ -58,6 +59,7 @@ class DieselZMQSocket(object):
                 else:
                     raise
             else:
+                self.handle_transition()
                 self.received += 1
                 return m
 
