@@ -464,9 +464,14 @@ class RedisClient(Client):
         return bool(resp)
 
     @call
-    def zrange(self, key, start, end):
-        self._send('ZRANGE', key, start, end)
+    def zrange(self, key, start, end, with_scores=False):
+        args = 'ZRANGE', key, start, end
+        if with_scores:
+            args += 'WITHSCORES',
+        self._send(*args)
         resp = self._get_response()
+        if with_scores:
+            return self.__pair_with_scores(resp)
         return resp
 
     @call
