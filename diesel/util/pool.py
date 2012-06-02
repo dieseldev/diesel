@@ -130,3 +130,14 @@ class ThreadPool(object):
         finally:
             for x in xrange(self.concurrency):
                 self.q.put(ThreadPoolDie)
+
+class TerminalThreadPool(ThreadPool):
+    def __call__(self, *args, **kw):
+        try:
+            ThreadPool.__call__(self, *args, **kw)
+        finally:
+            while self.running:
+                self.trigger.wait()
+                self.trigger.clear()
+            log.warning("TerminalThreadPool's producer exited; issuing quickstop()")
+            quickstop()
