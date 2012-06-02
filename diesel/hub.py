@@ -14,12 +14,14 @@ except:
 else:
     have_libev = True
 
-from collections import deque
-from time import time
-import thread
-from Queue import Queue, Empty
+import errno
 import fcntl
 import os
+import thread
+
+from collections import deque
+from time import time
+from Queue import Queue, Empty
 
 class Timer(object):
     '''A timer is a promise to call some function at a future date.
@@ -249,20 +251,26 @@ class EPollEventHub(AbstractEventHub):
                 break
 
         # Handle all socket I/O
-        for (fd, evtype) in self.epoll.poll(timeout):
-            if evtype & select.EPOLLIN or evtype & select.EPOLLPRI:
-                self.events[fd][0]()
-            elif evtype & select.EPOLLERR or evtype & select.EPOLLHUP:
-                self.events[fd][2]()
-            # fd could be removed by above read
-            if evtype & select.EPOLLOUT and fd in self.events:
-                self.events[fd][1]()
+        try:
+            for (fd, evtype) in self.epoll.poll(timeout):
+                if evtype & select.EPOLLIN or evtype & select.EPOLLPRI:
+                    self.events[fd][0]()
+                elif evtype & select.EPOLLERR or evtype & select.EPOLLHUP:
+                    self.events[fd][2]()
+                # fd could be removed by above read
+                if evtype & select.EPOLLOUT and fd in self.events:
+                    self.events[fd][1]()
 
-            while self.run_now and self.run:
-                self.run_now.popleft()()
+                while self.run_now and self.run:
+                    self.run_now.popleft()()
 
-            if not self.run:
-                return
+                if not self.run:
+                    return
+        except IOError, e:
+            if e.errno == errno.EINTR:
+                pass
+            else:
+                raise
 
         self.run_now = self.reschedule
         self.reschedule = deque()
