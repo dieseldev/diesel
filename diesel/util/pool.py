@@ -140,4 +140,4 @@ class TerminalThreadPool(ThreadPool):
                 self.trigger.wait()
                 self.trigger.clear()
             log.warning("TerminalThreadPool's producer exited; issuing quickstop()")
-            quickstop()
+            fork(quickstop)
