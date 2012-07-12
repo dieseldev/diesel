@@ -63,7 +63,7 @@ class Application(object):
                     self.hub.handle_events()
                 except SystemExit:
                     log.warn("-- SystemExit raised.. exiting main loop --")
-                    break
+                    raise
                 except KeyboardInterrupt:
                     log.warn("-- KeyboardInterrupt raised.. exiting main loop --")
                     break
