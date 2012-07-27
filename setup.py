@@ -1,8 +1,11 @@
-import sys
+import sys, os
 assert sys.version_info >= (2, 6), \
 "Diesel requires python 2.6 (or greater 2.X release)"
 
 from setuptools import setup
+
+if os.system("which palmc > /dev/null 2>&1") == 0:
+    os.system("palmc ./diesel/protocols ./diesel/protocols")
 
 additional_requires = []
 
