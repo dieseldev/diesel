@@ -1,7 +1,0 @@
-include MANIFEST.in
-include setup.py
-include test.py
-
-include riak.cc
-include riak.pb.cc
-include riak.pb.h
