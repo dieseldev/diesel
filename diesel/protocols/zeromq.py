@@ -1,4 +1,6 @@
 import zmq
+import diesel
+from diesel import logmod
 from errno import EAGAIN
 from collections import deque
 from diesel.util.queue import Queue
@@ -93,3 +95,97 @@ class DieselZMQSocket(object):
         if not self.destroyed:
             self.hub.unregister(self.fd)
             self.socket.close(self.linger_time)
+
+class DieselZMQService(object):
+    """A ZeroMQ service that can handle multiple clients.
+
+    Clients must maintain a steady flow of messages in order to maintain
+    state in the service. A heartbeat of some sort. Or the timeout can be
+    set to a sufficiently large value understanding that it will cause more
+    resource consumption.
+
+    """
+    name = ''
+    # TODO logging at instance level
+    log_level = logmod.LOGLVL_DEBUG
+    timeout = 10
+
+    def __init__(self, uri):
+        self.uri = uri
+        self.zmq_socket = None
+        self.log = None
+        self.clients = {}
+        self.outgoing = Queue()
+        self.incoming = Queue()
+        self.name = self.name or self.__class__.__name__
+
+    def _setup_socket(self):
+        # TODO support other ZeroMQ socket types
+        low_level_sock = zctx.socket(zmq.ROUTER)
+        self.zmq_socket = DieselZMQSocket(low_level_sock, bind=self.uri)
+
+    def _setup_logging(self):
+        log_name = self.name or self.__class__.__name__
+        self.log = diesel.log.sublog(log_name, verbosity=self.log_level)
+
+    def _client_handler(self, remote_client):
+        assert self.zmq_socket
+        queues = [remote_client.incoming, remote_client.outgoing]
+        while True:
+            (evt, value) = diesel.first(waits=queues, sleep=self.timeout)
+            if evt is remote_client.incoming:
+                resp = self.handle_client_packet(value, remote_client.context)
+            elif evt is remote_client.outgoing:
+                resp = value
+            elif evt == 'sleep':
+                break
+            if resp:
+                self.outgoing.put((remote_client.token, resp))
+        del self.clients[remote_client.token]
+        self.log.debug("cleaned up client %r" % remote_client.token)
+
+    def _receive_incoming_packets(self):
+        assert self.zmq_socket
+        socket = self.zmq_socket
+        while True:
+            # TODO support receiving data from other socket types
+            token_msg = socket.recv(copy=False)
+            assert token_msg.more
+            token = token_msg.bytes
+            packet_raw = socket.recv()
+            self.incoming.put((token, packet_raw))
+
+    def _dispatch(self):
+        assert self.zmq_socket
+        diesel.fork_child(self._receive_incoming_packets)
+        queues = [self.incoming, self.outgoing]
+        while True:
+            (queue, (token, data)) = diesel.first(waits=queues)
+
+            if queue is self.incoming:
+                if token not in self.clients:
+                    self.clients[token] = remote = RemoteClient(token)
+                    diesel.fork_child(self._client_handler, remote)
+                self.clients[token].incoming.put(data)
+
+            elif queue is self.outgoing:
+                self.zmq_socket.send(token, zmq.SNDMORE)
+                self.zmq_socket.send(data)
+
+    # Public API
+    # ==========
+
+    def run(self):
+        self._setup_socket()
+        self._setup_logging()
+        self._dispatch()
+
+    def handle_client_packet(self, packet, context):
+        pass
+
+class RemoteClient(object):
+    def __init__(self, token):
+        self.token = token
+        self.incoming = Queue()
+        self.outgoing = Queue()
+        self.context = {'async':self.outgoing}
