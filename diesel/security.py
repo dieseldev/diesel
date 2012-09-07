@@ -12,14 +12,9 @@ def ssl_async_handshake(sock, hub, next):
             hub.enable_write(sock)
         except SSL.WantX509LookupError:
             pass
-        except SSL.ZeroReturnError:
-            hub.unregister(sock) # and ignore
-        except SSL.SysCallError:
-            hub.unregister(sock) # and ignore
-        except:
+        except Exception, e:
             hub.unregister(sock)
-            sys.stderr.write("Unknown Error on connect():\n%s"
-            % traceback.format_exc())
+            next(e)
         else:
             hub.unregister(sock)
             next()
