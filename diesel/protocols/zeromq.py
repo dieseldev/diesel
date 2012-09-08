@@ -140,7 +140,12 @@ class DieselZMQService(object):
             elif evt == 'sleep':
                 break
             if resp:
-                self.outgoing.put((remote_client.token, resp))
+                if isinstance(resp, basestring):
+                    output = [resp]
+                else:
+                    output = iter(resp)
+                for part in output:
+                    self.outgoing.put((remote_client.token, part))
         del self.clients[remote_client.token]
         self.log.debug("cleaned up client %r" % remote_client.token)
 
