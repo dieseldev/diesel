@@ -215,4 +215,5 @@ class RemoteClient(object):
         self.token = token
         self.incoming = Queue()
         self.outgoing = Queue()
-        self.context = {'async':self.outgoing}
+        self.context = {'async':self.outgoing, 'token':token}
+
