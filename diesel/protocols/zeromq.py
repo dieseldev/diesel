@@ -146,7 +146,11 @@ class DieselZMQService(object):
                     output = iter(resp)
                 for part in output:
                     self.outgoing.put((remote_client.token, part))
+        self._cleanup_client(remote_client)
+
+    def _cleanup_client(self, remote_client):
         del self.clients[remote_client.token]
+        self.cleanup_client(remote_client)
         self.log.debug("cleaned up client %r" % remote_client.token)
 
     def _receive_incoming_packets(self):
@@ -169,13 +173,17 @@ class DieselZMQService(object):
 
             if queue is self.incoming:
                 if token not in self.clients:
-                    self.clients[token] = remote = RemoteClient(token)
-                    diesel.fork_child(self._client_handler, remote)
+                    self._register_client(token, data)
                 self.clients[token].incoming.put(data)
 
             elif queue is self.outgoing:
                 self.zmq_socket.send(token, zmq.SNDMORE)
                 self.zmq_socket.send(data)
+
+    def _register_client(self, token, packet):
+        self.clients[token] = remote = RemoteClient(token)
+        diesel.fork_child(self._client_handler, remote)
+        self.register_client(remote, packet)
 
     # Public API
     # ==========
@@ -186,7 +194,21 @@ class DieselZMQService(object):
         self._dispatch()
 
     def handle_client_packet(self, packet, context):
+        """Called with a bytestring packet and dictionary context.
+
+        Return an iterable of bytestrings.
+
+        """
         pass
+
+    def cleanup_client(self, remote_client):
+        """Called with a RemoteClient instance. Do any cleanup you need to."""
+        pass
+
+    def register_client(self, remote_client, packet):
+        """Called with a RemoteClient instance. Do any registration here."""
+        pass
+
 
 class RemoteClient(object):
     def __init__(self, token):
