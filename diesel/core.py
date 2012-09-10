@@ -310,12 +310,18 @@ class Loop(object):
                     ))
                 return
 
-            def finish():
-                client.conn = Connection(fsock, ip)
-                client.connected = True
-                self.hub.schedule(
-                lambda: self.wake()
-                )
+            def finish(e=None):
+                if e:
+                    assert isinstance(e, Exception)
+                    self.hub.schedule(
+                    lambda: self.wake(e)
+                    )
+                else:
+                    client.conn = Connection(fsock, ip)
+                    client.connected = True
+                    self.hub.schedule(
+                    lambda: self.wake()
+                    )
 
             if client.ssl_ctx:
                 fsock = SSL.Connection(client.ssl_ctx, sock)
