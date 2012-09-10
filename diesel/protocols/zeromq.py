@@ -1,3 +1,5 @@
+import warnings
+
 from errno import EAGAIN
 
 import zmq
@@ -108,18 +110,24 @@ class DieselZMQService(object):
 
     """
     name = ''
-    # TODO logging at instance level
-    log_level = logmod.LOGLVL_DEBUG
+    default_log_level = logmod.LOGLVL_DEBUG
     timeout = 10
 
-    def __init__(self, uri, logger=None):
+    def __init__(self, uri, logger=None, log_level=None):
         self.uri = uri
         self.zmq_socket = None
         self.log = logger or None
+        self.selected_log_level = log_level
         self.clients = {}
         self.outgoing = Queue()
         self.incoming = Queue()
         self.name = self.name or self.__class__.__name__
+        if self.log and self.selected_log_level is not None:
+            self.selected_log_level = None
+            warnings.warn(
+                "ignored `log_level` argument since `logger` was provided.",
+                RuntimeWarning,
+            )
 
     def _setup_socket(self):
         # TODO support other ZeroMQ socket types
@@ -128,8 +136,12 @@ class DieselZMQService(object):
 
     def _setup_logging(self):
         if not self.log:
+            if self.selected_log_level is not None:
+                log_level = self.selected_log_level
+            else:
+                log_level = self.default_log_level
             log_name = self.name or self.__class__.__name__
-            self.log = diesel.log.sublog(log_name, verbosity=self.log_level)
+            self.log = diesel.log.sublog(log_name, verbosity=log_level)
 
     def _client_handler(self, remote_client):
         assert self.zmq_socket
