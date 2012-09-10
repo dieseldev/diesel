@@ -198,8 +198,8 @@ class DieselZMQService(object):
 
     def _register_client(self, token, packet):
         self.clients[token] = remote = RemoteClient(token)
-        diesel.fork_child(self._handle_client_requests_and_responses, remote)
         self.register_client(remote, packet)
+        diesel.fork_child(self._handle_client_requests_and_responses, remote)
 
     # Public API
     # ==========
