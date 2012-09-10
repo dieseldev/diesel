@@ -1,10 +1,12 @@
+from errno import EAGAIN
+
 import zmq
 import diesel
+
 from diesel import logmod
-from errno import EAGAIN
-from collections import deque
 from diesel.util.queue import Queue
-from diesel.util.event import Event, EventTimeout
+from diesel.util.event import Event
+
 
 zctx = zmq.Context()
 
