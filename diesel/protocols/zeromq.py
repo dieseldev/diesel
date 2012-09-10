@@ -228,8 +228,31 @@ class DieselZMQService(object):
 
 class RemoteClient(object):
     def __init__(self, token):
+
+        # The token is the identifier sent along with thq ZeroMQ packet that
+        # uniquely identifies the remote client.
+
         self.token = token
+
+        # The incoming queue is typically populated by the DieselZMQService
+        # and represents a queue of messages send from the remote client.
+
         self.incoming = Queue()
+
+        # The outgoing queue is where return values from the
+        # DieselZMQService.handle_client_packet method are placed. Those values
+        # are sent on to the remote client.
+        #
+        # Other diesel threads can stick values directly into outgoing queue
+        # and the service will send them on as well. This allows for
+        # asynchronous sending of messages to remote clients. That's why it's
+        # called 'async' in the context.
+
         self.outgoing = Queue()
+
+        # The context in general is a place where you can put data that is
+        # related specifically to the remote client and it will exist as long
+        # the remote client doesn't timeout.
+
         self.context = {'async':self.outgoing, 'token':token}
 
