@@ -127,6 +127,7 @@ class DieselZMQService(object):
             warnings.warn(
                 "ignored `log_level` argument since `logger` was provided.",
                 RuntimeWarning,
+                stacklevel=2,
             )
 
     def _setup_socket(self):
