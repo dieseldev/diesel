@@ -110,10 +110,10 @@ class DieselZMQService(object):
     log_level = logmod.LOGLVL_DEBUG
     timeout = 10
 
-    def __init__(self, uri):
+    def __init__(self, uri, logger=None):
         self.uri = uri
         self.zmq_socket = None
-        self.log = None
+        self.log = logger or None
         self.clients = {}
         self.outgoing = Queue()
         self.incoming = Queue()
@@ -125,8 +125,9 @@ class DieselZMQService(object):
         self.zmq_socket = DieselZMQSocket(low_level_sock, bind=self.uri)
 
     def _setup_logging(self):
-        log_name = self.name or self.__class__.__name__
-        self.log = diesel.log.sublog(log_name, verbosity=self.log_level)
+        if not self.log:
+            log_name = self.name or self.__class__.__name__
+            self.log = diesel.log.sublog(log_name, verbosity=self.log_level)
 
     def _client_handler(self, remote_client):
         assert self.zmq_socket
