@@ -130,12 +130,12 @@ class DieselZMQService(object):
                 stacklevel=2,
             )
 
-    def _setup_socket(self):
+    def _create_zeromq_server_socket(self):
         # TODO support other ZeroMQ socket types
         low_level_sock = zctx.socket(zmq.ROUTER)
         self.zmq_socket = DieselZMQSocket(low_level_sock, bind=self.uri)
 
-    def _setup_logging(self):
+    def _setup_the_logging_system(self):
         if not self.log:
             if self.selected_log_level is not None:
                 log_level = self.selected_log_level
@@ -144,7 +144,7 @@ class DieselZMQService(object):
             log_name = self.name or self.__class__.__name__
             self.log = diesel.log.sublog(log_name, verbosity=log_level)
 
-    def _client_handler(self, remote_client):
+    def _handle_client_requests_and_responses(self, remote_client):
         assert self.zmq_socket
         queues = [remote_client.incoming, remote_client.outgoing]
         while True:
@@ -180,7 +180,7 @@ class DieselZMQService(object):
             packet_raw = socket.recv()
             self.incoming.put((token, packet_raw))
 
-    def _dispatch(self):
+    def _handle_all_inbound_and_outbound_traffic(self):
         assert self.zmq_socket
         diesel.fork_child(self._receive_incoming_packets)
         queues = [self.incoming, self.outgoing]
@@ -198,16 +198,16 @@ class DieselZMQService(object):
 
     def _register_client(self, token, packet):
         self.clients[token] = remote = RemoteClient(token)
-        diesel.fork_child(self._client_handler, remote)
+        diesel.fork_child(self._handle_client_requests_and_responses, remote)
         self.register_client(remote, packet)
 
     # Public API
     # ==========
 
     def run(self):
-        self._setup_socket()
-        self._setup_logging()
-        self._dispatch()
+        self._create_zeromq_server_socket()
+        self._setup_the_logging_system()
+        self._handle_all_inbound_and_outbound_traffic()
 
     def handle_client_packet(self, packet, context):
         """Called with a bytestring packet and dictionary context.
@@ -215,7 +215,7 @@ class DieselZMQService(object):
         Return an iterable of bytestrings.
 
         """
-        pass
+        raise NotImplementedError()
 
     def cleanup_client(self, remote_client):
         """Called with a RemoteClient instance. Do any cleanup you need to."""
