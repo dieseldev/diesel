@@ -1,8 +1,14 @@
-import zmq
+import warnings
+
 from errno import EAGAIN
-from collections import deque
+
+import zmq
+import diesel
+
+from diesel import logmod
 from diesel.util.queue import Queue
-from diesel.util.event import Event, EventTimeout
+from diesel.util.event import Event
+
 
 zctx = zmq.Context()
 
@@ -93,3 +99,160 @@ class DieselZMQSocket(object):
         if not self.destroyed:
             self.hub.unregister(self.fd)
             self.socket.close(self.linger_time)
+
+class DieselZMQService(object):
+    """A ZeroMQ service that can handle multiple clients.
+
+    Clients must maintain a steady flow of messages in order to maintain
+    state in the service. A heartbeat of some sort. Or the timeout can be
+    set to a sufficiently large value understanding that it will cause more
+    resource consumption.
+
+    """
+    name = ''
+    default_log_level = logmod.LOGLVL_DEBUG
+    timeout = 10
+
+    def __init__(self, uri, logger=None, log_level=None):
+        self.uri = uri
+        self.zmq_socket = None
+        self.log = logger or None
+        self.selected_log_level = log_level
+        self.clients = {}
+        self.outgoing = Queue()
+        self.incoming = Queue()
+        self.name = self.name or self.__class__.__name__
+        if self.log and self.selected_log_level is not None:
+            self.selected_log_level = None
+            warnings.warn(
+                "ignored `log_level` argument since `logger` was provided.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+
+    def _create_zeromq_server_socket(self):
+        # TODO support other ZeroMQ socket types
+        low_level_sock = zctx.socket(zmq.ROUTER)
+        self.zmq_socket = DieselZMQSocket(low_level_sock, bind=self.uri)
+
+    def _setup_the_logging_system(self):
+        if not self.log:
+            if self.selected_log_level is not None:
+                log_level = self.selected_log_level
+            else:
+                log_level = self.default_log_level
+            log_name = self.name or self.__class__.__name__
+            self.log = diesel.log.sublog(log_name, verbosity=log_level)
+
+    def _handle_client_requests_and_responses(self, remote_client):
+        assert self.zmq_socket
+        queues = [remote_client.incoming, remote_client.outgoing]
+        while True:
+            (evt, value) = diesel.first(waits=queues, sleep=self.timeout)
+            if evt is remote_client.incoming:
+                resp = self.handle_client_packet(value, remote_client.context)
+            elif evt is remote_client.outgoing:
+                resp = value
+            elif evt == 'sleep':
+                break
+            if resp:
+                if isinstance(resp, basestring):
+                    output = [resp]
+                else:
+                    output = iter(resp)
+                for part in output:
+                    self.outgoing.put((remote_client.token, part))
+        self._cleanup_client(remote_client)
+
+    def _cleanup_client(self, remote_client):
+        del self.clients[remote_client.token]
+        self.cleanup_client(remote_client)
+        self.log.debug("cleaned up client %r" % remote_client.token)
+
+    def _receive_incoming_packets(self):
+        assert self.zmq_socket
+        socket = self.zmq_socket
+        while True:
+            # TODO support receiving data from other socket types
+            token_msg = socket.recv(copy=False)
+            assert token_msg.more
+            token = token_msg.bytes
+            packet_raw = socket.recv()
+            self.incoming.put((token, packet_raw))
+
+    def _handle_all_inbound_and_outbound_traffic(self):
+        assert self.zmq_socket
+        diesel.fork_child(self._receive_incoming_packets)
+        queues = [self.incoming, self.outgoing]
+        while True:
+            (queue, (token, data)) = diesel.first(waits=queues)
+
+            if queue is self.incoming:
+                if token not in self.clients:
+                    self._register_client(token, data)
+                self.clients[token].incoming.put(data)
+
+            elif queue is self.outgoing:
+                self.zmq_socket.send(token, zmq.SNDMORE)
+                self.zmq_socket.send(data)
+
+    def _register_client(self, token, packet):
+        self.clients[token] = remote = RemoteClient(token)
+        self.register_client(remote, packet)
+        diesel.fork_child(self._handle_client_requests_and_responses, remote)
+
+    # Public API
+    # ==========
+
+    def run(self):
+        self._create_zeromq_server_socket()
+        self._setup_the_logging_system()
+        self._handle_all_inbound_and_outbound_traffic()
+
+    def handle_client_packet(self, packet, context):
+        """Called with a bytestring packet and dictionary context.
+
+        Return an iterable of bytestrings.
+
+        """
+        raise NotImplementedError()
+
+    def cleanup_client(self, remote_client):
+        """Called with a RemoteClient instance. Do any cleanup you need to."""
+        pass
+
+    def register_client(self, remote_client, packet):
+        """Called with a RemoteClient instance. Do any registration here."""
+        pass
+
+
+class RemoteClient(object):
+    def __init__(self, token):
+
+        # The token is the identifier sent along with thq ZeroMQ packet that
+        # uniquely identifies the remote client.
+
+        self.token = token
+
+        # The incoming queue is typically populated by the DieselZMQService
+        # and represents a queue of messages send from the remote client.
+
+        self.incoming = Queue()
+
+        # The outgoing queue is where return values from the
+        # DieselZMQService.handle_client_packet method are placed. Those values
+        # are sent on to the remote client.
+        #
+        # Other diesel threads can stick values directly into outgoing queue
+        # and the service will send them on as well. This allows for
+        # asynchronous sending of messages to remote clients. That's why it's
+        # called 'async' in the context.
+
+        self.outgoing = Queue()
+
+        # The context in general is a place where you can put data that is
+        # related specifically to the remote client and it will exist as long
+        # the remote client doesn't timeout.
+
+        self.context = {'async':self.outgoing, 'token':token}
+
