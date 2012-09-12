@@ -147,28 +147,30 @@ class DieselZMQService(object):
     def _handle_client_requests_and_responses(self, remote_client):
         assert self.zmq_socket
         queues = [remote_client.incoming, remote_client.outgoing]
-        while True:
-            (evt, value) = diesel.first(waits=queues, sleep=self.timeout)
-            if evt is remote_client.incoming:
-                assert isinstance(value, Message)
-                resp = self.handle_client_packet(value.data, remote_client.context)
-            elif evt is remote_client.outgoing:
-                resp = value
-            elif evt == 'sleep':
-                break
-            if resp:
-                if isinstance(resp, basestring):
-                    output = [resp]
-                else:
-                    output = iter(resp)
-                for part in output:
-                    msg = Message(
-                        remote_client.identity,
-                        part,
-                    )
-                    msg.zmq_return = remote_client.zmq_return
-                    self.outgoing.put(msg)
-        self._cleanup_client(remote_client)
+        try:
+            while True:
+                (evt, value) = diesel.first(waits=queues, sleep=self.timeout)
+                if evt is remote_client.incoming:
+                    assert isinstance(value, Message)
+                    resp = self.handle_client_packet(value.data, remote_client.context)
+                elif evt is remote_client.outgoing:
+                    resp = value
+                elif evt == 'sleep':
+                    break
+                if resp:
+                    if isinstance(resp, basestring):
+                        output = [resp]
+                    else:
+                        output = iter(resp)
+                    for part in output:
+                        msg = Message(
+                            remote_client.identity,
+                            part,
+                        )
+                        msg.zmq_return = remote_client.zmq_return
+                        self.outgoing.put(msg)
+        finally:
+            self._cleanup_client(remote_client)
 
     def _cleanup_client(self, remote_client):
         del self.clients[remote_client.identity]
