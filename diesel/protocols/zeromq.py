@@ -150,7 +150,8 @@ class DieselZMQService(object):
         while True:
             (evt, value) = diesel.first(waits=queues, sleep=self.timeout)
             if evt is remote_client.incoming:
-                resp = self.handle_client_packet(value, remote_client.context)
+                assert isinstance(value, Message)
+                resp = self.handle_client_packet(value.data, remote_client.context)
             elif evt is remote_client.outgoing:
                 resp = value
             elif evt == 'sleep':
@@ -161,44 +162,52 @@ class DieselZMQService(object):
                 else:
                     output = iter(resp)
                 for part in output:
-                    self.outgoing.put((remote_client.token, part))
+                    msg = Message(
+                        remote_client.identity,
+                        part,
+                    )
+                    msg.zmq_return = remote_client.zmq_return
+                    self.outgoing.put(msg)
         self._cleanup_client(remote_client)
 
     def _cleanup_client(self, remote_client):
-        del self.clients[remote_client.token]
+        del self.clients[remote_client.identity]
         self.cleanup_client(remote_client)
-        self.log.debug("cleaned up client %r" % remote_client.token)
+        self.log.debug("cleaned up client %r" % remote_client.identity)
 
-    def _receive_incoming_packets(self):
+    def _receive_incoming_messages(self):
         assert self.zmq_socket
         socket = self.zmq_socket
         while True:
             # TODO support receiving data from other socket types
-            token_msg = socket.recv(copy=False)
-            assert token_msg.more
-            token = token_msg.bytes
+            zmq_return_routing_data = socket.recv(copy=False)
+            assert zmq_return_routing_data.more
+            zmq_return_routing = zmq_return_routing_data.bytes
             packet_raw = socket.recv()
-            self.incoming.put((token, packet_raw))
+            msg = self.convert_raw_data_to_message(zmq_return_routing, packet_raw)
+            msg.zmq_return = zmq_return_routing
+            self.incoming.put(msg)
 
     def _handle_all_inbound_and_outbound_traffic(self):
         assert self.zmq_socket
-        diesel.fork_child(self._receive_incoming_packets)
+        diesel.fork_child(self._receive_incoming_messages)
         queues = [self.incoming, self.outgoing]
         while True:
-            (queue, (token, data)) = diesel.first(waits=queues)
+            (queue, msg) = diesel.first(waits=queues)
 
             if queue is self.incoming:
-                if token not in self.clients:
-                    self._register_client(token, data)
-                self.clients[token].incoming.put(data)
+                if msg.remote_identity not in self.clients:
+                    self._register_client(msg)
+                self.clients[msg.remote_identity].incoming.put(msg)
 
             elif queue is self.outgoing:
-                self.zmq_socket.send(token, zmq.SNDMORE)
-                self.zmq_socket.send(data)
+                self.zmq_socket.send(msg.zmq_return, zmq.SNDMORE)
+                self.zmq_socket.send(msg.data)
 
-    def _register_client(self, token, packet):
-        self.clients[token] = remote = RemoteClient(token)
-        self.register_client(remote, packet)
+    def _register_client(self, msg):
+        remote = RemoteClient.from_message(msg)
+        self.clients[msg.remote_identity] = remote
+        self.register_client(remote, msg)
         diesel.fork_child(self._handle_client_requests_and_responses, remote)
 
     # Public API
@@ -221,18 +230,37 @@ class DieselZMQService(object):
         """Called with a RemoteClient instance. Do any cleanup you need to."""
         pass
 
-    def register_client(self, remote_client, packet):
+    def register_client(self, remote_client, msg):
         """Called with a RemoteClient instance. Do any registration here."""
         pass
 
+    def convert_raw_data_to_message(self, zmq_return, raw_data):
+        """Subclasses can override to alter the handling of inbound data.
+
+        Importantly, they can route the message based on the raw_data and
+        even convert the raw_data to something more application specific
+        and pass it to the Message constructor.
+
+        This default implementation uses the zmq_return identifier for the
+        remote socket as the identifier and passes the raw_data to the
+        Message constructor.
+
+        """
+        return Message(zmq_return, raw_data)
+
 
 class RemoteClient(object):
-    def __init__(self, token):
+    def __init__(self, identity, zmq_return):
 
-        # The token is the identifier sent along with thq ZeroMQ packet that
-        # uniquely identifies the remote client.
+        # The identity is some information sent along with packets from the
+        # remote client that uniquely identifies it.
 
-        self.token = token
+        self.identity = identity
+
+        # The zmq_return is from the envelope and tells the ZeroMQ ROUTER
+        # socket where to route outbound packets.
+
+        self.zmq_return = zmq_return
 
         # The incoming queue is typically populated by the DieselZMQService
         # and represents a queue of messages send from the remote client.
@@ -254,5 +282,18 @@ class RemoteClient(object):
         # related specifically to the remote client and it will exist as long
         # the remote client doesn't timeout.
 
-        self.context = {'async':self.outgoing, 'token':token}
+        self.context = {'async':self.outgoing}
+
+    @classmethod
+    def from_message(cls, msg):
+        return cls(msg.remote_identity, msg.zmq_return)
+
+
+class Message(object):
+    def __init__(self, remote_identity, data):
+        self.remote_identity = remote_identity
+        self.data = data
+
+        # This is set by the DieselZMQService.
+        self.zmq_return = None
 
