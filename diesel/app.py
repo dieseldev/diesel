@@ -57,7 +57,7 @@ class Application(object):
                 try:
                     self.hub.handle_events()
                 except SystemExit:
-                    log.warn("-- SystemExit raised.. exiting main loop --")
+                    log.warning("-- SystemExit raised.. exiting main loop --")
                     raise
                 except KeyboardInterrupt:
                     log.warning("-- KeyboardInterrupt raised.. exiting main loop --")
