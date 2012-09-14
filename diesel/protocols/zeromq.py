@@ -5,7 +5,7 @@ from errno import EAGAIN
 import zmq
 import diesel
 
-from diesel import logmod
+from diesel import log, loglevels
 from diesel.util.queue import Queue
 from diesel.util.event import Event
 
@@ -112,7 +112,7 @@ class DieselZMQService(object):
 
     """
     name = ''
-    default_log_level = logmod.LOGLVL_DEBUG
+    default_log_level = loglevels.DEBUG
     timeout = 10
 
     def __init__(self, uri, logger=None, log_level=None):
@@ -144,7 +144,8 @@ class DieselZMQService(object):
             else:
                 log_level = self.default_log_level
             log_name = self.name or self.__class__.__name__
-            self.log = diesel.log.sublog(log_name, verbosity=log_level)
+            self.log = log.name(log_name)
+            self.log.min_level = log_level
 
     def _handle_client_requests_and_responses(self, remote_client):
         assert self.zmq_socket
