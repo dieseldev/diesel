@@ -33,7 +33,7 @@ class WSGIRequestHandler(object):
         buf = []
         r = Response()
         env['diesel.response'] = r
-        for output in self.wsgi_callable(env, 
+        for output in self.wsgi_callable(env,
                 functools.partial(self._start_response, env)):
             r.response.append(output)
         del env['diesel.response']

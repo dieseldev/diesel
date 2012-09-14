@@ -137,3 +137,14 @@ class ThreadPool(object):
             if self.finalizer:
                 self.finished.wait()
                 fork(self.finalizer)
+
+class TerminalThreadPool(ThreadPool):
+    def __call__(self, *args, **kw):
+        try:
+            ThreadPool.__call__(self, *args, **kw)
+        finally:
+            while self.running:
+                self.trigger.wait()
+                self.trigger.clear()
+            log.warning("TerminalThreadPool's producer exited; issuing quickstop()")
+            fork(quickstop)

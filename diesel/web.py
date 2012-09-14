@@ -17,7 +17,6 @@ class DieselFlask(Flask):
         self.jobs = []
         self.diesel_app = self.make_application()
         Flask.__init__(self, name, *args, **kw)
-        self.make_logger()
 
     use_x_sendfile = True
 
@@ -46,7 +45,7 @@ class DieselFlask(Flask):
             o = traceback.format_exception(*exc_info)
         else:
             o = traceback.format_exc()
-        
+
         for line in o.splitlines():
             self._dlog.error('    ' + line)
 
@@ -64,21 +63,19 @@ class DieselFlask(Flask):
                 except:
                     tb = tbtools.get_current_traceback(skip=1)
                     response = Response(tb.render_summary(), headers={'Content-Type' : 'text/html'})
-                    
+
         return response
 
-    def run(self, port=8080, iface='', verbosity=loglevels.DEBUG, debug=True):
+    def make_service(self, port=8080, iface='', verbosity=loglevels.DEBUG, debug=True):
+        self.make_logger()
         set_log_level(verbosity)
-
         if debug:
             self.debug = True
 
-        from diesel.protocols.wsgi import WSGIRequestHandler
         from diesel.protocols.http import HttpServer
         http_service = Service(HttpServer(self.handle_request), port, iface)
-        self.schedule(http_service)
-        quickstart(*self.jobs, __app=self.diesel_app)
 
+        return http_service
 
     def websocket(self, f):
         def no_web(req):
@@ -88,3 +85,8 @@ class DieselFlask(Flask):
             assert not args and not kw, "No arguments allowed to websocket routes"
             ws.do_upgrade(request)
         return ws_call
+
+    def run(self, *args, **params):
+        http_service = self.make_service(*args, **params)
+        self.schedule(http_service)
+        quickstart(*self.jobs, __app=self.diesel_app)
