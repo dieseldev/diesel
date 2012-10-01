@@ -90,6 +90,7 @@ class HttpServer(object):
                     'wsgi.multithread' : False,
                     'wsgi.multiprocess' : False,
                     'wsgi.run_once' : False,
+                    'REMOTE_ADDR' : addr[0],
                     })
                 req = Request(env)
 
