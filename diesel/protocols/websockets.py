@@ -67,7 +67,7 @@ class WebSocketServer(HttpServer):
             self.web_socket_handler(req, inq, outq)
             outq.put(WebSocketDisconnect())
 
-        fork(wrap, req, inq, outq)
+        fork(wrap, req._get_current_object(), inq, outq)
 
         while True:
             try:
