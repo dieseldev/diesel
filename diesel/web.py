@@ -12,6 +12,25 @@ from app import Application, Service, quickstart
 from diesel import log, set_log_level, loglevels
 
 
+class _FlaskTwiggyLogProxy(object):
+    """Proxies to a Twiggy Logger.
+
+    Nearly all attribute access is proxied to a twiggy Logger, with the
+    exception of the `name` attribute. This one change brings it closer in
+    line with the API of the Python standard library `logging` module which
+    Flask expects.
+
+    """
+    def __init__(self, name):
+        self.__dict__['_logger'] = log.name(name)
+        self.__dict__['name'] = name
+
+    def __getattr__(self, name):
+        return getattr(self._logger, name)
+
+    def __setattr__(self, name, value):
+        return setattr(self._logger, name, value)
+
 class DieselFlask(Flask):
     def __init__(self, name, *args, **kw):
         self.jobs = []
@@ -27,8 +46,10 @@ class DieselFlask(Flask):
     def make_application(cls):
         return Application()
 
-    def make_logger(self):
-        self._dlog = log.name('diesel.web+' + self.logger_name)
+    def make_logger(self, level):
+        # Flask expects a _logger attribute which we set here.
+        self._logger = _FlaskTwiggyLogProxy(self.logger_name)
+        self._logger.min_level = level
 
     def log_exception(self, exc_info):
         """A replacement for Flask's default.
@@ -37,7 +58,7 @@ class DieselFlask(Flask):
         diesel doesn't support.
 
         """
-        self._dlog.error('Exception on {0} [{1}]',
+        self._logger.error('Exception on {0} [{1}]',
             request.path,
             request.method
         )
@@ -47,7 +68,7 @@ class DieselFlask(Flask):
             o = traceback.format_exc()
 
         for line in o.splitlines():
-            self._dlog.error('    ' + line)
+            self._logger.error('    ' + line)
 
     def schedule(self, *args):
         self.jobs.append(args)
@@ -67,8 +88,7 @@ class DieselFlask(Flask):
         return response
 
     def make_service(self, port=8080, iface='', verbosity=loglevels.DEBUG, debug=True):
-        self.make_logger()
-        set_log_level(verbosity)
+        self.make_logger(verbosity)
         if debug:
             self.debug = True
 
