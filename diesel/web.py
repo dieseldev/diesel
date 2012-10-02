@@ -58,17 +58,10 @@ class DieselFlask(Flask):
         diesel doesn't support.
 
         """
-        self._logger.error('Exception on {0} [{1}]',
+        self._logger.trace().error('Exception on {0} [{1}]',
             request.path,
             request.method
         )
-        if exc_info and isinstance(exc_info, tuple):
-            o = traceback.format_exception(*exc_info)
-        else:
-            o = traceback.format_exc()
-
-        for line in o.splitlines():
-            self._logger.error('    ' + line)
 
     def schedule(self, *args):
         self.jobs.append(args)

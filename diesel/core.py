@@ -183,9 +183,7 @@ class Loop(object):
         except ParentDiedException:
             pass
         except:
-            log.error("-- Unhandled Exception in local loop <%s> --" % self.loop_label)
-            for line in traceback.format_exc().splitlines():
-                log.error("    " + line)
+            log.trace().error("-- Unhandled Exception in local loop <%s> --" % self.loop_label)
         finally:
             if self.connection_stack:
                 assert len(self.connection_stack) == 1
