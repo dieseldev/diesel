@@ -3,21 +3,24 @@ import warnings
 from errno import EAGAIN
 
 import zmq
-import diesel
+from collections import deque
 
 from diesel import log, loglevels
+from diesel import fire
+from diesel.events import Waiter, StopWaitDispatch
 from diesel.util.queue import Queue
 from diesel.util.event import Event
 
 
 zctx = zmq.Context.instance()
 
-class DieselZMQSocket(object):
+class DieselZMQSocket(Waiter):
     '''Integrate zmq's super fast event loop with ours.
     '''
     def __init__(self, socket, bind=None, connect=None, context=None, linger_time=1000):
         self.zctx = context or zctx
         self.socket = socket
+        self._early_value = None
         from diesel.runtime import current_app
         from diesel.hub import IntWrap
 
@@ -46,12 +49,12 @@ class DieselZMQSocket(object):
                 self.socket.send(message, zmq.NOBLOCK | flags)
             except zmq.ZMQError, e:
                 if e.errno == EAGAIN:
-                    self.handle_transition() # force re-evaluation of EVENTS
+                    self.handle_transition(True) # force re-evaluation of EVENTS
                     self.write_gate.wait()
                 else:
                     raise
             else:
-                self.handle_transition()
+                self.handle_transition(True)
                 self.sent += 1
                 break
 
@@ -62,19 +65,46 @@ class DieselZMQSocket(object):
                 m = self.socket.recv(zmq.NOBLOCK, copy=copy)
             except zmq.ZMQError, e:
                 if e.errno == EAGAIN:
-                    self.handle_transition() # force re-evaluation of EVENTS
+                    self.handle_transition(True) # force re-evaluation of EVENTS
                     self.read_gate.wait()
                 else:
                     raise
             else:
-                self.handle_transition()
+                self.handle_transition(True)
                 self.received += 1
                 return m
 
-    def handle_transition(self):
+    def process_fire(self, dc):
+        if not self._early_value:
+            got = self.ready_early()
+            if not got:
+                raise StopWaitDispatch()
+
+        assert self._early_value
+        v = self._early_value
+        self._early_value = None
+        return v
+
+
+    def ready_early(self):
+        try:
+            m = self.socket.recv(zmq.NOBLOCK, copy=False)
+        except zmq.ZMQError, e:
+            if e.errno == EAGAIN:
+                return False
+            else:
+                raise
+        else:
+            self.handle_transition(True)
+            self.received += 1
+            self._early_value = m
+            return True
+
+    def handle_transition(self, manual=False):
         '''Handle state change.
         '''
-
+        if not manual:
+            fire(self)
         events = self.socket.getsockopt(zmq.EVENTS)
         if events & zmq.POLLIN:
             self.read_gate.set()
