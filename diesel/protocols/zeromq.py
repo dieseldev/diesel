@@ -3,10 +3,9 @@ import warnings
 from errno import EAGAIN
 
 import zmq
-from collections import deque
 
+import diesel
 from diesel import log, loglevels
-from diesel import fire
 from diesel.events import Waiter, StopWaitDispatch
 from diesel.util.queue import Queue
 from diesel.util.event import Event
@@ -104,7 +103,7 @@ class DieselZMQSocket(Waiter):
         '''Handle state change.
         '''
         if not manual:
-            fire(self)
+            diesel.fire(self)
         events = self.socket.getsockopt(zmq.EVENTS)
         if events & zmq.POLLIN:
             self.read_gate.set()
