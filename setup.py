@@ -49,7 +49,7 @@ Other bundled protocols include MongoDB, Riak, and Redis client libraries.
         "twiggy",
         "pyopenssl",
         "flask",
-        "http-parser",
+        "http-parser >= 0.7.12",
         "dnspython",
     ] + additional_requires),
     )
