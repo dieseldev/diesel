@@ -160,7 +160,7 @@ class HttpClient(Client):
     '''
     url_scheme = "http"
     @call
-    def request(self, method, url, headers={}, body=None, timeout=None):
+    def request(self, method, url, headers=None, body=None, timeout=None):
         '''Issues a `method` request to `path` on the
         connected server.  Sends along `headers`, and
         body.
@@ -169,6 +169,7 @@ class HttpClient(Client):
         for example.  It will set Content-Length,
         however.
         '''
+        headers = headers or {}
         url_info = urlparse(url)
         fake_wsgi = dict(
         (cgi_name(n), v) for n, v in headers.iteritems())
