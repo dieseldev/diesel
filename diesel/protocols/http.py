@@ -149,7 +149,12 @@ class TimeoutHandler(object):
         raise HttpRequestTimeout()
 
 def cgi_name(n):
-    return 'HTTP_' + n.upper().replace('-', '_')
+    if n in ('Content-Type', 'Content-Length'):
+        # Certain headers are defined in CGI as not having an HTTP
+        # prefix.
+        return n.upper().replace('-', '_')
+    else:
+        return 'HTTP_' + n.upper().replace('-', '_')
 
 class HttpClient(Client):
     '''An HttpClient instance that issues 1.1 requests,
