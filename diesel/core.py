@@ -414,7 +414,9 @@ class Loop(object):
             self.hub.schedule(call_in)
         v = self.app.waits.wait(self, event)
         if type(v) is EarlyValue:
-            self.sleep()
+            # XXX A sleep here is needed for fair queue scheduling, but that
+            # causes incorrect values to be switched into running greenlets.
+            #self.sleep()
             return v
         self.fire_handlers[v] = cb
 
