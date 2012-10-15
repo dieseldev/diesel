@@ -172,9 +172,9 @@ class HttpClient(Client):
         headers = headers or {}
         url_info = urlparse(url)
         fake_wsgi = dict(
-        (cgi_name(n), v) for n, v in headers.iteritems())
+        (cgi_name(n), str(v).strip()) for n, v in headers.iteritems())
         fake_wsgi.update({
-            'HTTP_METHOD' : method,
+            'REQUEST_METHOD' : method,
             'SCRIPT_NAME' : '',
             'PATH_INFO' : url_info[2],
             'QUERY_STRING' : url_info[4],
