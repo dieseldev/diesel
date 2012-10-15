@@ -9,7 +9,7 @@ if os.system("which palmc > /dev/null 2>&1") == 0:
 
 additional_requires = []
 
-VERSION = "3.0b1"
+VERSION = "3.0"
 
 setup(name="diesel",
     version=VERSION,
@@ -33,7 +33,7 @@ integration with the Flask web framework.
 
 Other bundled protocols include MongoDB, Riak, and Redis client libraries.
 ''',
-    url="http://dieselweb.org",
+    url="http://diesel.io",
     download_url="http://jamwt.com/diesel/diesel-%s.tar.gz" % VERSION,
     packages=["diesel", "diesel.protocols", "diesel.util", "diesel.util.patches"],
     scripts=["examples/dhttpd"],
