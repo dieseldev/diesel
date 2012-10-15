@@ -183,9 +183,7 @@ class Loop(object):
         except ParentDiedException:
             pass
         except:
-            log.error("-- Unhandled Exception in local loop <%s> --" % self.loop_label)
-            for line in traceback.format_exc().splitlines():
-                log.error("    " + line)
+            log.trace().error("-- Unhandled Exception in local loop <%s> --" % self.loop_label)
         finally:
             if self.connection_stack:
                 assert len(self.connection_stack) == 1
@@ -315,12 +313,18 @@ class Loop(object):
                     ))
                 return
 
-            def finish():
-                client.conn = Connection(fsock, ip)
-                client.connected = True
-                self.hub.schedule(
-                lambda: self.wake()
-                )
+            def finish(e=None):
+                if e:
+                    assert isinstance(e, Exception)
+                    self.hub.schedule(
+                    lambda: self.wake(e)
+                    )
+                else:
+                    client.conn = Connection(fsock, ip)
+                    client.connected = True
+                    self.hub.schedule(
+                    lambda: self.wake()
+                    )
 
             if client.ssl_ctx:
                 fsock = SSL.Connection(client.ssl_ctx, sock)

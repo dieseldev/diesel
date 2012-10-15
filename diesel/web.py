@@ -12,12 +12,30 @@ from app import Application, Service, quickstart
 from diesel import log, set_log_level, loglevels
 
 
+class _FlaskTwiggyLogProxy(object):
+    """Proxies to a Twiggy Logger.
+
+    Nearly all attribute access is proxied to a twiggy Logger, with the
+    exception of the `name` attribute. This one change brings it closer in
+    line with the API of the Python standard library `logging` module which
+    Flask expects.
+
+    """
+    def __init__(self, name):
+        self.__dict__['_logger'] = log.name(name)
+        self.__dict__['name'] = name
+
+    def __getattr__(self, name):
+        return getattr(self._logger, name)
+
+    def __setattr__(self, name, value):
+        return setattr(self._logger, name, value)
+
 class DieselFlask(Flask):
     def __init__(self, name, *args, **kw):
         self.jobs = []
         self.diesel_app = self.make_application()
         Flask.__init__(self, name, *args, **kw)
-        self.make_logger()
 
     use_x_sendfile = True
 
@@ -28,8 +46,10 @@ class DieselFlask(Flask):
     def make_application(cls):
         return Application()
 
-    def make_logger(self):
-        self._dlog = log.name('diesel.web+' + self.logger_name)
+    def make_logger(self, level):
+        # Flask expects a _logger attribute which we set here.
+        self._logger = _FlaskTwiggyLogProxy(self.logger_name)
+        self._logger.min_level = level
 
     def log_exception(self, exc_info):
         """A replacement for Flask's default.
@@ -38,17 +58,10 @@ class DieselFlask(Flask):
         diesel doesn't support.
 
         """
-        self._dlog.error('Exception on {0} [{1}]',
+        self._logger.trace().error('Exception on {0} [{1}]',
             request.path,
             request.method
         )
-        if exc_info and isinstance(exc_info, tuple):
-            o = traceback.format_exception(*exc_info)
-        else:
-            o = traceback.format_exc()
-        
-        for line in o.splitlines():
-            self._dlog.error('    ' + line)
 
     def schedule(self, *args):
         self.jobs.append(args)
@@ -64,21 +77,18 @@ class DieselFlask(Flask):
                 except:
                     tb = tbtools.get_current_traceback(skip=1)
                     response = Response(tb.render_summary(), headers={'Content-Type' : 'text/html'})
-                    
+
         return response
 
-    def run(self, port=8080, iface='', verbosity=loglevels.DEBUG, debug=True):
-        set_log_level(verbosity)
-
+    def make_service(self, port=8080, iface='', verbosity=loglevels.DEBUG, debug=True):
+        self.make_logger(verbosity)
         if debug:
             self.debug = True
 
-        from diesel.protocols.wsgi import WSGIRequestHandler
         from diesel.protocols.http import HttpServer
         http_service = Service(HttpServer(self.handle_request), port, iface)
-        self.schedule(http_service)
-        quickstart(*self.jobs, __app=self.diesel_app)
 
+        return http_service
 
     def websocket(self, f):
         def no_web(req):
@@ -88,3 +98,8 @@ class DieselFlask(Flask):
             assert not args and not kw, "No arguments allowed to websocket routes"
             ws.do_upgrade(request)
         return ws_call
+
+    def run(self, *args, **params):
+        http_service = self.make_service(*args, **params)
+        self.schedule(http_service)
+        quickstart(*self.jobs, __app=self.diesel_app)

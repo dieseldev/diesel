@@ -58,7 +58,7 @@ class Application(object):
                     self.hub.handle_events()
                 except SystemExit:
                     log.warning("-- SystemExit raised.. exiting main loop --")
-                    break
+                    raise
                 except KeyboardInterrupt:
                     log.warning("-- KeyboardInterrupt raised.. exiting main loop --")
                     break
@@ -120,7 +120,7 @@ class Application(object):
         pass
 
 class Service(object):
-    '''A TCP service listening on a certain port, with a protocol 
+    '''A TCP service listening on a certain port, with a protocol
     implemented by a passed connection handler.
     '''
     LQUEUE_SIZ = 500
@@ -138,7 +138,7 @@ class Service(object):
         self.ssl_ctx = ssl_ctx
 
     def handle_cannot_bind(self, reason):
-        log.critical("service at {0}:{1} cannot bind: {2}", 
+        log.critical("service at {0}:{1} cannot bind: {2}",
             self.iface or '*', self.port, reason)
         raise
 

@@ -1,6 +1,6 @@
 """Riak protocol buffers client.
 
-Provides a couple interfaces to working with a Riak database. 
+Provides a couple interfaces to working with a Riak database.
 
 The first is a lower-level Client object. It has methods for interacting with
 the server, buckets, keys and values. The methods are more verbose and return
@@ -138,10 +138,10 @@ class Bucket(object):
 
     def get(self, key):
         """Get the value for key from the bucket.
-        
+
         Records the vector clock for the value for future modification
         using ``put`` with this same Bucket instance.
-        
+
         """
         with self.make_client_context() as client:
             if self.client_id:
@@ -209,12 +209,12 @@ class Bucket(object):
         if response:
             return self._handle_response(key, response)
 
-    def delete(self, key):
+    def delete(self, key, vclock=None):
         """Deletes all values for the given key from the bucket."""
         with self.make_client_context() as client:
             if self.client_id:
                 client.set_client_id(self.client_id)
-            client.delete(self.name, key)
+            client.delete(self.name, key, vclock)
 
     def keys(self):
         """Get all the keys for a given bucket, is an iterator."""
@@ -257,9 +257,9 @@ class Bucket(object):
             other = response['content'].pop(0)
             other['value'] = self.dumps(
                 self.resolve(
-                    res['last_mod'], 
+                    res['last_mod'],
                     self.loads(res['value']),
-                    other['last_mod'], 
+                    other['last_mod'],
                     self.loads(other['value']),
                 )
             )
@@ -299,10 +299,10 @@ class RiakErrorResp(Exception):
 
 class RiakClient(diesel.Client):
     """A client for the Riak distributed key/value database.
-    
+
     Instances can be used stand-alone or passed to a Bucket constructor
     (which has a simpler API).
-    
+
     """
     def __init__(self, host='127.0.0.1', port=8087, **kw):
         """Creates a new Riak Client connection object."""
@@ -311,10 +311,10 @@ class RiakClient(diesel.Client):
     @diesel.call
     def get(self, bucket, key):
         """Get the value of key from named bucket.
-        
+
         Returns a dictionary with a list of the content for the key
         and the vector clock (vclock) for the key.
-        
+
         """
         request = riak_palm.RpbGetReq(bucket=bucket, key=key)
         self._send(request)
@@ -349,7 +349,7 @@ class RiakClient(diesel.Client):
             return _to_dict(response)
 
     @diesel.call
-    def delete(self, bucket, key):
+    def delete(self, bucket, key, vclock=None):
         """Deletes the given key from the named bucket, including all values."""
         request = riak_palm.RpbDelReq(bucket=bucket, key=key)
         self._send(request)
@@ -379,10 +379,10 @@ class RiakClient(diesel.Client):
     @diesel.call
     def set_bucket_props(self, bucket, props):
         """Sets some properties on the named bucket.
-        
+
         ``props`` should be a dictionary of properties supported by the
         RpbBucketProps protocol buffer.
-        
+
         """
         request = riak_palm.RpbSetBucketReq(bucket=bucket)
         bucket_props = riak_palm.RpbBucketProps()
@@ -473,6 +473,7 @@ if __name__ == '__main__':
         c.delete('testing', 'diff')
         c.delete('testing.pickles', 'here')
         c.delete('testing.pickles', 'there')
+        diesel.sleep(3) # race condition for deleting PickleBucket keys?
 
         assert not c.get('testing', 'foo')
         assert c.put('testing', 'foo', '1', return_body=True)
@@ -494,8 +495,8 @@ if __name__ == '__main__':
         b = Bucket('testing', c, resolver=resolve_longest)
         resolved = b.get('bar')
         assert resolved == 'bye', resolved
-        #print c.get('testing', 'bar')['content']
-        #assert len(c.get('testing', 'bar')['content']) == 1
+        b.put('bar', resolved)
+        assert len(c.get('testing', 'bar')['content']) == 1
 
         # put/get/delete with a Bucket
         assert b.put('lala', 'g'*1024)
@@ -548,7 +549,7 @@ if __name__ == '__main__':
         there = p5.get('there')
         assert (3,7) == (there.x, there.y), (there.x, there.y)
         assert isinstance(there, Point)
-        
+
         # resolve on put
         p5.put('there', Point(1,9)) # should resolve b/c safe=True
         assert len(c.get('testing.pickles', 'there')['content']) == 1
@@ -559,7 +560,7 @@ if __name__ == '__main__':
         c.set_client_id('diff 2')
         assert b.put('diff', '+++')
         assert b.get('diff') == '+++'
-        
+
         # Provoking an error
         try:
             # Tell Riak to require 10000 nodes to write this before success.
