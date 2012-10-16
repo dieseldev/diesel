@@ -195,6 +195,11 @@ class HttpClient(Client):
 
         timeout_handler = TimeoutHandler(timeout or 60)
 
+        if 'Content-Length' not in req.headers and body:
+            # If the caller hasn't set their own Content-Length but submitted
+            # a body, we auto-set the Content-Length header here.
+            req.headers['Content-Length'] = str(len(body))
+
         send('%s %s HTTP/1.1\r\n%s' % (req.method, str(req.path), str(req.headers)))
 
         if body:
