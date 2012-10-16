@@ -205,7 +205,11 @@ class HttpClient(Client):
 
         timeout_handler = TimeoutHandler(timeout or 60)
 
-        send('%s %s HTTP/1.1\r\n%s' % (req.method, str(req.path), str(req.headers)))
+        url = str(req.path)
+        if req.query_string:
+            url += '?' + str(req.query_string)
+
+        send('%s %s HTTP/1.1\r\n%s' % (req.method, url, str(req.headers)))
 
         if body:
             send(body)
