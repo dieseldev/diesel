@@ -81,6 +81,10 @@ class HttpServer(object):
                     data = receive()
 
                 env = h.get_wsgi_environ()
+                if 'HTTP_CONTENT_LENGTH' in env:
+                    env['CONTENT_LENGTH'] = env.pop("HTTP_CONTENT_LENGTH")
+                if 'HTTP_CONTENT_TYPE' in env:
+                    env['CONTENT_TYPE'] = env.pop("HTTP_CONTENT_TYPE")
 
                 env.update({
                     'wsgi.version' : (1,0),
@@ -149,7 +153,7 @@ class TimeoutHandler(object):
         raise HttpRequestTimeout()
 
 def cgi_name(n):
-    if n in ('Content-Type', 'Content-Length'):
+    if n.lower() in ('content-type', 'content-length'):
         # Certain headers are defined in CGI as not having an HTTP
         # prefix.
         return n.upper().replace('-', '_')
@@ -178,6 +182,12 @@ class HttpClient(Client):
         url_info = urlparse(url)
         fake_wsgi = dict(
         (cgi_name(n), str(v).strip()) for n, v in headers.iteritems())
+
+        if body and 'CONTENT_LENGTH' not in fake_wsgi:
+            # If the caller hasn't set their own Content-Length but submitted
+            # a body, we auto-set the Content-Length header here.
+            fake_wsgi['CONTENT_LENGTH'] = str(len(body))
+
         fake_wsgi.update({
             'REQUEST_METHOD' : method,
             'SCRIPT_NAME' : '',
@@ -194,11 +204,6 @@ class HttpClient(Client):
         req = Request(fake_wsgi)
 
         timeout_handler = TimeoutHandler(timeout or 60)
-
-        if 'Content-Length' not in req.headers and body:
-            # If the caller hasn't set their own Content-Length but submitted
-            # a body, we auto-set the Content-Length header here.
-            req.headers['Content-Length'] = str(len(body))
 
         send('%s %s HTTP/1.1\r\n%s' % (req.method, str(req.path), str(req.headers)))
 
