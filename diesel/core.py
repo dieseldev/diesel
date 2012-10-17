@@ -287,7 +287,7 @@ class Loop(object):
             for w in waits:
                 v = self._wait(w, marked_cb(w))
                 if type(v) is EarlyValue:
-                    #self.clear_pending_events()
+                    self.clear_pending_events()
                     self.reschedule_with_this_value((w, v.val))
                     break
         return self.dispatch()
