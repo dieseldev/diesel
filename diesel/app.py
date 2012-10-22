@@ -136,6 +136,11 @@ class Service(object):
         self.connection_handler = connection_handler
         self.application = None
         self.ssl_ctx = ssl_ctx
+        # Call this last so the connection_handler has a fully-instantiated
+        # Service instance at its disposal.
+        if hasattr(connection_handler, 'on_service_init'):
+            if callable(connection_handler.on_service_init):
+                connection_handler.on_service_init(self)
 
     def handle_cannot_bind(self, reason):
         log.critical("service at {0}:{1} cannot bind: {2}",
