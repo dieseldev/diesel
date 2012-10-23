@@ -59,6 +59,10 @@ class HttpServer(object):
         '''
         self.request_handler = request_handler
 
+    def on_service_init(self, service):
+        '''Called when this connection handler is connected to a Service.'''
+        self.port = service.port
+
     def __call__(self, addr):
         '''Since an instance of HttpServer is passed to the Service
         class (with appropriate request_handler established during
@@ -95,6 +99,8 @@ class HttpServer(object):
                     'wsgi.multiprocess' : False,
                     'wsgi.run_once' : False,
                     'REMOTE_ADDR' : addr[0],
+                    'SERVER_NAME' : HOSTNAME,
+                    'SERVER_PORT': str(self.port),
                     })
                 req = Request(env)
 
