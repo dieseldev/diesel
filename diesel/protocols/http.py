@@ -100,7 +100,7 @@ class HttpServer(object):
                     'wsgi.run_once' : False,
                     'REMOTE_ADDR' : addr[0],
                     'SERVER_NAME' : HOSTNAME,
-                    'SERVER_PORT': self.port,
+                    'SERVER_PORT': str(self.port),
                     })
                 req = Request(env)
 
