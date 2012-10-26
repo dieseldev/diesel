@@ -103,6 +103,8 @@ class HttpServer(object):
                     'SERVER_PORT': str(self.port),
                     })
                 req = Request(env)
+                if req.headers.get('Connection', '').lower() == 'upgrade':
+                    req.data = data
 
                 resp = self.request_handler(req)
                 if 'Server' not in resp.headers:
