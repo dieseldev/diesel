@@ -288,7 +288,8 @@ class Loop(object):
                 v = self._wait(w, marked_cb(w))
                 if type(v) is EarlyValue:
                     self.clear_pending_events()
-                    return w, v.val
+                    self.reschedule_with_this_value((w, v.val))
+                    break
         return self.dispatch()
 
     def connect(self, client, ip, sock, host, port, timeout=None):
@@ -403,7 +404,7 @@ class Loop(object):
     def wait(self, event):
         v = self._wait(event)
         if type(v) is EarlyValue:
-            return v.val
+            self.reschedule_with_this_value(v.val)
         return self.dispatch()
 
     def _wait(self, event, cb_maker=identity):
@@ -414,9 +415,6 @@ class Loop(object):
             self.hub.schedule(call_in)
         v = self.app.waits.wait(self, event)
         if type(v) is EarlyValue:
-            # XXX A sleep here is needed for fair queue scheduling, but that
-            # causes incorrect values to be switched into running greenlets.
-            #self.sleep()
             return v
         self.fire_handlers[v] = cb
 
@@ -486,6 +484,11 @@ class Loop(object):
         conn = self.check_connection()
         conn.queue_outgoing(o, priority)
         conn.set_writable(True)
+
+    def reschedule_with_this_value(self, value):
+        def delayed_call():
+            self.wake(value)
+        self.hub.schedule(delayed_call, True)
 
 class Connection(object):
     def __init__(self, sock, addr):
