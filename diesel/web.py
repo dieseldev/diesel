@@ -35,6 +35,8 @@ class DieselFlask(Flask):
     def __init__(self, name, *args, **kw):
         self.jobs = []
         self.diesel_app = self.make_application()
+        self._run = False
+        self._loops = []
         Flask.__init__(self, name, *args, **kw)
 
     use_x_sendfile = True
@@ -99,7 +101,26 @@ class DieselFlask(Flask):
             ws.do_upgrade(request)
         return ws_call
 
+    def add_loop(self, loop, front=False, keep_alive=False):
+        '''Add a Loop instance to this Application.
+
+        The loop will be started when the Application is run().
+        '''
+        if keep_alive:
+            loop.keep_alive = True
+
+        if self._run:
+            self.hub.schedule(loop.wake)
+        else:
+            if front:
+                self._loops.insert(0, loop)
+            else:
+                self._loops.append(loop)
+
     def run(self, *args, **params):
         http_service = self.make_service(*args, **params)
-        self.schedule(http_service)
-        quickstart(*self.jobs, __app=self.diesel_app)
+        #self.schedule(http_service)
+        #quickstart(*self.jobs, __app=self.diesel_app)
+        app = self.diesel_app
+        app.add_service(http_service)
+        app.run()

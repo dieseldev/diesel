@@ -977,6 +977,26 @@ class RedisSubHub(object):
                                 q.put((key, msg))
 
     @contextmanager
+    def subq(self, classes):
+        if type(classes) not in (set, list, tuple):
+            print "subscribing to %s" % classes
+            classes = [classes]
+
+        q = Queue()
+
+        for cls in classes:
+            self.sub_adds.append((cls, q))
+
+        fire(self.sub_wake_signal)
+
+        try:
+            yield q
+        finally:
+            for cls in classes:
+                self.sub_rms.append((cls, q))
+
+
+    @contextmanager
     def sub(self, classes):
         if type(classes) not in (set, list, tuple):
             classes = [classes]
