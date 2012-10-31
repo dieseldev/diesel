@@ -979,7 +979,6 @@ class RedisSubHub(object):
     @contextmanager
     def subq(self, classes):
         if type(classes) not in (set, list, tuple):
-            print "subscribing to %s" % classes
             classes = [classes]
 
         q = Queue()

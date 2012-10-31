@@ -7,6 +7,7 @@ from diesel.protocols.websockets import WebSocketDisconnect
 
 from diesel.util.queue import Fanout
 from diesel.protocols.redis import RedisSubHub, RedisClient
+from simplejson import dumps, loads, JSONDecodeError
 
 
 
@@ -110,21 +111,26 @@ def pubsub_socket(req, inq, outq):
                 print "(inq) %s" % v
                 cmd = v.get("cmd", "")
                 if cmd=="":
-                    print "published message to %i subscribers" % c.publish("foo", str({
+                    print "published message to %i subscribers" % c.publish("foo", dumps({
                     'nick' : cgi.escape(v['nick'].strip()),
                     'message' : cgi.escape(v['message'].strip()),
                     }))
                 else:
                     outq.put(dict(message="test bot"))
             elif q == group: # getting message for broadcasting
-                data = dict(message=v['message'], nick=v['nick'])
-                print "(outq) %s" % data
-                outq.put(data)
+                chan, msg_str = v
+                try:
+                    msg = loads(msg_str)
+                    data = dict(message=msg['message'], nick=msg['nick'])
+                    print "(outq) %s" % data
+                    outq.put(data)
+                except JSONDecodeError:
+                    print "error decoding message %s" % msg_str
             elif isinstance(v, WebSocketDisconnect): # getting a disconnect signal
                 return
             else:
                 print "oops %s" % v
 
-app.add_loop(Loop(hub))
+app.diesel_app.add_loop(Loop(hub))
 app.run()
 
