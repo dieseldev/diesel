@@ -18,11 +18,17 @@ REDIS_PORT = 6379
 class RedisError(Exception): pass
 
 class RedisClient(Client):
-    def __init__(self, host='localhost', port=REDIS_PORT, **kw):
+    def __init__(self, host='localhost', port=REDIS_PORT, password=None, **kw):
+        self.password = password
         Client.__init__(self, host, port, **kw)
 
     ##################################################
     ### GENERAL OPERATIONS
+    @call
+    def auth(self):
+        self._send('AUTH', self.password)
+        resp = self._get_response()
+        return bool(resp)
     @call
     def exists(self, k):
         self._send('EXISTS', k)
@@ -908,16 +914,19 @@ class RedisLock(object):
 #########################################
 ## Hub, an abstraction of sub behavior, etc
 class RedisSubHub(object):
-    def __init__(self, host='127.0.0.1', port=REDIS_PORT):
+    def __init__(self, host='127.0.0.1', port=REDIS_PORT, password=None):
         self.host = host
         self.port = port
+        self.password= password
         self.sub_wake_signal = uuid.uuid4().hex
         self.sub_adds = []
         self.sub_rms = []
         self.subs = {}
 
     def make_client(self):
-        client = RedisClient(self.host, self.port)
+        client = RedisClient(self.host, self.port, self.password)
+        if self.password != None:
+            client.auth()
         return  client
 
     def __isglob(self, glob):
