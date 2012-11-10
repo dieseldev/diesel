@@ -1,13 +1,14 @@
 # vim:ts=4:sw=4:expandtab
 '''HTTP/1.1 implementation of client and server.
 '''
+
 import cStringIO
 import os
 import urllib
+import time
 from datetime import datetime
 from urlparse import urlparse
 from flask import Request, Response
-from collections import defaultdict
 from OpenSSL import SSL
 
 utcnow = datetime.utcnow
@@ -17,7 +18,7 @@ try:
 except ImportError:
     from http_parser.pyparser import HttpParser
 
-from diesel import until, until_eol, receive, ConnectionClosed, send, log
+from diesel import receive, ConnectionClosed, send, log, Client, call, first
 
 SERVER_TAG = 'diesel-http-server'
 
@@ -54,8 +55,15 @@ class HttpServer(object):
     '''An HTTP/1.1 implementation of a server.
     '''
     def __init__(self, request_handler):
-        '''`request_handler` is a callable that takes
-        an HttpRequest object and generates a response.
+        '''Create an HTTP server that calls `request_handler` on requests.
+
+        `request_handler` is a callable that takes a `Request` object and
+        generates a `Response`.
+
+        To support WebSockets, if the `Response` generated has a `status_code` of
+        101 (Switching Protocols) and the `Response` has a `new_protocol` method,
+        it will be called to handle the remainder of the client connection.
+
         '''
         self.request_handler = request_handler
 
@@ -121,6 +129,11 @@ class HttpServer(object):
                     resp.headers.get('Content-Length') == None:
                     return
 
+                # Switching Protocols
+                if resp.status_code == 101 and hasattr(resp, 'new_protocol'):
+                    resp.new_protocol(req)
+                    break
+
             except ConnectionClosed:
                 break
 
@@ -140,9 +153,6 @@ class HttpServer(object):
         else:
             for i in resp.iter_encoded():
                 send(i)
-
-import time
-from diesel import Client, call, sleep, first
 
 class HttpRequestTimeout(Exception): pass
 
