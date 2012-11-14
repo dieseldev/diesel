@@ -362,7 +362,7 @@ class RiakClient(diesel.Client):
         self._send(request)
 
         response = riak_palm.RpbListKeysResp(done=False) #Do/while?
-        while not response.done:
+        while not (response.done__exists and response.done):
             response = self._receive()
             for key in response.keys:
                 yield key
