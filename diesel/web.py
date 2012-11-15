@@ -96,7 +96,7 @@ class DieselFlask(Flask):
         ws = WebSocketServer(no_web, f)
         def ws_call(*args, **kw):
             assert not args and not kw, "No arguments allowed to websocket routes"
-            ws.do_upgrade(request)
+            return ws.do_upgrade(request)
         return ws_call
 
     def run(self, *args, **params):
