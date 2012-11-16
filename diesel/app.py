@@ -1,6 +1,7 @@
 # vim:ts=4:sw=4:expandtab
 '''The main Application and Service classes
 '''
+import cProfile
 from OpenSSL import SSL
 import socket
 import traceback
@@ -37,7 +38,7 @@ class Application(object):
             self.halt()
         return bail
 
-    def run(self):
+    def run(self, profile=False):
         '''Start up an Application--blocks until the program ends
         or .halt() is called.
         '''
@@ -52,7 +53,8 @@ class Application(object):
             self.hub.schedule(l.wake)
 
         self.setup()
-        def main():
+
+        def _main():
             while self._run:
                 try:
                     self.hub.handle_events()
@@ -71,7 +73,16 @@ class Application(object):
 
             log.info('Ending diesel application')
             runtime.current_app = None
-        self.runhub = greenlet(main)
+
+        def _profiled_main():
+            log.warning("(Profiling with cProfile)")
+
+            # NOTE: Scoping Issue:
+            # Have to rebind _main to _real_main so it shows up in locals().
+            _real_main = _main
+            cProfile.runctx('_real_main()', globals(), locals())
+
+        self.runhub = greenlet(_main if not profile else _profiled_main)
         self.runhub.switch()
 
     def add_service(self, service):
@@ -231,6 +242,7 @@ class UDPService(Service):
 
 
 def quickstart(*args, **kw):
+    should_profile = kw.pop('profile', False)
     if '__app' in kw:
         app = kw.pop('__app')
     else:
@@ -247,7 +259,7 @@ def quickstart(*args, **kw):
             app.add_loop(a)
         elif callable(a):
             app.add_loop(Loop(a))
-    app.run()
+    app.run(profile=should_profile)
 
 def quickstop():
     from runtime import current_app
