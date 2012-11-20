@@ -15,6 +15,9 @@ from diesel.security import ssl_async_handshake
 from diesel import runtime
 from diesel.events import WaitPool
 
+
+YES_PROFILE = ['1', 'on', 'true', 'yes']
+
 class ApplicationEnd(Exception): pass
 
 class Application(object):
@@ -39,10 +42,11 @@ class Application(object):
             self.halt()
         return bail
 
-    def run(self, profile=False):
+    def run(self):
         '''Start up an Application--blocks until the program ends
         or .halt() is called.
         '''
+        profile = os.environ.get('DIESEL_PROFILE', '').lower() in YES_PROFILE
         self._run = True
         log.warning('Starting diesel <{0}>', self.hub.describe)
 
@@ -247,7 +251,6 @@ class UDPService(Service):
 
 
 def quickstart(*args, **kw):
-    should_profile = kw.pop('profile', False)
     if '__app' in kw:
         app = kw.pop('__app')
     else:
@@ -264,7 +267,7 @@ def quickstart(*args, **kw):
             app.add_loop(a)
         elif callable(a):
             app.add_loop(Loop(a))
-    app.run(profile=should_profile)
+    app.run()
 
 def quickstop():
     from runtime import current_app
