@@ -80,7 +80,7 @@ class Application(object):
             # NOTE: Scoping Issue:
             # Have to rebind _main to _real_main so it shows up in locals().
             _real_main = _main
-            cProfile.runctx('_real_main()', globals(), locals())
+            cProfile.runctx('_real_main()', globals(), locals(), sort=1)
 
         self.runhub = greenlet(_main if not profile else _profiled_main)
         self.runhub.switch()
