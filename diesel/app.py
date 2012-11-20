@@ -1,6 +1,7 @@
 # vim:ts=4:sw=4:expandtab
 '''The main Application and Service classes
 '''
+import os
 import cProfile
 from OpenSSL import SSL
 import socket
@@ -80,7 +81,11 @@ class Application(object):
             # NOTE: Scoping Issue:
             # Have to rebind _main to _real_main so it shows up in locals().
             _real_main = _main
-            cProfile.runctx('_real_main()', globals(), locals(), sort=1)
+            config = {'sort':1}
+            statsfile = os.environ.get('DIESEL_PSTATS', None)
+            if statsfile:
+                config['filename'] = statsfile
+            cProfile.runctx('_real_main()', globals(), locals(), **config)
 
         self.runhub = greenlet(_main if not profile else _profiled_main)
         self.runhub.switch()
