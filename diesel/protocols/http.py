@@ -111,7 +111,9 @@ class HttpServer(object):
                     'SERVER_PORT': str(self.port),
                     })
                 req = Request(env)
-                if req.headers.get('Connection', '').lower() == 'upgrade':
+                conn_val = req.headers.get('Connection', '')
+                conn_tokens = [t.strip().lower() for t in conn_val.split(',')]
+                if 'upgrade' in conn_tokens:
                     req.data = data
 
                 resp = self.request_handler(req)
