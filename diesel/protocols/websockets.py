@@ -65,8 +65,8 @@ class WebSocketServer(HttpServer):
 
         # do upgrade response
         org = req.headers.get('Origin')
-        handshake_finish = None
         if 'Sec-WebSocket-Key' in req.headers:
+            req.rfc_handshake = True
             assert req.headers.get('Sec-WebSocket-Version') in ['8', '13'], \
                    "We currently only support Websockets version 8 and 13 (ver=%s)" % \
                    req.headers.get('Sec-WebSocket-Version')
@@ -80,32 +80,22 @@ class WebSocketServer(HttpServer):
                 'Sec-WebSocket-Accept' : accept,
                 }
         elif 'Sec-WebSocket-Key1' in req.headers:
+            req.rfc_handshake = False
             protocol = req.headers.get('Sec-WebSocket-Protocol', None)
-            key1 = req.headers.get('Sec-WebSocket-Key1')
-            key2 = req.headers.get('Sec-WebSocket-Key2')
             headers = {
                 'Upgrade': 'WebSocket',
                 'Connection': 'Upgrade',
                 'Sec-WebSocket-Origin': org,
                 'Sec-WebSocket-Location': req.url.replace('http', 'ws', 1),
             }
-            key3 = req.data
-            assert len(key3) == 8, len(key3)
-            num1 = int(''.join(c for c in key1 if c in '0123456789'))
-            num2 = int(''.join(c for c in key2 if c in '0123456789'))
-            assert num1 % key1.count(' ') == 0
-            assert num2 % key2.count(' ') == 0
-            final = pack('!II8s', num1 / key1.count(' '), num2 / key2.count(' '), key3)
-            handshake_finish = hashlib.md5(final).digest()
         else:
             assert 0, "Unsupported WebSocket handshake."
-        req.rfc_handshake = not bool(handshake_finish)
 
         if protocol:
             headers['Sec-WebSocket-Protocol'] = protocol
 
         resp = Response(
-                response='' if not handshake_finish else handshake_finish,
+                response='',
                 status=101,
                 headers=headers,
                 )
@@ -124,16 +114,41 @@ class WebSocketServer(HttpServer):
         inq = Queue()
         outq = Queue()
 
+        if req.rfc_handshake:
+            handle_frames = self.handle_rfc_6455_frames
+        else:
+            # Finish the non-RFC handshake
+            key1 = req.headers.get('Sec-WebSocket-Key1')
+            key2 = req.headers.get('Sec-WebSocket-Key2')
+
+            # The final key can be in two places. The first is in the
+            # `Request.data` attribute if diesel is *not* being proxied
+            # to by a smart proxy that parsed HTTP requests. If it is being
+            # proxied to, that data will not have been sent until after our
+            # initial 101 Switching Protocols response, so we will need to
+            # receive it here.
+
+            if req.data:
+                key3 = req.data
+            else:
+                evt, key3 = first(receive=8, sleep=5)
+                assert evt == "receive", "timed out while finishing handshake"
+
+            num1 = int(''.join(c for c in key1 if c in '0123456789'))
+            num2 = int(''.join(c for c in key2 if c in '0123456789'))
+            assert num1 % key1.count(' ') == 0
+            assert num2 % key2.count(' ') == 0
+            final = pack('!II8s', num1 / key1.count(' '), num2 / key2.count(' '), key3)
+            handshake_finish = hashlib.md5(final).digest()
+            send(handshake_finish)
+
+            handle_frames = self.handle_non_rfc_frames
+
         def wrap(req, inq, outq):
             self.web_socket_handler(req, inq, outq)
             outq.put(WebSocketDisconnect())
 
         handler_loop = fork(wrap, req, inq, outq)
-
-        if req.rfc_handshake:
-            handle_frames = self.handle_rfc_6455_frames
-        else:
-            handle_frames = self.handle_non_rfc_frames
 
         try:
             handle_frames(inq, outq)
