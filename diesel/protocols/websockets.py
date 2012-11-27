@@ -89,29 +89,8 @@ class WebSocketServer(HttpServer):
                 'Sec-WebSocket-Origin': org,
                 'Sec-WebSocket-Location': req.url.replace('http', 'ws', 1),
             }
-
-
-            # The third WebSocket key can be in two places. It's possible that
-            # it was received during the inital HTTP request. In that case it
-            # will be in the `Request.data` attribute. If it wasn't received at
-            # that time then it is either in the receive buffer or we're still
-            # waiting for it to be sent. In that case we need to receive it
-            # here.
-
-            if req.data:
-                key3 = req.data
-                assert len(key3) == 8, len(key3)
-            else:
-                evt, key3 = first(receive=8, sleep=5)
-                if evt == "sleep":
-                    resp = Response(
-                        response='Timeout during WebSocket handshake',
-                        status=408,
-                        headers=headers,
-                    )
-                assert evt == 'receive'
-
-
+            key3 = req.data
+            assert len(key3) == 8, len(key3)
             num1 = int(''.join(c for c in key1 if c in '0123456789'))
             num2 = int(''.join(c for c in key2 if c in '0123456789'))
             assert num1 % key1.count(' ') == 0
