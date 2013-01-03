@@ -1,6 +1,8 @@
 # vim:ts=4:sw=4:expandtab
 '''The main Application and Service classes
 '''
+import os
+import cProfile
 from OpenSSL import SSL
 import socket
 import traceback
@@ -12,6 +14,9 @@ from diesel import log, Connection, UDPSocket, Loop
 from diesel.security import ssl_async_handshake
 from diesel import runtime
 from diesel.events import WaitPool
+
+
+YES_PROFILE = ['1', 'on', 'true', 'yes']
 
 class ApplicationEnd(Exception): pass
 
@@ -41,6 +46,7 @@ class Application(object):
         '''Start up an Application--blocks until the program ends
         or .halt() is called.
         '''
+        profile = os.environ.get('DIESEL_PROFILE', '').lower() in YES_PROFILE
         self._run = True
         log.warning('Starting diesel <{0}>', self.hub.describe)
 
@@ -52,7 +58,8 @@ class Application(object):
             self.hub.schedule(l.wake)
 
         self.setup()
-        def main():
+
+        def _main():
             while self._run:
                 try:
                     self.hub.handle_events()
@@ -71,7 +78,20 @@ class Application(object):
 
             log.info('Ending diesel application')
             runtime.current_app = None
-        self.runhub = greenlet(main)
+
+        def _profiled_main():
+            log.warning("(Profiling with cProfile)")
+
+            # NOTE: Scoping Issue:
+            # Have to rebind _main to _real_main so it shows up in locals().
+            _real_main = _main
+            config = {'sort':1}
+            statsfile = os.environ.get('DIESEL_PSTATS', None)
+            if statsfile:
+                config['filename'] = statsfile
+            cProfile.runctx('_real_main()', globals(), locals(), **config)
+
+        self.runhub = greenlet(_main if not profile else _profiled_main)
         self.runhub.switch()
 
     def add_service(self, service):
