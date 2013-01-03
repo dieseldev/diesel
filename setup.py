@@ -42,6 +42,7 @@ Other bundled protocols include MongoDB, Riak, and Redis client libraries.
             'dpython = diesel.interactive:python',
             'idpython = diesel.interactive:ipython',
             'dnosetests = diesel.dnosetests:main',
+            'dconsole = diesel.console:main',
         ],
     },
     install_requires=([
