@@ -36,6 +36,8 @@ from cStringIO import StringIO
 
 import diesel
 
+from diesel.util import debugtools
+
 
 port = 4299
 
@@ -81,7 +83,10 @@ def console_for(pid):
 class RemoteConsoleService(diesel.Client):
     """Runs the backend console."""
     def __init__(self, *args, **kw):
-        self.interpreter = BackendInterpreter({'diesel':diesel})
+        self.interpreter = BackendInterpreter({
+            'diesel':diesel,
+            'debugtools':debugtools,
+        })
         super(RemoteConsoleService, self).__init__(*args, **kw)
 
     @diesel.call
