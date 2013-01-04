@@ -52,15 +52,16 @@ class LocalConsole(code.InteractiveConsole):
         return code.InteractiveConsole.runsource(self, source, filename)
 
     def runcode(self, ignored_codeobj):
-        sz = len(self.current_source)
-        header = struct.pack('>Q', sz)
-        diesel.send("%s%s" % (header, self.current_source))
-        self.current_source = None
-        header = diesel.receive(8)
-        (sz,) = struct.unpack('>Q', header)
-        if sz:
-            data = diesel.receive(sz)
-            print data.rstrip()
+        if self.current_source:
+            sz = len(self.current_source)
+            header = struct.pack('>Q', sz)
+            diesel.send("%s%s" % (header, self.current_source))
+            self.current_source = None
+            header = diesel.receive(8)
+            (sz,) = struct.unpack('>Q', header)
+            if sz:
+                data = diesel.receive(sz)
+                print data.rstrip()
 
 def console_for(pid):
     """Sends a SIGTRAP to the pid and returns a console UI handler.
