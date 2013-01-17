@@ -153,6 +153,15 @@ class DieselZMQService(object):
         self.outgoing = Queue()
         self.incoming = Queue()
         self.name = self.name or self.__class__.__name__
+        self._incoming_loop = None
+
+        # Allow for custom `should_run` properties in subclasses.
+        try:
+            self.should_run = True
+        except AttributeError:
+            # A custom `should_run` property exists.
+            pass
+
         if self.log and self.selected_log_level is not None:
             self.selected_log_level = None
             warnings.warn(
@@ -224,9 +233,9 @@ class DieselZMQService(object):
 
     def _handle_all_inbound_and_outbound_traffic(self):
         assert self.zmq_socket
-        diesel.fork_child(self._receive_incoming_messages)
+        self._incoming_loop = diesel.fork_child(self._receive_incoming_messages)
         queues = [self.incoming, self.outgoing]
-        while True:
+        while self.should_run:
             (queue, msg) = diesel.first(waits=queues)
 
             if queue is self.incoming:
