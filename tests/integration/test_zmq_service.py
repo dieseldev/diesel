@@ -5,45 +5,9 @@ import diesel
 from collections import namedtuple
 from diesel.protocols.zeromq import DieselZMQService
 
-envelope = namedtuple('envelope', ['more', 'bytes'])
-body = namedtuple
 
-class MisbehavingSocket(object):
-    def __init__(self):
-        self.recv_calls = 0
-        self.send_calls = 0
-        self._recv_test_hook = None
-        self.exceptions = 0
-
-    def recv(self, copy=True):
-        self.recv_calls += 1
-        if self._recv_test_hook:
-            self._recv_test_hook(self)
-        if (self.recv_calls % 5) == 0:
-            self.exceptions += 1
-            raise Exception("aaaahhhhh")
-        if not copy:
-            return envelope(more=True, bytes="foobarbaz")
-        return "this is the data you are looking for"
-
-    def send(self, *args):
-        self.send_calls += 1
-
-class MisbehavingService(DieselZMQService):
-    def __init__(self, *args, **kw):
-        self._test_ticks = 0
-        self._max_ticks = kw.pop('max_ticks')
-        super(MisbehavingService, self).__init__(*args, **kw)
-
-    def _create_zeromq_server_socket(self):
-        self.zmq_socket = MisbehavingSocket()
-
-    @property
-    def should_run(self):
-        if self._test_ticks >= self._max_ticks:
-            return False
-        self._test_ticks += 1
-        return True
+# Test Cases
+# ==========
 
 def test_incoming_message_loop_is_kept_alive():
     def stop_after_10_sends(sock):
@@ -62,3 +26,53 @@ def test_incoming_message_loop_is_kept_alive():
         diesel.sleep()
         assert not loop.running
     assert svc.zmq_socket.exceptions > 1, svc.zmq_socket.exceptions
+
+
+# Stubs and Utilities For the Tests Above
+# =======================================
+
+envelope = namedtuple('envelope', ['more', 'bytes'])
+body = namedtuple
+
+class MisbehavingSocket(object):
+    """Stub for DieselZMQSocket."""
+    def __init__(self):
+        self.recv_calls = 0
+        self.send_calls = 0
+        self.exceptions = 0
+
+    def recv(self, copy=True):
+        # raises an Exception every 5 calls
+        self.recv_calls += 1
+        if (self.recv_calls % 5) == 0:
+            self.exceptions += 1
+            raise Exception("aaaahhhhh")
+        if not copy:
+            return envelope(more=True, bytes="foobarbaz")
+        return "this is the data you are looking for"
+
+    def send(self, *args):
+        self.send_calls += 1
+
+class MisbehavingService(DieselZMQService):
+    """A DieselZMQService with a MisbehavingSocket.
+
+    It also stops running after a number of iterations (controlled via a
+    `max_ticks` keyword argument).
+
+    """
+    def __init__(self, *args, **kw):
+        self._test_ticks = 0
+        self._max_ticks = kw.pop('max_ticks')
+        super(MisbehavingService, self).__init__(*args, **kw)
+
+    def _create_zeromq_server_socket(self):
+        self.zmq_socket = MisbehavingSocket()
+
+    @property
+    def should_run(self):
+        if self._test_ticks >= self._max_ticks:
+            return False
+        self._test_ticks += 1
+        return True
+
