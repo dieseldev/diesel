@@ -105,3 +105,49 @@ def test_loop_keep_alive_exception():
     while lp.running:
         sleep()
     assert (v[0] > 1)
+
+def flapping_child():
+    sleep(0.1)
+
+def strong_child():
+    sleep(20)
+
+def protective_parent(child, children):
+    child = fork_child(child)
+    child.keep_alive = True
+    children[0] = child
+    sleep(2)
+
+def test_child_keep_alive_retains_parent():
+    children = [None]
+    parent = Loop(protective_parent, flapping_child, children)
+    runtime.current_app.add_loop(parent)
+    sleep()
+    while parent.running:
+        # Deaths of the child are interspersed here.
+        assert parent.children
+        assert children[0].parent is parent
+        sleep()
+    # The child should have died a bunch of times during the parent's life.
+    assert children[0].deaths > 1, children[0].deaths
+
+def test_child_keep_alive_dies_with_parent():
+    # Starts a child that attempts to run for a long time, with a parent
+    # that has a short lifetime. The rule is that children are always
+    # subordinate to their parents.
+    children = [None]
+    parent = Loop(protective_parent, strong_child, children)
+    runtime.current_app.add_loop(parent)
+    sleep()
+    while parent.running:
+        sleep()
+
+    # Wait here because a child could respawn after 0.5 seconds if the
+    # child-always-dies-with-parent rule is being violated.
+    sleep(1)
+
+    # Once the parent is dead, the child (even thought it is keep-alive)
+    # should be dead as well.
+    assert not children[0].running
+    assert not parent.children
+

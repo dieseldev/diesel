@@ -160,6 +160,7 @@ class Loop(object):
         self.id = ids.next()
         self.children = set()
         self.parent = None
+        self.deaths = 0
         self.reset()
 
     def reset(self):
@@ -174,6 +175,7 @@ class Loop(object):
         from diesel.app import ApplicationEnd
         self.running = True
         self.app.running.add(self)
+        parent_died = False
         try:
             self.loop_callable(*self.args, **self.kw)
         except TerminateLoop:
@@ -181,24 +183,29 @@ class Loop(object):
         except (SystemExit, KeyboardInterrupt, ApplicationEnd):
             raise
         except ParentDiedException:
-            pass
+            parent_died = True
         except:
             log.trace().error("-- Unhandled Exception in local loop <%s> --" % self.loop_label)
         finally:
             if self.connection_stack:
                 assert len(self.connection_stack) == 1
                 self.connection_stack.pop().close()
+        self.deaths += 1
         self.running = False
         self.app.running.remove(self)
+        # Keep-Alive Laws
+        # ---------------
+        # 1) Parent loop death always kills off children.
+        # 2) Child loops with keep-alive resurrect if their parent didn't die.
+        # 3) If a parent has died, a child always dies.
         self.notify_children()
-        if self.parent and self in self.parent.children:
-            self.parent.children.remove(self)
-            self.parent = None
-
-        if self.keep_alive:
+        if self.keep_alive and not parent_died:
             log.warning("(Keep-Alive loop %s died; restarting)" % self)
             self.reset()
             self.hub.call_later(0.5, self.wake)
+        elif self.parent and self in self.parent.children:
+            self.parent.children.remove(self)
+            self.parent = None
 
     def notify_children(self):
         for c in self.children:
