@@ -234,6 +234,7 @@ class DieselZMQService(object):
     def _handle_all_inbound_and_outbound_traffic(self):
         assert self.zmq_socket
         self._incoming_loop = diesel.fork_child(self._receive_incoming_messages)
+        self._incoming_loop.keep_alive = True
         queues = [self.incoming, self.outgoing]
         while self.should_run:
             (queue, msg) = diesel.first(waits=queues)
