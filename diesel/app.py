@@ -2,6 +2,7 @@
 '''The main Application and Service classes
 '''
 import os
+import gc
 import cProfile
 from OpenSSL import SSL
 import socket
@@ -47,6 +48,13 @@ class Application(object):
         or .halt() is called.
         '''
         profile = os.environ.get('DIESEL_PROFILE', '').lower() in YES_PROFILE
+        track_gc = os.environ.get('TRACK_GC', '').lower() in YES_PROFILE
+        track_gc_leaks = os.environ.get('TRACK_GC_LEAKS', '').lower() in YES_PROFILE
+        if track_gc:
+            gc.set_debug(gc.DEBUG_STATS)
+        if track_gc_leaks:
+            gc.set_debug(gc.DEBUG_LEAK)
+
         self._run = True
         log.warning('Starting diesel <{0}>', self.hub.describe)
 
