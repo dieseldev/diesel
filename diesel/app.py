@@ -89,7 +89,13 @@ class Application(object):
             statsfile = os.environ.get('DIESEL_PSTATS', None)
             if statsfile:
                 config['filename'] = statsfile
-            cProfile.runctx('_real_main()', globals(), locals(), **config)
+            try:
+                cProfile.runctx('_real_main()', globals(), locals(), **config)
+            except TypeError, e:
+                if "sort" in e.args[0]:
+                    del config['sort']
+                    cProfile.runctx('_real_main()', globals(), locals(), **config)
+                else: raise e
 
         self.runhub = greenlet(_main if not profile else _profiled_main)
         self.runhub.switch()
