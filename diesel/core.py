@@ -2,6 +2,7 @@
 '''Core implementation/handling of coroutines, protocol primitives,
 scheduling primitives, green-thread procedures.
 '''
+import os
 import socket
 import traceback
 import errno
@@ -115,6 +116,9 @@ def fork_from_thread(f, *args, **kw):
     l = Loop(f, *args, **kw)
     runtime.current_app.hub.schedule_loop_from_other_thread(l, ContinueNothing)
 
+def clock():
+    return current_loop.clocktime()
+
 class call(object):
     def __init__(self, f, inst=None):
         self.f = f
@@ -162,6 +166,10 @@ class Loop(object):
         self.parent = None
         self.deaths = 0
         self.reset()
+        self._clock = 0.0
+        self.clock = 0.0
+        self.tracked = False
+        self.dispatch = self._dispatch
 
     def reset(self):
         self.running = False
@@ -170,6 +178,10 @@ class Loop(object):
         self.fire_due = False
         self.connection_stack = []
         self.coroutine = None
+
+    def set_tracking(self):
+        self.tracked = True
+        self.dispatch = self._dispatch_track
 
     def run(self):
         from diesel.app import ApplicationEnd
@@ -241,7 +253,8 @@ class Loop(object):
         if make_child:
             self.children.add(l)
             l.parent = self
-        self.app.add_loop(l)
+        l.loop_label = str(f)
+        self.app.add_loop(l, track=self.tracked)
         return l
 
     def parent_died(self):
@@ -428,7 +441,26 @@ class Loop(object):
     def fire(self, event, value=None):
         self.app.waits.fire(event, value)
 
-    def dispatch(self):
+    def start_clock(self):
+        usage = os.times()
+        self._clock = usage[0] + usage[1]
+
+    def update_clock(self):
+        usage = os.times()
+        now = usage[0] + usage[1]
+        self.clock += (now - self._clock)
+        self._clock = now
+
+    def clocktime(self):
+        self.update_clock()
+        return self.clock
+
+    def _dispatch(self):
+        r = self.app.runhub.switch()
+        return r
+
+    def _dispatch_track(self):
+        self.update_clock()
         r = self.app.runhub.switch()
         return r
 
@@ -441,6 +473,9 @@ class Loop(object):
         '''Wake up this loop.  Called by the main hub to resume a loop
         when it is rescheduled.
         '''
+        if self.tracked:
+            self.start_clock()
+
         global current_loop
 
         # if we have a fire pending,
