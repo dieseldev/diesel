@@ -2,6 +2,7 @@
 '''Core implementation/handling of coroutines, protocol primitives,
 scheduling primitives, green-thread procedures.
 '''
+import os
 import socket
 import traceback
 import errno
@@ -115,6 +116,9 @@ def fork_from_thread(f, *args, **kw):
     l = Loop(f, *args, **kw)
     runtime.current_app.hub.schedule_loop_from_other_thread(l, ContinueNothing)
 
+def clock():
+    return current_loop.clocktime()
+
 class call(object):
     def __init__(self, f, inst=None):
         self.f = f
@@ -149,7 +153,7 @@ def identity(cb): return cb
 ids = itertools.count(1)
 
 class Loop(object):
-    def __init__(self, loop_callable, *args, **kw):
+    def __init__(self, loop_callable, track=False, *args, **kw):
         self.loop_callable = loop_callable
         self.loop_label = str(self.loop_callable)
         self.args = args
@@ -162,6 +166,10 @@ class Loop(object):
         self.parent = None
         self.deaths = 0
         self.reset()
+        self._clock = 0.0
+        self.clock = 0.0
+        self.tracked = track
+        self.dispatch = self._dispatch_track if self.tracked else self._dispatch
 
     def reset(self):
         self.running = False
@@ -237,10 +245,11 @@ class Loop(object):
     def fork(self, make_child, f, *args, **kw):
         def wrap():
             return f(*args, **kw)
-        l = Loop(wrap)
+        l = Loop(wrap, track=self.tracked)
         if make_child:
             self.children.add(l)
             l.parent = self
+        l.loop_label = str(f)
         self.app.add_loop(l)
         return l
 
@@ -428,7 +437,26 @@ class Loop(object):
     def fire(self, event, value=None):
         self.app.waits.fire(event, value)
 
-    def dispatch(self):
+    def start_clock(self):
+        usage = os.times()
+        self._clock = usage[0] + usage[1]
+
+    def update_clock(self):
+        usage = os.times()
+        now = usage[0] + usage[1]
+        self.clock += (now - self._clock)
+        self._clock = now
+
+    def clocktime(self):
+        self.update_clock()
+        return self.clock
+
+    def _dispatch(self):
+        r = self.app.runhub.switch()
+        return r
+
+    def _dispatch_track(self):
+        self.update_clock()
         r = self.app.runhub.switch()
         return r
 
@@ -441,6 +469,9 @@ class Loop(object):
         '''Wake up this loop.  Called by the main hub to resume a loop
         when it is rescheduled.
         '''
+        if self.tracked:
+            self.start_clock()
+
         global current_loop
 
         # if we have a fire pending,
