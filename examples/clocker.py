@@ -8,13 +8,11 @@ def usage():
 def not_always_busy_worker(clocker):
     start = clocker()
 
-    sleeping = 6
-    while sleeping:
+    for _ in xrange(12):
         use = usage()
         for i in xrange(10000000): # do some work to forward cpu seconds
             pass
         sleep(0.1) # give up control
-        sleeping -= 0.5
 
     end = clocker()
     print "start ", start, " end ", end, " diff ", end - start
