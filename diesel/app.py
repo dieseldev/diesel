@@ -114,11 +114,14 @@ class Application(object):
         else:
             self._services.append(service)
 
-    def add_loop(self, loop, front=False, keep_alive=False):
+    def add_loop(self, loop, front=False, keep_alive=False, track=False):
         '''Add a Loop instance to this Application.
 
         The loop will be started when the Application is run().
         '''
+        if track:
+            loop.set_tracking()
+
         if keep_alive:
             loop.keep_alive = True
 

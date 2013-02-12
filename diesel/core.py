@@ -179,6 +179,10 @@ class Loop(object):
         self.connection_stack = []
         self.coroutine = None
 
+    def set_tracking(self):
+        self.tracked = True
+        self.dispatch = self._dispatch_track
+
     def run(self):
         from diesel.app import ApplicationEnd
         self.running = True

@@ -22,5 +22,5 @@ def spawn_busy_workers():
         fork(not_always_busy_worker, clock)
 
 a = Application()
-a.add_loop(Loop(spawn_busy_workers, track=True))
+a.add_loop(Loop(spawn_busy_workers), track=True)
 a.run()
