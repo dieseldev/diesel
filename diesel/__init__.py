@@ -2,7 +2,7 @@
 from logmod import log, levels as loglevels, set_log_level
 import events
 from core import sleep, Loop, wait, fire, thread, until, Connection, UDPSocket, ConnectionClosed, ClientConnectionClosed
-from core import until_eol, send, receive, call, first, fork, fork_child, label, fork_from_thread, clock
+from core import until_eol, send, receive, call, first, fork, fork_child, label, fork_from_thread
 from core import ParentDiedException, ClientConnectionError, TerminateLoop, datagram
 from app import Application, Service, UDPService, quickstart, quickstop, Thunk
 from client import Client, UDPClient
