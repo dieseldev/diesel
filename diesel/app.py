@@ -161,7 +161,7 @@ class Service(object):
     implemented by a passed connection handler.
     '''
     LQUEUE_SIZ = 500
-    def __init__(self, connection_handler, port, iface='', ssl_ctx=None):
+    def __init__(self, connection_handler, port, iface='', ssl_ctx=None, track=False):
         '''Given a protocol-implementing callable `connection_handler`,
         handle connections on port `port`.
 
@@ -173,6 +173,7 @@ class Service(object):
         self.connection_handler = connection_handler
         self.application = None
         self.ssl_ctx = ssl_ctx
+        self.track = track
         # Call this last so the connection_handler has a fully-instantiated
         # Service instance at its disposal.
         if hasattr(connection_handler, 'on_service_init'):
@@ -223,7 +224,7 @@ class Service(object):
             c = Connection(sock, addr)
             l = Loop(self.connection_handler, addr)
             l.connection_stack.append(c)
-            runtime.current_app.add_loop(l)
+            runtime.current_app.add_loop(l, track=self.track)
         if self.ssl_ctx:
             sock = SSL.Connection(self.ssl_ctx, sock)
             sock.set_accept_state()
