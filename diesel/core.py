@@ -176,7 +176,7 @@ class Loop(object):
         self.connection_stack = []
         self.coroutine = None
 
-    def set_tracking(self):
+    def enable_tracking(self):
         self.tracked = True
         self.dispatch = self._dispatch_track
 
@@ -438,13 +438,15 @@ class Loop(object):
     def fire(self, event, value=None):
         self.app.waits.fire(event, value)
 
-    def start_clock(self):
+    def os_time(self):
         usage = os.times()
-        self._clock = usage[0] + usage[1]
+        return usage[0] + usage[1]
+
+    def start_clock(self):
+        self._clock = self.os_time()
 
     def update_clock(self):
-        usage = os.times()
-        now = usage[0] + usage[1]
+        now = self.os_time()
         self.clock += (now - self._clock)
         self._clock = now
 
@@ -458,8 +460,7 @@ class Loop(object):
 
     def _dispatch_track(self):
         self.update_clock()
-        r = self.app.runhub.switch()
-        return r
+        return self._dispatch()
 
     def wake_fire(self, value=ContinueNothing):
         assert self.fire_due, "wake_fire called when fire wasn't due!"
