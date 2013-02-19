@@ -128,7 +128,7 @@ class Application(object):
         The loop will be started when the Application is run().
         '''
         if track:
-            loop.set_tracking()
+            loop.enable_tracking()
 
         if keep_alive:
             loop.keep_alive = True
