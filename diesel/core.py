@@ -2,6 +2,7 @@
 '''Core implementation/handling of coroutines, protocol primitives,
 scheduling primitives, green-thread procedures.
 '''
+import os
 import socket
 import traceback
 import errno
@@ -162,6 +163,10 @@ class Loop(object):
         self.parent = None
         self.deaths = 0
         self.reset()
+        self._clock = 0.0
+        self.clock = 0.0
+        self.tracked = False
+        self.dispatch = self._dispatch
 
     def reset(self):
         self.running = False
@@ -170,6 +175,10 @@ class Loop(object):
         self.fire_due = False
         self.connection_stack = []
         self.coroutine = None
+
+    def enable_tracking(self):
+        self.tracked = True
+        self.dispatch = self._dispatch_track
 
     def run(self):
         from diesel.app import ApplicationEnd
@@ -241,7 +250,8 @@ class Loop(object):
         if make_child:
             self.children.add(l)
             l.parent = self
-        self.app.add_loop(l)
+        l.loop_label = str(f)
+        self.app.add_loop(l, track=self.tracked)
         return l
 
     def parent_died(self):
@@ -428,9 +438,29 @@ class Loop(object):
     def fire(self, event, value=None):
         self.app.waits.fire(event, value)
 
-    def dispatch(self):
+    def os_time(self):
+        usage = os.times()
+        return usage[0] + usage[1]
+
+    def start_clock(self):
+        self._clock = self.os_time()
+
+    def update_clock(self):
+        now = self.os_time()
+        self.clock += (now - self._clock)
+        self._clock = now
+
+    def clocktime(self):
+        self.update_clock()
+        return self.clock
+
+    def _dispatch(self):
         r = self.app.runhub.switch()
         return r
+
+    def _dispatch_track(self):
+        self.update_clock()
+        return self._dispatch()
 
     def wake_fire(self, value=ContinueNothing):
         assert self.fire_due, "wake_fire called when fire wasn't due!"
@@ -441,6 +471,9 @@ class Loop(object):
         '''Wake up this loop.  Called by the main hub to resume a loop
         when it is rescheduled.
         '''
+        if self.tracked:
+            self.start_clock()
+
         global current_loop
 
         # if we have a fire pending,
