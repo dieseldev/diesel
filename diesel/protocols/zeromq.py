@@ -259,6 +259,9 @@ class DieselZMQService(object):
     # Public API
     # ==========
 
+    def __call__(self):
+        return self.run()
+
     def run(self):
         self._create_zeromq_server_socket()
         self._setup_the_logging_system()
