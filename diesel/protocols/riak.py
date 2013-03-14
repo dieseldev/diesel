@@ -56,6 +56,8 @@ MESSAGE_CODES = [
 #(22, riak_palm.RpbSetBucketResp),
 (23, riak_palm.RpbMapRedReq),
 (24, riak_palm.RpbMapRedResp),
+(25, riak_palm.RpbIndexReq),
+(26, riak_palm.RpbIndexResp),
 ]
 
 resolutions_in_progress = {}
@@ -323,7 +325,7 @@ class RiakClient(diesel.Client):
             return _to_dict(response)
 
     @diesel.call
-    def put(self, bucket, key, value, **params):
+    def put(self, bucket, key, value, indexes=None, **params):
         """Puts the value to the key in the named bucket.
 
         If an ``extra_content`` dictionary parameter is present, its content
@@ -332,7 +334,23 @@ class RiakClient(diesel.Client):
         All other parameters are merged into the RpbPutReq object.
 
         """
-        dict_content={'value':value}
+
+        index_pairs = []
+        if isinstance(indexes,list):
+            for k,v in indexes:
+                if not (k.endswith('_int') or k.endswith('_bin')):
+                    msg = "Key must ends with _int or _bin"
+                    raise NotImplementedError(msg)
+                pair = riak_palm.RpbPair()
+                pair.key = k
+                pair.value = str(v)
+                index_pairs.append(pair)
+
+        index_seq = riak_palm.RpbContent.Repeated_indexes(index_pairs)
+
+        dict_content={'value':value,
+                      'indexes':index_seq,}
+
         if 'extra_content' in params:
             dict_content.update(params.pop('extra_content'))
         content = riak_palm.RpbContent(**dict_content)
@@ -347,6 +365,30 @@ class RiakClient(diesel.Client):
         response = self._receive()
         if response:
             return _to_dict(response)
+
+    @diesel.call
+    def index(self, bucket, idx, key, end=None):
+        request = riak_palm.RpbIndexReq(
+            bucket=bucket,
+            index=idx,)
+
+        if end:
+            """range query"""
+            setattr(request, 'qtype', 1)
+            setattr(request, 'range_min', key)
+            setattr(request, 'range_max', end)
+        else:
+            """equal query"""
+            setattr(request, 'qtype', 0)
+            setattr(request, 'key', key)
+
+        self._send(request)
+        response = self._receive()
+        if response:
+            result = _to_dict(response)
+            if result.has_key('keys'):
+                return result['keys']
+        return None
 
     @diesel.call
     def delete(self, bucket, key, vclock=None):
