@@ -193,6 +193,8 @@ class DieselZMQService(object):
                 (evt, value) = diesel.first(waits=queues, sleep=self.timeout)
                 if evt is remote_client.incoming:
                     assert isinstance(value, Message)
+                    # Update return path with latest (in case of reconnect)
+                    remote_client.zmq_return = value.zmq_return
                     resp = self.handle_client_packet(value.data, remote_client.context)
                 elif evt is remote_client.outgoing:
                     resp = value
