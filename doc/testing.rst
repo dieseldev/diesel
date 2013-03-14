@@ -1,0 +1,4 @@
+Testing Diesel Applications
+===========================
+
+dnosetests
