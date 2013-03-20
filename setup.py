@@ -35,7 +35,13 @@ Other bundled protocols include MongoDB, Riak, and Redis client libraries.
 ''',
     url="http://diesel.io",
     download_url="http://jamwt.com/diesel/diesel-%s.tar.gz" % VERSION,
-    packages=["diesel", "diesel.protocols", "diesel.util", "diesel.util.patches"],
+    packages=[
+        "diesel",
+        "diesel.protocols",
+        "diesel.util",
+        "diesel.util.patches",
+        "diesel.protocols.http",
+    ],
     scripts=["examples/dhttpd"],
     entry_points={
         'console_scripts': [
