@@ -9,10 +9,10 @@ from diesel import Application, Loop, log, quickstart, quickstop
 from diesel.protocols.http import HttpClient
 
 def req_loop():
-    with HttpClient('www.jamwt.com', 80) as client:
-        heads = {'Host' : 'www.jamwt.com'}
-        log.info(str(client.request('GET', '/Py-TOC/', heads)))
-        log.info(str(client.request('GET', '/', heads)))
+    for path in ['/Py-TOC', '/']:
+        with HttpClient('www.jamwt.com', 80) as client:
+            heads = {'Host' : 'www.jamwt.com'}
+            log.info(str(client.request('GET', path, heads)))
     quickstop()
 
 log = log.name('http-client')
