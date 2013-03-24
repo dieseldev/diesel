@@ -334,6 +334,7 @@ class RiakClient(diesel.Client):
         All other parameters are merged into the RpbPutReq object.
 
         """
+        dict_content={'value':value}
 
         index_pairs = []
         if isinstance(indexes,list):
@@ -346,14 +347,11 @@ class RiakClient(diesel.Client):
                 pair.value = str(v)
                 index_pairs.append(pair)
 
-        index_seq = riak_palm.RpbContent.Repeated_indexes(index_pairs)
-
-        dict_content={'value':value,
-                      'indexes':index_seq,}
-
         if 'extra_content' in params:
             dict_content.update(params.pop('extra_content'))
         content = riak_palm.RpbContent(**dict_content)
+        content.indexes.set(index_pairs)
+
         request = riak_palm.RpbPutReq(
             bucket=bucket,
             key=key,
@@ -374,13 +372,13 @@ class RiakClient(diesel.Client):
 
         if end:
             """range query"""
-            setattr(request, 'qtype', 1)
-            setattr(request, 'range_min', key)
-            setattr(request, 'range_max', end)
+            request.qtype = 1
+            request.range_min = key
+            request.range_max = end
         else:
             """equal query"""
-            setattr(request, 'qtype', 0)
-            setattr(request, 'key', key)
+            request.qtype = 0
+            request.key = key
 
         self._send(request)
         response = self._receive()
