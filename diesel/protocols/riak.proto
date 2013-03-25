@@ -89,6 +89,8 @@ package riak_proto;
 ** 22 - RpbSetBucketResp
 ** 23 - RpbMapRedReq
 ** 24 - RpbMapRedResp{1,}
+** 25 - RpbIndexReq
+** 26 - RpbIndexResp
 **
 */
 
@@ -231,6 +233,23 @@ message RpbMapRedResp {
     optional bool done = 3;
 }
 
+message RpbIndexReq {
+    enum IndexQueryType {
+        eq = 0;
+        range = 1;
+    }
+    required bytes bucket = 1;
+    required bytes index = 2;
+    required IndexQueryType qtype = 3;
+    optional bytes key = 4;
+    optional bytes range_min = 5;
+    optional bytes range_max = 6;
+}
+
+message RpbIndexResp {
+    repeated bytes keys = 1;
+}
+
 // Content message included in get/put responses
 // Holds the value and associated metadata
 message RpbContent {
@@ -243,6 +262,8 @@ message RpbContent {
     optional uint32 last_mod = 7;
     optional uint32 last_mod_usecs = 8;
     repeated RpbPair usermeta = 9;       // user metadata stored with the object
+    repeated RpbPair indexes = 10; // user metadata stored with the object
+    optional bool deleted = 11;
 }
 
 // Key/value pair - used for user metadata
