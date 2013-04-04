@@ -116,7 +116,10 @@ class Pipeline(object):
 
         out = ''
         while len(out) < amt:
-            data = self.current.read(amt - len(out))
+            try:
+                data = self.current.read(amt - len(out))
+            except ValueError:
+                data = ''
             if data == '':
                 if not self.line:
                     self.current = None
