@@ -23,6 +23,9 @@ from collections import deque
 from time import time
 from Queue import Queue, Empty
 
+F_TRIGGER_TIME = 0
+F_TIMER_ID = 1
+
 class Timer(object):
     '''A timer is a promise to call some function at a future date.
     '''
@@ -63,9 +66,6 @@ class Timer(object):
         '''
         return (self.trigger_time - time()) < self.ALLOWANCE
 
-    def __cmp__(self, o):
-        return cmp(self.trigger_time, o.trigger_time)
-
 class _PipeWrap(object):
     def __init__(self, p):
         self.p = p
@@ -79,6 +79,7 @@ class AbstractEventHub(object):
     def __init__(self):
         self.timers = deque()
         self.new_timers = []
+        self.timer_map = {}
         self.run = True
         self.events = {}
         self.run_now = deque()
@@ -108,8 +109,8 @@ class AbstractEventHub(object):
 
     def remove_timer(self, t):
         try:
-            self.timers.remove(t)
-        except ValueError:
+            del self.timer_map[id(t)]
+        except KeyError:
             pass
 
     def run_in_thread(self, reschedule, f, *args, **kw):
@@ -221,17 +222,18 @@ class EPollEventHub(AbstractEventHub):
         '''
         while self.run_now and self.run:
             self.run_now.popleft()()
-        
+
         if self.new_timers:
             for tr in self.new_timers:
                 if tr.pending:
                     tr.inq = True
-                    self.timers.append(tr)
+                    self.timer_map[id(tr)] = tr
+                    self.timers.append((tr.trigger_time, id(tr)))
             self.timers = deque(sorted(self.timers))
             self.new_timers = []
 
         tm = time()
-        timeout = (self.timers[0].trigger_time - tm) if self.timers else 1e6
+        timeout = (self.timers[0][F_TRIGGER_TIME] - tm) if self.timers else 1e6
         # epoll, etc, limit to 2^^31/1000 or OverflowError
         timeout = min(timeout, 1e6)
         if timeout < 0 or self.reschedule:
@@ -239,8 +241,13 @@ class EPollEventHub(AbstractEventHub):
 
         # Run timers first, to try to nail their timings
         while self.timers:
-            if self.timers[0].due:
-                t = self.timers.popleft()
+            trigger_ts, next_timer = self.timers[0]
+            if next_timer not in self.timer_map:
+                self.timers.popleft()
+                continue
+            if self.timer_map[next_timer].due:
+                self.timers.popleft()
+                t = self.timer_map.pop(next_timer)
                 if t.pending:
                     t.callback()
                     while self.run_now and self.run:
