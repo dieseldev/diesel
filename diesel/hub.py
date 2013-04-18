@@ -232,6 +232,14 @@ class EPollEventHub(AbstractEventHub):
             self.timers = deque(sorted(self.timers))
             self.new_timers = []
 
+        # Clear deleted timers from the head of the timers deque
+        while self.timers:
+            trigger_ts, next_timer = self.timers[0]
+            if next_timer not in self.timer_map:
+                self.timers.popleft()
+                continue
+            break
+
         tm = time()
         timeout = (self.timers[0][F_TRIGGER_TIME] - tm) if self.timers else 1e6
         # epoll, etc, limit to 2^^31/1000 or OverflowError
