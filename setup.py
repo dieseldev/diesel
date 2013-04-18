@@ -9,7 +9,7 @@ if os.system("which palmc > /dev/null 2>&1") == 0:
 
 additional_requires = []
 
-VERSION = "3.0.17"
+VERSION = "3.0.18"
 
 setup(name="diesel",
     version=VERSION,
