@@ -49,7 +49,7 @@ class Timer(object):
 
     def callback(self):
         '''When the external entity checks this timer and determines
-        it's due, this function is called, which calls the original 
+        it's due, this function is called, which calls the original
         callback.
         '''
         self.pending = False
@@ -61,7 +61,7 @@ class Timer(object):
     def due(self):
         '''Is it time to run this timer yet?
 
-        The allowance provides some give-and-take so that if a 
+        The allowance provides some give-and-take so that if a
         sleep() delay comes back a little early, we still go.
         '''
         return (self.trigger_time - time()) < self.ALLOWANCE
@@ -411,8 +411,8 @@ class LibEvHub(AbstractEventHub):
         wev.stop()
 
 # Expose a usable EventHub implementation
-if (os.environ.get('DIESEL_LIBEV') or 
-    os.environ.get('DIESEL_NO_EPOLL') or 
+if (os.environ.get('DIESEL_LIBEV') or
+    os.environ.get('DIESEL_NO_EPOLL') or
     not hasattr(select, 'epoll')):
     assert have_libev, "if you don't have select.epoll (not on linux?), please install pyev!"
     EventHub = LibEvHub
