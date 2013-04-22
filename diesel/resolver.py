@@ -5,6 +5,7 @@ a cache.
 import os
 import random
 import time
+import socket
 from diesel.protocols.DNS import DNSClient, NotFound, Timeout
 from diesel.util.pool import ConnectionPool
 from diesel.util.lock import synchronized
@@ -41,6 +42,15 @@ def resolve_dns_name(name):
 
     Keep a cache.
     '''
+
+    # Is name an IP address?
+    try:
+        socket.inet_pton(socket.AF_INET, name)
+        return name
+    except socket.error:
+        # Not a valid IP address resolve it
+        pass
+
     if name in hosts:
         return hosts[name]
 
