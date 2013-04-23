@@ -24,8 +24,6 @@ from operator import attrgetter
 from time import time
 from Queue import Queue, Empty
 
-F_TRIGGER_TIME = 0
-F_TIMER_ID = 1
 TRIGGER_COMPARE = attrgetter('trigger_time')
 
 class Timer(object):
