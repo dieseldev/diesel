@@ -20,11 +20,11 @@ import os
 import thread
 
 from collections import deque
+from operator import attrgetter
 from time import time
 from Queue import Queue, Empty
 
-F_TRIGGER_TIME = 0
-F_TIMER_ID = 1
+TRIGGER_COMPARE = attrgetter('trigger_time')
 
 class Timer(object):
     '''A timer is a promise to call some function at a future date.
@@ -77,9 +77,8 @@ class IntWrap(_PipeWrap): pass
 
 class AbstractEventHub(object):
     def __init__(self):
-        self.timers = deque()
+        self.timers = []
         self.new_timers = []
-        self.timer_map = {}
         self.run = True
         self.events = {}
         self.run_now = deque()
@@ -109,8 +108,8 @@ class AbstractEventHub(object):
 
     def remove_timer(self, t):
         try:
-            del self.timer_map[id(t)]
-        except KeyError:
+            self.timers.remove(t)
+        except IndexError:
             pass
 
     def run_in_thread(self, reschedule, f, *args, **kw):
@@ -227,43 +226,26 @@ class EPollEventHub(AbstractEventHub):
             for tr in self.new_timers:
                 if tr.pending:
                     tr.inq = True
-                    self.timer_map[id(tr)] = tr
-                    self.timers.append((tr.trigger_time, id(tr)))
-            self.timers = deque(sorted(self.timers))
+                    self.timers.append(tr)
+            self.timers.sort(key=TRIGGER_COMPARE, reverse=True)
             self.new_timers = []
 
-        # Clear deleted timers from the head of the timers deque
-        while self.timers:
-            trigger_ts, next_timer = self.timers[0]
-            if next_timer not in self.timer_map:
-                self.timers.popleft()
-                continue
-            break
-
         tm = time()
-        timeout = (self.timers[0][F_TRIGGER_TIME] - tm) if self.timers else 1e6
+        timeout = (self.timers[-1].trigger_time - tm) if self.timers else 1e6
         # epoll, etc, limit to 2^^31/1000 or OverflowError
         timeout = min(timeout, 1e6)
         if timeout < 0 or self.reschedule:
             timeout = 0
 
         # Run timers first, to try to nail their timings
-        while self.timers:
-            trigger_ts, next_timer = self.timers[0]
-            if next_timer not in self.timer_map:
-                self.timers.popleft()
-                continue
-            if self.timer_map[next_timer].due:
-                self.timers.popleft()
-                t = self.timer_map.pop(next_timer)
-                if t.pending:
-                    t.callback()
-                    while self.run_now and self.run:
-                        self.run_now.popleft()()
-                    if not self.run:
-                        return
-            else:
-                break
+        while self.timers and self.timers[-1].due:
+            t = self.timers.pop()
+            if t.pending:
+                t.callback()
+                while self.run_now and self.run:
+                    self.run_now.popleft()()
+                if not self.run:
+                    return
 
         # Handle all socket I/O
         try:

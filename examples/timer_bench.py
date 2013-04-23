@@ -20,7 +20,7 @@ import diesel
 from diesel.util.event import Countdown
 from diesel.util.queue import Queue
 
-OPERATIONS = 20
+OPERATIONS = 60
 cpustats = []
 
 
@@ -31,7 +31,7 @@ def producer(q):
 
 def consumer(q, done):
     for i in xrange(OPERATIONS):
-        evt, data = diesel.first(waits=[q], sleep=10)
+        evt, data = diesel.first(waits=[q], sleep=10000)
         if evt == "sleep":
             print "sleep was triggered!"
             break
