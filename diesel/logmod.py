@@ -5,7 +5,7 @@ levels and component-specific subloggers.
 
 import sys
 import time
-from twiggy import log as olog, addEmitters, levels, outputs, formats, emitters
+from twiggy import log as olog, add_emitters, levels, outputs, formats, emitters
 from functools import partial
 
 diesel_format = formats.line_format
@@ -23,7 +23,7 @@ diesel_output = outputs.StreamOutput(diesel_format)
 def set_log_level(level=levels.INFO):
     emitters.clear()
 
-    addEmitters(
+    add_emitters(
         ('*', level, None, diesel_output)
     )
 
