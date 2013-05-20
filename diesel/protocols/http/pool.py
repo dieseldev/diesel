@@ -23,13 +23,14 @@ def request(url, method='GET', timeout=60, body=None, headers=None):
     else:
         body_bytes = body
     req_url = urlparse.urlparse(url)
-    host = req_url.netloc.split(':')[0]
     if not headers:
         headers = {}
     headers.update({
-        'Host': host,
         'Connection': 'keep-alive',
     })
+    if 'Host' not in headers:
+        host = req_url.netloc.split(':')[0]
+        headers['Host'] = host
     if 'User-Agent' not in headers:
         headers['User-Agent'] = USER_AGENT
     if req_url.query:
