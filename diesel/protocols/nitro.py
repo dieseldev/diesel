@@ -36,7 +36,7 @@ class DieselNitroSocket(Waiter):
             try:
                 self.socket.send(message, self.socket.NOWAIT | flags)
             except pynitro.NitroFull:
-                sleep(0.2)
+                diesel.sleep(0.2)
             else:
                 self.sent += 1
                 return
@@ -80,6 +80,7 @@ class DieselNitroSocket(Waiter):
         '''Handle state change.
         '''
         self.read_gate.set()
+        diesel.fire(self)
 
     def error(self):
         raise RuntimeError("OH NOES, some weird zeromq FD error callback")
