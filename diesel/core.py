@@ -325,10 +325,6 @@ class Loop(object):
             try:
                 sock.getpeername()
             except socket.error:
-                self.hub.schedule(
-                lambda: self.wake(
-                    ClientConnectionError("Could not connect to remote host (%s:%s)" % (host, port))
-                    ))
                 return
 
             def finish(e=None):
@@ -363,13 +359,25 @@ class Loop(object):
                 ))
 
         def read_callback():
+            # DJB on handling socket connection failures, from
+            # http://cr.yp.to/docs/connect.html
+
+            # "Another possibility is getpeername(). If the socket is
+            # connected, getpeername() will return 0. If the socket is not
+            # connected, getpeername() will return ENOTCONN, and read(fd,&ch,1)
+            # will produce the right errno through error slippage. This is a
+            # combination of suggestions from Douglas C. Schmidt and Ken Keys."
+
             try:
                 sock.getpeername()
             except socket.error:
                 try:
                     d = sock.recv(1)
-                except:
-                    d = None
+                except socket.error, e:
+                    if e.errno == errno.ECONNREFUSED:
+                        d = ''
+                    else:
+                        d = None
 
                 if d != '':
                     log.error("internal error: expected empty read on disconnected socket")
