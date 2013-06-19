@@ -9,7 +9,7 @@ import struct
 from collections import deque
 from diesel import Client, call, sleep, send, receive, first, Loop, Application, ConnectionClosed
 from bson import BSON, _make_c_string, decode_all
-from pymongo.son import SON
+from bson.son import SON
 
 _ZERO = "\x00\x00\x00\x00"
 HEADER_SIZE = 16
