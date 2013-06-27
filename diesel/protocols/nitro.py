@@ -1,6 +1,7 @@
 import pynitro
 
 import diesel
+from functools import partial
 from diesel import log, loglevels
 from diesel.events import Waiter, StopWaitDispatch
 from diesel.util.queue import Queue
@@ -31,10 +32,10 @@ class DieselNitroSocket(Waiter):
         self.sent = 0
         self.received = 0
 
-    def send(self, message, flags=0):
+    def _send_op(self, op):
         while True:
             try:
-                self.socket.send(message, self.socket.NOWAIT | flags)
+                op()
             except pynitro.NitroFull:
                 diesel.sleep(0.2)
             else:
@@ -51,6 +52,14 @@ class DieselNitroSocket(Waiter):
             else:
                 self.received += 1
                 return m
+
+    def send(self, frame, flags=0):
+        return self._send_op(
+            partial(self.socket.send, frame, self.socket.NOWAIT | flags))
+
+    def reply(self, orig, frame, flags=0):
+        return self._send_op(
+            partial(self.socket.reply, orig, frame, self.socket.NOWAIT | flags))
 
     def process_fire(self, dc):
         if not self._early_value:
@@ -100,3 +109,207 @@ class DieselNitroSocket(Waiter):
 
     def __exit__(self, *args):
         self.destroy()
+
+class DieselNitroService(object):
+    """A Nitro service that can handle multiple clients.
+
+    Clients must maintain a steady flow of messages in order to maintain
+    state in the service. A heartbeat of some sort. Or the timeout can be
+    set to a sufficiently large value understanding that it will cause more
+    resource consumption.
+
+    """
+    name = ''
+    default_log_level = loglevels.DEBUG
+    timeout = 10
+
+    def __init__(self, uri, logger=None, log_level=None):
+        self.uri = uri
+        self.nitro_socket = None
+        self.log = logger or None
+        self.selected_log_level = log_level
+        self.clients = {}
+        self.outgoing = Queue()
+        self.incoming = Queue()
+        self.name = self.name or self.__class__.__name__
+        self._incoming_loop = None
+
+        # Allow for custom `should_run` properties in subclasses.
+        try:
+            self.should_run = True
+        except AttributeError:
+            # A custom `should_run` property exists.
+            pass
+
+        if self.log and self.selected_log_level is not None:
+            self.selected_log_level = None
+            warnings.warn(
+                "ignored `log_level` argument since `logger` was provided.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+
+    def _create_server_socket(self):
+        self.nitro_socket = DieselNitroSocket(bind=self.uri)
+
+    def _setup_the_logging_system(self):
+        if not self.log:
+            if self.selected_log_level is not None:
+                log_level = self.selected_log_level
+            else:
+                log_level = self.default_log_level
+            log_name = self.name or self.__class__.__name__
+            self.log = log.name(log_name)
+            self.log.min_level = log_level
+
+    def _handle_client_requests_and_responses(self, remote_client):
+        assert self.nitro_socket
+        queues = [remote_client.incoming, remote_client.outgoing]
+        try:
+            while True:
+                (evt, value) = diesel.first(waits=queues, sleep=self.timeout)
+                if evt is remote_client.incoming:
+                    assert isinstance(value, Message)
+                    remote_client.async_frame = value.orig_frame
+                    resp = self.handle_client_packet(value.data, remote_client.context)
+                elif evt is remote_client.outgoing:
+                    resp = value
+                elif evt == 'sleep':
+                    break
+                if resp:
+                    if isinstance(resp, basestring):
+                        output = [resp]
+                    else:
+                        output = iter(resp)
+                    for part in output:
+                        msg = Message(
+                            value.orig_frame,
+                            remote_client.identity,
+                            self.serialize_message(remote_client.identity, part),
+                        )
+                        self.outgoing.put(msg)
+        finally:
+            self._cleanup_client(remote_client)
+
+    def _cleanup_client(self, remote_client):
+        del self.clients[remote_client.identity]
+        self.cleanup_client(remote_client)
+        self.log.debug("cleaned up client %r" % remote_client.identity)
+
+    def _handle_all_inbound_and_outbound_traffic(self):
+        assert self.nitro_socket
+        queues = [self.nitro_socket, self.outgoing]
+        socket = self.nitro_socket
+        make_frame = pynitro.NitroFrame
+        while self.should_run:
+            (queue, msg) = diesel.first(waits=queues)
+
+            if queue is self.outgoing:
+                socket.reply(msg.orig_frame, make_frame(msg.data))
+            else:
+                id, obj = self.parse_message(msg.data)
+                msg.clear_data()
+                msg = Message(msg, id, obj)
+                if msg.identity not in self.clients:
+                    self._register_client(msg)
+                self.clients[msg.identity].incoming.put(msg)
+
+
+    def _register_client(self, msg):
+        remote = RemoteClient.from_message(msg)
+        self.clients[msg.identity] = remote
+        self.register_client(remote, msg)
+        diesel.fork_child(self._handle_client_requests_and_responses, remote)
+
+    # Public API
+    # ==========
+
+    def __call__(self):
+        return self.run()
+
+    def run(self):
+        self._create_server_socket()
+        self._setup_the_logging_system()
+        self._handle_all_inbound_and_outbound_traffic()
+
+    def handle_client_packet(self, packet, context):
+        """Called with a bytestring packet and dictionary context.
+
+        Return an iterable of bytestrings.
+
+        """
+        raise NotImplementedError()
+
+    def cleanup_client(self, remote_client):
+        """Called with a RemoteClient instance. Do any cleanup you need to."""
+        pass
+
+    def register_client(self, remote_client, msg):
+        """Called with a RemoteClient instance. Do any registration here."""
+        pass
+
+    def parse_message(self, raw_data):
+        """Subclasses can override to alter the handling of inbound data.
+
+        """
+        return None, raw_data
+
+    def serialize_message(self, identity, raw_data):
+        """Subclasses can override to alter the handling of outbound data.
+
+        """
+        return raw_data
+
+    def async_send(self, identity, msg):
+        """Raises KeyError if client is no longer connected.
+        """
+        remote_client = self.clients[identity]
+        out = self.serialize_message(msg)
+        remote_client.outgoing.put(
+            Message(
+                remote_client.async_frame,
+                identity,
+                out))
+
+class RemoteClient(object):
+    def __init__(self, identity):
+
+        # The identity is some information sent along with packets from the
+        # remote client that uniquely identifies it.
+
+        self.identity = identity
+
+        # The incoming queue is typically populated by the DieselNitroService
+        # and represents a queue of messages send from the remote client.
+
+        self.incoming = Queue()
+
+        # The outgoing queue is where return values from the
+        # DieselNitroService.handle_client_packet method are placed. Those values
+        # are sent on to the remote client.
+        #
+        # Other diesel threads can stick values directly into outgoing queue
+        # and the service will send them on as well. This allows for
+        # asynchronous sending of messages to remote clients. 
+
+        self.outgoing = Queue()
+
+        # The context in general is a place where you can put data that is
+        # related specifically to the remote client and it will exist as long
+        # the remote client doesn't timeout.
+
+        self.context = {}
+
+        # A skeleton frame to hang onto for async sending back
+        self.async_frame = None
+
+    @classmethod
+    def from_message(cls, msg):
+        return cls(msg.identity)
+
+
+class Message(object):
+    def __init__(self, frame, identity, data):
+        self.orig_frame = frame
+        self.identity = identity
+        self.data = data
