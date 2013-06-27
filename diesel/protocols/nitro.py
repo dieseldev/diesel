@@ -164,7 +164,7 @@ class DieselNitroService(object):
 
     def _handle_client_requests_and_responses(self, remote_client):
         assert self.nitro_socket
-        queues = [remote_client.incoming, remote_client.outgoing]
+        queues = [remote_client.incoming]
         try:
             while True:
                 (evt, value) = diesel.first(waits=queues, sleep=self.timeout)
@@ -172,22 +172,20 @@ class DieselNitroService(object):
                     assert isinstance(value, Message)
                     remote_client.async_frame = value.orig_frame
                     resp = self.handle_client_packet(value.data, remote_client.context)
-                elif evt is remote_client.outgoing:
-                    resp = value
+                    if resp:
+                        if isinstance(resp, basestring):
+                            output = [resp]
+                        else:
+                            output = iter(resp)
+                        for part in output:
+                            msg = Message(
+                                value.orig_frame,
+                                remote_client.identity,
+                                self.serialize_message(remote_client.identity, part),
+                            )
+                            self.outgoing.put(msg)
                 elif evt == 'sleep':
                     break
-                if resp:
-                    if isinstance(resp, basestring):
-                        output = [resp]
-                    else:
-                        output = iter(resp)
-                    for part in output:
-                        msg = Message(
-                            value.orig_frame,
-                            remote_client.identity,
-                            self.serialize_message(remote_client.identity, part),
-                        )
-                        self.outgoing.put(msg)
         finally:
             self._cleanup_client(remote_client)
 
@@ -251,12 +249,14 @@ class DieselNitroService(object):
     def parse_message(self, raw_data):
         """Subclasses can override to alter the handling of inbound data.
 
+        Transform an incoming bytestring into a structure (aka, json.loads)
         """
         return None, raw_data
 
     def serialize_message(self, identity, raw_data):
         """Subclasses can override to alter the handling of outbound data.
 
+        Turn some structure into a bytestring (aka, json.dumps)
         """
         return raw_data
 
@@ -265,7 +265,7 @@ class DieselNitroService(object):
         """
         remote_client = self.clients[identity]
         out = self.serialize_message(msg)
-        remote_client.outgoing.put(
+        self.outgoing.put(
             Message(
                 remote_client.async_frame,
                 identity,
@@ -283,16 +283,6 @@ class RemoteClient(object):
         # and represents a queue of messages send from the remote client.
 
         self.incoming = Queue()
-
-        # The outgoing queue is where return values from the
-        # DieselNitroService.handle_client_packet method are placed. Those values
-        # are sent on to the remote client.
-        #
-        # Other diesel threads can stick values directly into outgoing queue
-        # and the service will send them on as well. This allows for
-        # asynchronous sending of messages to remote clients. 
-
-        self.outgoing = Queue()
 
         # The context in general is a place where you can put data that is
         # related specifically to the remote client and it will exist as long
