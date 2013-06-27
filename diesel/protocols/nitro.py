@@ -83,7 +83,7 @@ class DieselNitroSocket(Waiter):
         diesel.fire(self)
 
     def error(self):
-        raise RuntimeError("OH NOES, some weird zeromq FD error callback")
+        raise RuntimeError("OH NOES, some weird nitro FD callback")
 
 
     def destroy(self):
