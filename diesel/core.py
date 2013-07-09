@@ -116,6 +116,9 @@ def fork_from_thread(f, *args, **kw):
     l = Loop(f, *args, **kw)
     runtime.current_app.hub.schedule_loop_from_other_thread(l, ContinueNothing)
 
+def signal(sig):
+    return current_loop.signal(sig)
+
 class call(object):
     def __init__(self, f, inst=None):
         self.f = f
@@ -537,6 +540,11 @@ class Loop(object):
         def delayed_call():
             self.wake(value)
         self.hub.schedule(delayed_call, True)
+
+    def signal(self, sig):
+        cb = lambda: self.wake(True)
+        self.hub.add_signal_handler(sig, cb)
+        return self.dispatch()
 
 class Connection(object):
     def __init__(self, sock, addr):

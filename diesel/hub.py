@@ -17,9 +17,10 @@ else:
 import errno
 import fcntl
 import os
+import signal
 import thread
 
-from collections import deque
+from collections import deque, defaultdict
 from operator import attrgetter
 from time import time
 from Queue import Queue, Empty
@@ -85,6 +86,8 @@ class AbstractEventHub(object):
         self.fdmap = {}
         self._setup_threading()
         self.reschedule = deque()
+        self.signal_handlers = defaultdict(deque)
+        self.pending_signals = []
 
     def _setup_threading(self):
         self._t_recv, self._t_wakeup = os.pipe()
@@ -105,6 +108,9 @@ class AbstractEventHub(object):
                 else:
                     c(v)
         self.register(_PipeWrap(self._t_recv), handle_thread_done, None, None)
+
+    def _report_signal(self, sig, frame):
+        self.pending_signals.append(sig)
 
     def remove_timer(self, t):
         try:
@@ -165,6 +171,10 @@ class AbstractEventHub(object):
         self.events[fn] = (read_callback, write_callback, error_callback)
         self._add_fd(fd)
 
+    def add_signal_handler(self, sig, callback):
+        self.signal_handlers[sig].append(callback)
+        signal.signal(sig, self._report_signal)
+
     def _add_fd(self, fd):
         '''Add this socket to the list of sockets used in the
         poll call.
@@ -219,6 +229,16 @@ class EPollEventHub(AbstractEventHub):
         timer.  When epoll returns, all fd-related events (if any) are
         handled, and timers are handled as well.
         '''
+        while self.pending_signals:
+            sig = self.pending_signals.pop()
+            pending = deque(self.signal_handlers[sig])
+            self.signal_handlers[sig] = deque()
+            while pending:
+                handler = pending.popleft()
+                handler()
+            if not self.signal_handlers[sig]:
+                signal.signal(sig, signal.SIG_DFL)
+
         while self.run_now and self.run:
             self.run_now.popleft()()
 
