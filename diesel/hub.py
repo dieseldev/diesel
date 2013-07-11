@@ -215,7 +215,6 @@ class EPollEventHub(AbstractEventHub):
     def __init__(self):
         self.epoll = select.epoll()
         self.signal_handlers = defaultdict(deque)
-        self.pending_signals = []
         super(EPollEventHub, self).__init__()
 
     @property
@@ -229,16 +228,6 @@ class EPollEventHub(AbstractEventHub):
         timer.  When epoll returns, all fd-related events (if any) are
         handled, and timers are handled as well.
         '''
-        while self.pending_signals:
-            sig = self.pending_signals.pop()
-            pending = deque(self.signal_handlers[sig])
-            self.signal_handlers[sig] = deque()
-            while pending:
-                handler = pending.popleft()
-                handler()
-            if not self.signal_handlers[sig]:
-                signal.signal(sig, signal.SIG_DFL)
-
         while self.run_now and self.run:
             self.run_now.popleft()()
 
@@ -301,7 +290,10 @@ class EPollEventHub(AbstractEventHub):
         self.signal_handlers[sig].append(callback)
 
     def _report_signal(self, sig, frame):
-        self.pending_signals.append(sig)
+        for callback in self.signal_handlers[sig]:
+            self.run_now.append(callback)
+        self.signal_handlers[sig] = deque()
+        signal.signal(sig, signal.SIG_DFL)
 
     def _add_fd(self, fd):
         '''Add this socket to the list of sockets used in the
