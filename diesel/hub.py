@@ -86,8 +86,6 @@ class AbstractEventHub(object):
         self.fdmap = {}
         self._setup_threading()
         self.reschedule = deque()
-        self.signal_handlers = defaultdict(deque)
-        self.pending_signals = []
 
     def _setup_threading(self):
         self._t_recv, self._t_wakeup = os.pipe()
@@ -108,9 +106,6 @@ class AbstractEventHub(object):
                 else:
                     c(v)
         self.register(_PipeWrap(self._t_recv), handle_thread_done, None, None)
-
-    def _report_signal(self, sig, frame):
-        self.pending_signals.append(sig)
 
     def remove_timer(self, t):
         try:
@@ -172,8 +167,8 @@ class AbstractEventHub(object):
         self._add_fd(fd)
 
     def add_signal_handler(self, sig, callback):
-        self.signal_handlers[sig].append(callback)
-        signal.signal(sig, self._report_signal)
+        '''Run the given callback when signal sig is triggered.'''
+        raise NotImplementedError
 
     def _add_fd(self, fd):
         '''Add this socket to the list of sockets used in the
@@ -216,6 +211,8 @@ class EPollEventHub(AbstractEventHub):
     '''
     def __init__(self):
         self.epoll = select.epoll()
+        self.signal_handlers = defaultdict(deque)
+        self.pending_signals = []
         super(EPollEventHub, self).__init__()
 
     @property
@@ -291,6 +288,13 @@ class EPollEventHub(AbstractEventHub):
 
         self.run_now = self.reschedule
         self.reschedule = deque()
+
+    def add_signal_handler(self, sig, callback):
+        self.signal_handlers[sig].append(callback)
+        signal.signal(sig, self._report_signal)
+
+    def _report_signal(self, sig, frame):
+        self.pending_signals.append(sig)
 
     def _add_fd(self, fd):
         '''Add this socket to the list of sockets used in the
