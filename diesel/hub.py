@@ -322,6 +322,11 @@ class LibEvHub(AbstractEventHub):
         self._ev_fdmap = {}
         AbstractEventHub.__init__(self)
 
+    def add_signal_handler(self, sig, callback):
+        watcher = self._ev_loop.signal(sig, self._signal_fired)
+        self._ev_watchers[watcher] = callback
+        watcher.start()
+
     @property
     def describe(self):
         return "libev/pyev (%s/%s) backend=%s" % (
@@ -345,14 +350,17 @@ class LibEvHub(AbstractEventHub):
             del self._ev_loop
             return
 
-        self.run_now.extend(self.reschedule)
-        self.reschedule = deque()
-
-        if self.run_now:
+        if self.run_now or self.reschedule:
             self._ev_loop.start(pyev.EVRUN_NOWAIT)
         else:
             while not self.run_now:
                 self._ev_loop.start(pyev.EVRUN_ONCE)
+
+        while self.run_now and self.run:
+            self.run_now.popleft()()
+
+        self.run_now.extend(self.reschedule)
+        self.reschedule = deque()
 
     def call_later(self, interval, f, *args, **kw):
         '''Schedule a timer on the hub.
@@ -382,6 +390,10 @@ class LibEvHub(AbstractEventHub):
             self.reschedule.append(c)
         else:
             self.run_now.append(c)
+
+    def _signal_fired(self, watcher, revents):
+        callback = self._ev_watchers.pop(watcher)
+        self.run_now.append(callback)
 
     def _ev_io_fired(self, watcher, revents):
         r, w, e = self.events[watcher.fd]
