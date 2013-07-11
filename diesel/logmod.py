@@ -5,7 +5,11 @@ levels and component-specific subloggers.
 
 import sys
 import time
-from twiggy import log as olog, add_emitters, levels, outputs, formats, emitters
+from twiggy import log as olog, levels, outputs, formats, emitters
+try:
+    from twiggy import add_emitters
+except ImportError:
+    from twiggy import addEmitters as add_emitters
 from functools import partial
 
 diesel_format = formats.line_format
