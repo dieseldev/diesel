@@ -8,3 +8,4 @@ from app import Application, Service, UDPService, quickstart, quickstop, Thunk
 from client import Client, UDPClient
 from resolver import resolve_dns_name, DNSResolutionError
 from runtime import is_running
+from hub import ExistingSignalHandler

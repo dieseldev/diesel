@@ -3,7 +3,7 @@ import signal
 
 import diesel
 
-from diesel.util.event import Countdown
+from diesel.util.event import Countdown, Event
 
 
 state = {'triggered':False}
@@ -44,3 +44,25 @@ def test_multiple_signal_waiters():
     evt, data = diesel.first(sleep=1, waits=[c])
     assert evt is c, "all waiters were not triggered!"
 
+def test_overwriting_custom_signal_handler_fails():
+    readings = []
+    success = Event()
+    failure = Event()
+
+    def append_reading(sig, frame):
+        readings.append(sig)
+    signal.signal(signal.SIGUSR1, append_reading)
+
+    def overwriter():
+        try:
+            diesel.signal(signal.SIGUSR1)
+        except diesel.ExistingSignalHandler:
+            success.set()
+        else:
+            failure.set()
+    diesel.fork(overwriter)
+    diesel.sleep()
+    os.kill(os.getpid(), signal.SIGUSR1)
+    evt, _ = diesel.first(waits=[success, failure])
+    assert evt is success
+    assert readings

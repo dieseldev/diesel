@@ -27,6 +27,9 @@ from Queue import Queue, Empty
 
 TRIGGER_COMPARE = attrgetter('trigger_time')
 
+class ExistingSignalHandler(Exception):
+    pass
+
 class Timer(object):
     '''A timer is a promise to call some function at a future date.
     '''
@@ -290,8 +293,12 @@ class EPollEventHub(AbstractEventHub):
         self.reschedule = deque()
 
     def add_signal_handler(self, sig, callback):
+        existing = signal.getsignal(sig)
+        if not existing:
+            signal.signal(sig, self._report_signal)
+        elif existing != self._report_signal:
+            raise ExistingSignalHandler(existing)
         self.signal_handlers[sig].append(callback)
-        signal.signal(sig, self._report_signal)
 
     def _report_signal(self, sig, frame):
         self.pending_signals.append(sig)
@@ -327,6 +334,9 @@ class LibEvHub(AbstractEventHub):
         AbstractEventHub.__init__(self)
 
     def add_signal_handler(self, sig, callback):
+        existing = signal.getsignal(sig)
+        if existing:
+            raise ExistingSignalHandler(existing)
         watcher = self._ev_loop.signal(sig, self._signal_fired)
         self._ev_watchers[watcher] = callback
         watcher.start()
