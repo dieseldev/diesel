@@ -318,7 +318,7 @@ class EPollEventHub(AbstractEventHub):
 class LibEvHub(AbstractEventHub):
     def __init__(self):
         self._ev_loop = pyev.default_loop()
-        self._ev_timers = {}
+        self._ev_watchers = {}
         self._ev_fdmap = {}
         AbstractEventHub.__init__(self)
 
@@ -361,20 +361,20 @@ class LibEvHub(AbstractEventHub):
         t.inq = True
         evt = self._ev_loop.timer(interval, 0, self._ev_timer_fired)
         t.hub_data = evt
-        self._ev_timers[evt] = t
+        self._ev_watchers[evt] = t
         evt.start()
         return t
 
     def _ev_timer_fired(self, watcher, revents):
-        t = self._ev_timers.pop(watcher)
+        t = self._ev_watchers.pop(watcher)
         if t.hub_data:
             t.hub_data = None
             self.run_now.append(t.callback)
 
     def remove_timer(self, t):
         evt = t.hub_data
-        if evt in self._ev_timers:
-            del self._ev_timers[evt]
+        if evt in self._ev_watchers:
+            del self._ev_watchers[evt]
             evt.stop()
 
     def schedule(self, c, reschedule=False):
