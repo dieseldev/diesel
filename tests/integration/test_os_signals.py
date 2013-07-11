@@ -3,6 +3,9 @@ import signal
 
 import diesel
 
+from diesel.util.event import Countdown
+
+
 state = {'triggered':False}
 
 def waiter():
@@ -27,3 +30,17 @@ def test_can_wait_on_os_signals():
 
     # Now that we're back, the waiter should have triggered the state
     assert state['triggered']
+
+def test_multiple_signal_waiters():
+    N_WAITERS = 5
+    c = Countdown(N_WAITERS)
+    def mwaiter():
+        diesel.signal(signal.SIGUSR1)
+        c.tick()
+    for i in xrange(N_WAITERS):
+        diesel.fork(mwaiter)
+    diesel.sleep()
+    os.kill(os.getpid(), signal.SIGUSR1)
+    evt, data = diesel.first(sleep=1, waits=[c])
+    assert evt is c, "all waiters were not triggered!"
+
