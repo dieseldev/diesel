@@ -88,25 +88,15 @@ def test_signals_are_handled_while_event_loop_is_blocked():
 
 def test_signal_captured_by_Signal_instance():
     usr1 = Signal(signal.SIGUSR1)
-    diesel.sleep()
     os.kill(os.getpid(), signal.SIGUSR1)
     evt, _ = diesel.first(sleep=0.1, waits=[usr1])
     assert evt is usr1, evt
 
 def test_Signal_instances_trigger_multiple_times():
     usr1 = Signal(signal.SIGUSR1)
-    diesel.sleep()
     for i in xrange(5):
         os.kill(os.getpid(), signal.SIGUSR1)
         evt, _ = diesel.first(sleep=0.1, waits=[usr1])
         assert evt is usr1, evt
         usr1.rearm()
-        diesel.sleep()
 
-def test_Signal_loop_is_stopped_when_signal_is_caught():
-    usr1 = Signal(signal.SIGUSR1)
-    loop = usr1.loop
-    diesel.sleep()
-    os.kill(os.getpid(), signal.SIGUSR1)
-    evt, _ = diesel.first(sleep=0.1, waits=[usr1])
-    assert not loop.running

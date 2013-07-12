@@ -45,14 +45,8 @@ class Signal(Event):
     def __init__(self, sig):
         Event.__init__(self)
         self.sig = sig
-        self.loop = None
         self.rearm()
 
     def rearm(self):
         self.clear()
-        if not self.loop or not self.loop.running:
-            self.loop = fork(self.signal_watcher)
-
-    def signal_watcher(self):
-        signal(self.sig)
-        self.set()
+        signal(self.sig, self.set)
