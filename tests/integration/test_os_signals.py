@@ -1,5 +1,6 @@
 import os
 import signal
+import time
 
 import diesel
 
@@ -51,6 +52,7 @@ def test_overwriting_custom_signal_handler_fails():
 
     def append_reading(sig, frame):
         readings.append(sig)
+        signal.signal(signal.SIGUSR1, signal.SIG_DFL)
     signal.signal(signal.SIGUSR1, append_reading)
 
     def overwriter():
@@ -66,3 +68,20 @@ def test_overwriting_custom_signal_handler_fails():
     evt, _ = diesel.first(waits=[success, failure])
     assert evt is success
     assert readings
+
+def test_signals_are_handled_while_event_loop_is_blocked():
+    done = Event()
+
+    def handler():
+        diesel.signal(signal.SIGUSR1)
+        done.set()
+
+    def killer():
+        time.sleep(0.1)
+        os.kill(os.getpid(), signal.SIGUSR1)
+
+    diesel.fork(handler)
+    diesel.thread(killer)
+    diesel.sleep()
+    evt, _ = diesel.first(sleep=1, waits=[done])
+    assert evt is done

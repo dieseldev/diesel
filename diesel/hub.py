@@ -274,7 +274,8 @@ class EPollEventHub(AbstractEventHub):
                     return
         except IOError, e:
             if e.errno == errno.EINTR:
-                pass
+                while self.run_now and self.run:
+                    self.run_now.popleft()()
             else:
                 raise
 
