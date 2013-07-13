@@ -42,11 +42,31 @@ class Countdown(Event):
             self.set()
 
 class Signal(Event):
-    def __init__(self, sig):
+    """Used for waiting on an OS-level signal."""
+
+    def __init__(self, signum):
+        """Create a Signal instance waiting on signum.
+
+        It will be triggered whenever the provided signum is sent to the
+        process. A Loop can be off doing other tasks when the signal arrives
+        and it will still trigger this event (the Loop won't know until the
+        next time it waits on this event though).
+
+        After the event has been triggered, it must be rearmed before it can
+        be waited on again. Otherwise, like a base Event, it will remain in
+        the triggered state and thus waiting on it will immediately return.
+
+        """
         Event.__init__(self)
-        self.sig = sig
+        self.signum = signum
         self.rearm()
 
     def rearm(self):
+        """Prepares the Signal for use again.
+
+        This must be called before waiting on a Signal again after it has
+        been triggered.
+
+        """
         self.clear()
-        signal(self.sig, self.set)
+        signal(self.signum, self.set)
