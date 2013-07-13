@@ -16,7 +16,7 @@ Contents:
    patterns
    debugging
    testing
-   reference
+   API Reference <api/modules>
 
 Indices and tables
 ==================

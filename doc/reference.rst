@@ -1,2 +1,0 @@
-Diesel API Reference
-====================
