@@ -29,7 +29,7 @@ class ConnectionPool(object):
         if pool_max:
             self.remaining_conns = Queue()
             for _ in xrange(pool_max):
-                self.remaining_conns.put()
+                self.remaining_conns.inp.append(None)
         else:
             self.remaining_conns = InfiniteQueue()
         self.connections = deque()
