@@ -13,6 +13,7 @@ import sys
 sys.path.insert(0, '.')
 
 import diesel
+from diesel.util.streams import create_line_input_stream
 
 try:
     from IPython.Shell import IPShell
@@ -38,7 +39,14 @@ def interact_python():
         '__name__':globals_['__name__'],
         'diesel':diesel,
     }
-    code.interact(None, None, env)
+    inp = create_line_input_stream(sys.stdin)
+
+    def diesel_input(prompt):
+        sys.stdout.write(prompt)
+        sys.stdout.flush()
+        return inp.get().rstrip('\n')
+
+    code.interact(None, diesel_input, env)
     diesel.quickstop()
 
 def interact_ipython():
