@@ -305,7 +305,7 @@ class LibEvHub(AbstractEventHub):
     @property
     def describe(self):
         return "libev/pyev (%s/%s) backend=%s" % (
-                pyev.version() + ({
+                self._pyev_version() + ({
                     1  : "select()",
                     2  : "poll()",
                     4  : "epoll()",
@@ -313,6 +313,12 @@ class LibEvHub(AbstractEventHub):
                     16 : "/dev/poll",
                     32 : "event ports",
                     }.get(self._ev_loop.backend, "UNKNOWN"),))
+
+    def _pyev_version(self):
+        if hasattr(pyev, 'version'):
+            return pyev.version()
+        else:
+            return pyev.abi_version()
 
     def handle_events(self):
         '''Run one pass of event handling.
