@@ -19,7 +19,7 @@ import fcntl
 import os
 import thread
 
-from collections import deque
+from collections import deque, defaultdict
 from operator import attrgetter
 from time import time
 from Queue import Queue, Empty
@@ -83,6 +83,7 @@ class AbstractEventHub(object):
         self.events = {}
         self.run_now = deque()
         self.fdmap = {}
+        self.fd_ids = defaultdict(int)
         self._setup_threading()
         self.reschedule = deque()
 
@@ -161,6 +162,7 @@ class AbstractEventHub(object):
         '''
         fn = fd.fileno()
         self.fdmap[fd] = fn
+        self.fd_ids[fn] += 1
         assert fn not in self.events
         self.events[fn] = (read_callback, write_callback, error_callback)
         self._add_fd(fd)
@@ -250,12 +252,17 @@ class EPollEventHub(AbstractEventHub):
         # Handle all socket I/O
         try:
             for (fd, evtype) in self.epoll.poll(timeout):
+                fd_id = self.fd_ids[fd]
                 if evtype & select.EPOLLIN or evtype & select.EPOLLPRI:
                     self.events[fd][0]()
                 elif evtype & select.EPOLLERR or evtype & select.EPOLLHUP:
                     self.events[fd][2]()
-                # fd could be removed by above read
-                if evtype & select.EPOLLOUT and fd in self.events:
+
+                # The fd could have been reassigned to a new socket or removed
+                # when running the callbacks immediately above. Only use it if
+                # neither of those is the case.
+                use_fd = fd_id == self.fd_ids[fd] and fd in self.events
+                if evtype & select.EPOLLOUT and use_fd:
                     self.events[fd][1]()
 
                 while self.run_now and self.run:
