@@ -415,6 +415,7 @@ class LibEvHub(AbstractEventHub):
 
     def _signal_fired(self, watcher, revents):
         callback = self._ev_watchers.pop(watcher)
+        watcher.stop()
         self.run_now.append(callback)
 
     def _ev_io_fired(self, watcher, revents):
