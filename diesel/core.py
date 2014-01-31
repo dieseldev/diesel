@@ -67,23 +67,71 @@ class TerminateLoop(Exception):
 CRLF = '\r\n'
 BUFSIZ = 2 ** 14
 
-def until(*args, **kw):
-    return current_loop.input_op(*args, **kw)
+def until(sentinel):
+    """Returns data from the underlying connection, terminated by sentinel.
+
+    Useful if you are working with a text based protocol that delimits messages
+    with a certain character or sequence of characters. Data that has been read
+    off the socket beyond the sentinel is buffered.
+
+    :param sentinel: The sentinel to wait for before returning data.
+    :type sentinel: A byte string (str).
+    :return: A byte string (str).
+
+    """
+    return current_loop.input_op(sentinel)
 
 def until_eol():
-    return until("\r\n")
+    """Returns data from the underlying connection, terminated by \\r\\n.
+
+    Useful for working with text based protocols that are delimitted by
+    a carriage return and a line feed (CRLF). Data that has been read off the
+    socket beyond the CRLF is buffered.
+
+    :return: A byte string (str).
+
+    """
+    return until(CRLF)
 
 class datagram(object):
+    """Used to create a singleton instance of the same name.
+
+    Used in calls to receive when working with UDP protocols.
+
+    """
     pass
 datagram = datagram()
 _datagram = datagram
 
 
-def receive(*args, **kw):
-    return current_loop.input_op(*args, **kw)
+def receive(spec=None):
+    """Receives data from the underlying connection.
 
-def send(*args, **kw):
-    return current_loop.send(*args, **kw)
+    Typically waits for the specified amount of data to be ready. If no data
+    was specfied (spec == None) it will return immediately with the contents of
+    the receive buffer, if any. Be cautious when calling `receive()` in a tight
+    loop; if you aren't switching control to another :class:`diesel.Loop` you
+    can lock up your application. A simple `sleep()` call will suffice to
+    switch control and let other waiting code run.
+
+    :param spec: Specifies what to receive.
+    :type spec: An int to request a number of bytes, datagram if using a UDP
+        socket or a None value to return any data that is waiting in the buffer.
+    :return: Typically a byte string (str), but can be None when spec == None
+        and there is no data waiting in the buffer..
+
+    """
+    return current_loop.input_op(spec)
+
+def send(data, priority=5):
+    """Sends data out over the underlying connection.
+
+    :param data: The data that you want to send.
+    :type data: A byte string (str).
+    :param priority: The priority
+
+    """
+    return current_loop.send(data, priority=priority)
 
 def wait(*args, **kw):
     return current_loop.wait(*args, **kw)
@@ -507,7 +555,9 @@ class Loop(object):
         else:
             self.coroutine.switch()
 
-    def input_op(self, sentinel_or_receive=buffer.BufAny):
+    def input_op(self, sentinel_or_receive=None):
+        if sentinel_or_receive is None:
+            sentinel_or_receive = buffer.BufAny
         v = self._input_op(sentinel_or_receive)
         if v:
             return v
