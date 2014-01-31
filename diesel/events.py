@@ -66,4 +66,6 @@ class WaitPool(object):
     def clear(self, who):
         for what in self.loop_refs[who]:
             self.waits[what.wait_id].remove(who)
+            if not self.waits[what.wait_id]:
+                del self.waits[what.wait_id]
         del self.loop_refs[who]
