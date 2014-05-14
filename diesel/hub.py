@@ -17,6 +17,7 @@ else:
 import errno
 import fcntl
 import os
+import signal
 import thread
 
 from collections import deque, defaultdict
@@ -25,6 +26,9 @@ from time import time
 from Queue import Queue, Empty
 
 TRIGGER_COMPARE = attrgetter('trigger_time')
+
+class ExistingSignalHandler(Exception):
+    pass
 
 class Timer(object):
     '''A timer is a promise to call some function at a future date.
@@ -167,6 +171,10 @@ class AbstractEventHub(object):
         self.events[fn] = (read_callback, write_callback, error_callback)
         self._add_fd(fd)
 
+    def add_signal_handler(self, sig, callback):
+        '''Run the given callback when signal sig is triggered.'''
+        raise NotImplementedError
+
     def _add_fd(self, fd):
         '''Add this socket to the list of sockets used in the
         poll call.
@@ -208,6 +216,7 @@ class EPollEventHub(AbstractEventHub):
     '''
     def __init__(self):
         self.epoll = select.epoll()
+        self.signal_handlers = defaultdict(deque)
         super(EPollEventHub, self).__init__()
 
     @property
@@ -272,12 +281,27 @@ class EPollEventHub(AbstractEventHub):
                     return
         except IOError, e:
             if e.errno == errno.EINTR:
-                pass
+                while self.run_now and self.run:
+                    self.run_now.popleft()()
             else:
                 raise
 
         self.run_now = self.reschedule
         self.reschedule = deque()
+
+    def add_signal_handler(self, sig, callback):
+        existing = signal.getsignal(sig)
+        if not existing:
+            signal.signal(sig, self._report_signal)
+        elif existing != self._report_signal:
+            raise ExistingSignalHandler(existing)
+        self.signal_handlers[sig].append(callback)
+
+    def _report_signal(self, sig, frame):
+        for callback in self.signal_handlers[sig]:
+            self.run_now.append(callback)
+        self.signal_handlers[sig] = deque()
+        signal.signal(sig, signal.SIG_DFL)
 
     def _add_fd(self, fd):
         '''Add this socket to the list of sockets used in the
@@ -305,9 +329,17 @@ class EPollEventHub(AbstractEventHub):
 class LibEvHub(AbstractEventHub):
     def __init__(self):
         self._ev_loop = pyev.default_loop()
-        self._ev_timers = {}
+        self._ev_watchers = {}
         self._ev_fdmap = {}
         AbstractEventHub.__init__(self)
+
+    def add_signal_handler(self, sig, callback):
+        existing = signal.getsignal(sig)
+        if existing:
+            raise ExistingSignalHandler(existing)
+        watcher = self._ev_loop.signal(sig, self._signal_fired)
+        self._ev_watchers[watcher] = callback
+        watcher.start()
 
     @property
     def describe(self):
@@ -340,14 +372,17 @@ class LibEvHub(AbstractEventHub):
             del self._ev_loop
             return
 
-        self.run_now.extend(self.reschedule)
-        self.reschedule = deque()
-
-        if self.run_now:
+        if self.run_now or self.reschedule:
             self._ev_loop.start(pyev.EVRUN_NOWAIT)
         else:
             while not self.run_now:
                 self._ev_loop.start(pyev.EVRUN_ONCE)
+
+        while self.run_now and self.run:
+            self.run_now.popleft()()
+
+        self.run_now.extend(self.reschedule)
+        self.reschedule = deque()
 
     def call_later(self, interval, f, *args, **kw):
         '''Schedule a timer on the hub.
@@ -356,20 +391,20 @@ class LibEvHub(AbstractEventHub):
         t.inq = True
         evt = self._ev_loop.timer(interval, 0, self._ev_timer_fired)
         t.hub_data = evt
-        self._ev_timers[evt] = t
+        self._ev_watchers[evt] = t
         evt.start()
         return t
 
     def _ev_timer_fired(self, watcher, revents):
-        t = self._ev_timers.pop(watcher)
+        t = self._ev_watchers.pop(watcher)
         if t.hub_data:
             t.hub_data = None
             self.run_now.append(t.callback)
 
     def remove_timer(self, t):
         evt = t.hub_data
-        if evt in self._ev_timers:
-            del self._ev_timers[evt]
+        if evt in self._ev_watchers:
+            del self._ev_watchers[evt]
             evt.stop()
 
     def schedule(self, c, reschedule=False):
@@ -377,6 +412,11 @@ class LibEvHub(AbstractEventHub):
             self.reschedule.append(c)
         else:
             self.run_now.append(c)
+
+    def _signal_fired(self, watcher, revents):
+        callback = self._ev_watchers.pop(watcher)
+        watcher.stop()
+        self.run_now.append(callback)
 
     def _ev_io_fired(self, watcher, revents):
         r, w, e = self.events[watcher.fd]
