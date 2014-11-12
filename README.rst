@@ -16,6 +16,12 @@ MongoDB. It makes writing network applications fun.
 Read the documentation, browse the API and join the community in #diesel on
 freenode.
 
+Prerequisites
+=============
+
+You'll need the `python-dev` package as well as libffi-dev, or your
+platform's equivalents.
+
 Installation
 ============
 
