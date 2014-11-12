@@ -39,7 +39,7 @@ integration with the Flask web framework.
 Other bundled protocols include MongoDB, Riak, and Redis client libraries.
 ''',
     url="http://diesel.io",
-    download_url="http://jamwt.com/diesel/diesel-%s.tar.gz" % VERSION,
+    download_url="https://github.com/dieseldev/diesel/archive/%s.tar.gz" % VERSION,
     packages=[
         "diesel",
         "diesel.protocols",
