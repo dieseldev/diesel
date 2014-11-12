@@ -14,7 +14,7 @@ if (os.environ.get('DIESEL_LIBEV') or
     not hasattr(select, 'epoll')):
     additional_requires.append('pyev')
 
-VERSION = "3.0.22"
+VERSION = "3.0.23"
 
 setup(name="diesel",
     version=VERSION,
