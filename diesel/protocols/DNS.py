@@ -3,7 +3,7 @@ from __future__ import absolute_import
 import time
 from collections import deque
 
-from diesel import UDPClient, call, send, first, datagram
+from diesel import UDPClient, call, send, first
 
 from dns.message import make_query, from_wire
 from dns.rdatatype import A
