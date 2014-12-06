@@ -46,6 +46,7 @@ Other bundled protocols include MongoDB, Riak, and Redis client libraries.
         "diesel.util",
         "diesel.util.patches",
         "diesel.protocols.http",
+        "diesel.transports",
     ],
     scripts=["examples/dhttpd"],
     entry_points={
