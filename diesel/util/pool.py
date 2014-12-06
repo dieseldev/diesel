@@ -1,7 +1,9 @@
 '''Simple connection pool for asynchronous code.
 '''
 from collections import deque
-from diesel import *
+from diesel.app import quickstop
+from diesel.core import label, fork, sleep
+from diesel.logmod import log
 from diesel.util.queue import Queue, QueueTimeout
 from diesel.util.event import Event
 

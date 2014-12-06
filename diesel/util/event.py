@@ -1,4 +1,4 @@
-from diesel import fire, first, signal
+from diesel.core import fire, first, signal
 from diesel.events import Waiter, StopWaitDispatch
 
 class EventTimeout(Exception): pass

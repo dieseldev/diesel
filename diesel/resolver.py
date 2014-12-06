@@ -7,8 +7,8 @@ import random
 import time
 import socket
 from diesel.protocols.DNS import DNSClient, NotFound, Timeout
-from diesel.util.pool import ConnectionPool
 from diesel.util.lock import synchronized
+from diesel.util.pool import ConnectionPool
 
 DNS_CACHE_TIME = 60 * 5 # five minutes
 

@@ -1,9 +1,14 @@
+import warnings
+
+from functools import partial
+
 import pynitro
 
-import diesel
-from functools import partial
-from diesel import log, loglevels
+from diesel import runtime
+from diesel.core import sleep, fire, first, fork_child
 from diesel.events import Waiter, StopWaitDispatch
+from diesel.hub import IntWrap
+from diesel.logmod import log, loglevels
 from diesel.util.queue import Queue
 from diesel.util.event import Event
 
@@ -14,8 +19,6 @@ class DieselNitroSocket(Waiter):
         kwargs['want_eventfd'] = 1
         self.socket = pynitro.NitroSocket(**kwargs)
         self._early_value = None
-        from diesel.runtime import current_app
-        from diesel.hub import IntWrap
 
         if bind:
             assert not connect
@@ -24,7 +27,7 @@ class DieselNitroSocket(Waiter):
             assert not bind
             self.socket.connect(connect)
 
-        self.hub = current_app.hub
+        self.hub = runtime.current_app.hub
         self.fd = IntWrap(self.socket.fileno())
 
         self.read_gate = Event()
@@ -37,7 +40,7 @@ class DieselNitroSocket(Waiter):
             try:
                 op()
             except pynitro.NitroFull:
-                diesel.sleep(0.2)
+                sleep(0.2)
             else:
                 self.sent += 1
                 return
@@ -89,7 +92,7 @@ class DieselNitroSocket(Waiter):
         '''Handle state change.
         '''
         self.read_gate.set()
-        diesel.fire(self)
+        fire(self)
 
     def error(self):
         raise RuntimeError("OH NOES, some weird nitro FD callback")
@@ -167,7 +170,7 @@ class DieselNitroService(object):
         queues = [remote_client.incoming]
         try:
             while True:
-                (evt, value) = diesel.first(waits=queues, sleep=self.timeout)
+                (evt, value) = first(waits=queues, sleep=self.timeout)
                 if evt is remote_client.incoming:
                     assert isinstance(value, Message)
                     remote_client.async_frame = value.orig_frame
@@ -200,7 +203,7 @@ class DieselNitroService(object):
         socket = self.nitro_socket
         make_frame = pynitro.NitroFrame
         while self.should_run:
-            (queue, msg) = diesel.first(waits=queues)
+            (queue, msg) = first(waits=queues)
 
             if queue is self.outgoing:
                 socket.reply(msg.orig_frame, make_frame(msg.data))
@@ -217,7 +220,7 @@ class DieselNitroService(object):
         remote = RemoteClient.from_message(msg)
         self.clients[msg.identity] = remote
         self.register_client(remote, msg)
-        diesel.fork_child(self._handle_client_requests_and_responses, remote)
+        fork_child(self._handle_client_requests_and_responses, remote)
 
     # Public API
     # ==========

@@ -7,9 +7,12 @@ from __future__ import with_statement
 import itertools
 import struct
 from collections import deque
-from diesel import Client, call, sleep, send, receive, first, Loop, Application, ConnectionClosed
 from bson import BSON, _make_c_string, decode_all
 from bson.son import SON
+
+from diesel.core import send, receive
+from diesel.transports.common import protocol, ConnectionClosed
+from diesel.transports.tcp import TCPClient
 
 _ZERO = "\x00\x00\x00\x00"
 HEADER_SIZE = 16
@@ -48,11 +51,11 @@ class Collection(TraversesCollections):
     def delete(self, spec, safe=True):
         return self.client.delete(self.name, spec, safe)
 
-class MongoClient(Client):
+class MongoClient(TCPClient):
     collection_class = None
 
     def __init__(self, host='localhost', port=27017, **kw):
-        Client.__init__(self, host, port, **kw)
+        super(MongoClient, self).__init__(host, port, **kw)
         self._msg_id_counter = itertools.count(1)
 
     @property
@@ -81,7 +84,7 @@ class MongoClient(Client):
             cursor.finished = True
         return result
 
-    @call
+    @protocol
     def query(self, cursor):
         op = Ops.OP_QUERY
         c = cursor
@@ -89,7 +92,7 @@ class MongoClient(Client):
         resp = self._put_request_get_response(op, msg)
         return self._handle_response(cursor, resp)
 
-    @call
+    @protocol
     def get_more(self, cursor):
         limit = 0
         if cursor.limit:
@@ -114,37 +117,37 @@ class MongoClient(Client):
             raise MongoOperationalError(doc['err'])
         return doc
 
-    @call
+    @protocol
     def update(self, col, spec, doc, upsert=False, multi=False, safe=True):
         data = Ops.update(col, spec, doc, upsert, multi)
         self._put_request(Ops.OP_UPDATE, data)
         if safe:
             return self._put_gle_command()
 
-    @call
+    @protocol
     def insert(self, col, doc_or_docs, safe=True):
         data = Ops.insert(col, doc_or_docs)
         self._put_request(Ops.OP_INSERT, data)
         if safe:
             return self._put_gle_command()
 
-    @call
+    @protocol
     def delete(self, col, spec, safe=True):
         data = Ops.delete(col, spec)
         self._put_request(Ops.OP_DELETE, data)
         if safe:
             return self._put_gle_command()
 
-    @call
+    @protocol
     def drop_database(self, name):
         return self._command(name, {'dropDatabase':1})
 
-    @call
+    @protocol
     def list_databases(self):
         result = self._command('admin', {'listDatabases':1})
         return [(d['name'], d['sizeOnDisk']) for d in result['databases']]
 
-    @call
+    @protocol
     def _command(self, dbname, command):
         msg = Ops.query('%s.$cmd' % dbname, command, None, 0, 1)
         resp = self._put_request_get_response(Ops.OP_QUERY, msg)
@@ -171,8 +174,8 @@ class Ops(object):
     @staticmethod
     def query(col, spec, fields, skip, limit):
         data = [
-            _ZERO, 
-            _make_c_string(col), 
+            _ZERO,
+            _make_c_string(col),
             struct.pack('<ii', skip, limit),
             BSON.encode(spec or {}),
         ]
@@ -233,7 +236,7 @@ class MongoIter(object):
             else:
                 self.cache.extend(more)
                 return self.next()
-        
+
 class MongoCursor(object):
     def __init__(self, col, client, spec, fields, skip, limit):
         self.col = col
@@ -302,7 +305,7 @@ class MongoCursor(object):
                     ordering = spec.setdefault('$orderby', SON())
                     ordering.update(v)
             self.spec = spec
-        
+
     def __enter__(self):
         return self
 
@@ -310,10 +313,10 @@ class MongoCursor(object):
         if self.id and not self.finished:
             raise RuntimeError("need to cleanup cursor!")
 
-class RawMongoClient(Client):
+class RawMongoClient(TCPClient):
     "A mongodb client that does the bare minimum to push bits over the wire."
 
-    @call
+    @protocol
     def send(self, data, respond=False):
         """Send raw mongodb data and optionally yield the server's response."""
         send(data)

@@ -4,22 +4,19 @@
 import os
 import gc
 import cProfile
-from OpenSSL import SSL
-import socket
 import traceback
-import errno
+
 from greenlet import greenlet
 
-from diesel.hub import EventHub
-from diesel import log, Connection, UDPSocket, Loop
-from diesel.security import ssl_async_handshake
 from diesel import runtime
+from diesel.core import Loop
 from diesel.events import WaitPool
+from diesel.hub import EventHub
+from diesel.logmod import log
+from diesel.transports.common import Service
 
 
 YES_PROFILE = ['1', 'on', 'true', 'yes']
-
-class ApplicationEnd(Exception): pass
 
 class Application(object):
     '''The Application represents diesel's main loop--
@@ -76,9 +73,6 @@ class Application(object):
                     raise
                 except KeyboardInterrupt:
                     log.warning("-- KeyboardInterrupt raised.. exiting main loop --")
-                    break
-                except ApplicationEnd:
-                    log.warning("-- ApplicationEnd raised.. exiting main loop --")
                     break
                 except Exception, e:
                     log.error("-- Unhandled Exception rose to main loop --")
@@ -147,7 +141,7 @@ class Application(object):
         '''
         for s in self._services:
             s.sock.close()
-        raise ApplicationEnd()
+        raise SystemExit(0)
 
     def setup(self):
         '''Do some initialization right before the main loop is entered.
@@ -156,116 +150,12 @@ class Application(object):
         '''
         pass
 
-class Service(object):
-    '''A TCP service listening on a certain port, with a protocol
-    implemented by a passed connection handler.
-    '''
-    LQUEUE_SIZ = 500
-    def __init__(self, connection_handler, port, iface='', ssl_ctx=None, track=False):
-        '''Given a protocol-implementing callable `connection_handler`,
-        handle connections on port `port`.
-
-        Interface defaults to all interfaces, but overridable with `iface`.
-        '''
-        self.port = port
-        self.iface = iface
-        self.sock = None
-        self.connection_handler = connection_handler
-        self.application = None
-        self.ssl_ctx = ssl_ctx
-        self.track = track
-        # Call this last so the connection_handler has a fully-instantiated
-        # Service instance at its disposal.
-        if hasattr(connection_handler, 'on_service_init'):
-            if callable(connection_handler.on_service_init):
-                connection_handler.on_service_init(self)
-
-    def handle_cannot_bind(self, reason):
-        log.critical("service at {0}:{1} cannot bind: {2}",
-            self.iface or '*', self.port, reason)
-        raise
-
-    def register(self, app):
-        app.hub.register(
-            self.sock,
-            self.accept_new_connection,
-            None,
-            app.global_bail("low-level socket error on bound service"),
-        )
-
-    def bind_and_listen(self):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sock.setblocking(0)
-
-        try:
-            sock.bind((self.iface, self.port))
-        except socket.error, e:
-            self.handle_cannot_bind(str(e))
-
-        sock.listen(self.LQUEUE_SIZ)
-        self.sock = sock
-        self.port = sock.getsockname()[1] # in case of 0 binds
-
-    @property
-    def listening(self):
-        return self.sock is not None
-
-    def accept_new_connection(self):
-        try:
-            sock, addr = self.sock.accept()
-        except socket.error, e:
-            code, s = e
-            if code in (errno.EAGAIN, errno.EINTR):
-                return
-            raise
-        sock.setblocking(0)
-        def make_connection():
-            c = Connection(sock, addr)
-            l = Loop(self.connection_handler, addr)
-            l.connection_stack.append(c)
-            runtime.current_app.add_loop(l, track=self.track)
-        if self.ssl_ctx:
-            sock = SSL.Connection(self.ssl_ctx, sock)
-            sock.set_accept_state()
-            sock.setblocking(0)
-            ssl_async_handshake(sock, self.application.hub, make_connection)
-        else:
-            make_connection()
 
 class Thunk(object):
     def __init__(self, c):
         self.c = c
     def eval(self):
         return self.c()
-
-class UDPService(Service):
-    '''A UDP service listening on a certain port, with a protocol
-    implemented by a passed connection handler.
-    '''
-    def __init__(self, connection_handler, port, iface=''):
-        Service.__init__(self, connection_handler, port, iface)
-        self.remote_addr = (None, None)
-
-    def bind_and_listen(self):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        # unsure if the following two lines are necessary for UDP
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sock.setblocking(0)
-
-        try:
-            sock.bind((self.iface, self.port))
-        except socket.error, e:
-            self.handle_cannot_bind(str(e))
-
-        self.sock = sock
-        c = UDPSocket(self, sock)
-        l = Loop(self.connection_handler)
-        l.connection_stack.append(c)
-        runtime.current_app.add_loop(l)
-
-    def register(self, app):
-        pass
 
 
 def quickstart(*args, **kw):
@@ -288,5 +178,4 @@ def quickstart(*args, **kw):
     app.run()
 
 def quickstop():
-    from runtime import current_app
-    current_app.halt()
+    runtime.current_app.halt()

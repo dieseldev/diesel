@@ -8,7 +8,6 @@ import multiprocessing as mp
 import traceback
 
 from diesel import runtime
-from diesel import core
 from diesel.util.queue import Queue
 
 
@@ -58,7 +57,7 @@ class Process(object):
         >>> time_sleep = Process(time.sleep)
         >>> time_sleep(4.2)
         >>> do_other_stuff()
-        
+
         """
         self.func = func
         self.proc = None
@@ -140,7 +139,7 @@ class Process(object):
         runtime.current_app.hub.enable_write(self.pipe)
         self.args = args
         self.params = params
-        self.caller = core.current_loop
+        self.caller = runtime.current_loop
         self.in_call = True
         return self.caller.dispatch()
 
@@ -230,5 +229,5 @@ if __name__ == '__main__':
         diesel.sleep(1)
         print '^^ That was an intentional exception.'
         diesel.quickstop()
-        
+
     diesel.quickstart(sleep_pool.pool, main)

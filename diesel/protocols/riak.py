@@ -13,7 +13,9 @@ and hooks for conflict resolution and custom loading/dumping of values.
 """
 import struct
 
-import diesel
+from diesel.core import fork, send, receive
+from diesel.transports.common import protocol
+from diesel.transports.tcp import TCPClient
 from diesel.util.queue import Queue, QueueEmpty
 from diesel.util.event import Event
 
@@ -31,33 +33,33 @@ from contextlib import contextmanager
 # responses that don't have a body.
 
 MESSAGE_CODES = [
-(0, riak_palm.RpbErrorResp),
-#(1, riak_palm.RpbPingReq),
-#(2, riak_palm.RpbPingResp),
-#(3, riak_palm.RpbGetClientIdReq),
-(4, riak_palm.RpbGetClientIdResp),
-(5, riak_palm.RpbSetClientIdReq),
-#(6, riak_palm.RpbSetClientIdResp),
-#(7, riak_palm.RpbGetServerInfoReq),
-(8, riak_palm.RpbGetServerInfoResp),
-(9, riak_palm.RpbGetReq ),
-(10, riak_palm.RpbGetResp),
-(11, riak_palm.RpbPutReq ),
-(12, riak_palm.RpbPutResp),
-(13, riak_palm.RpbDelReq ),
-#(14, riak_palm.RpbDelResp),
-#(15, riak_palm.RpbListBucketsReq),
-(16, riak_palm.RpbListBucketsResp),
-(17, riak_palm.RpbListKeysReq),
-(18, riak_palm.RpbListKeysResp),
-(19, riak_palm.RpbGetBucketReq),
-(20, riak_palm.RpbGetBucketResp),
-(21, riak_palm.RpbSetBucketReq),
-#(22, riak_palm.RpbSetBucketResp),
-(23, riak_palm.RpbMapRedReq),
-(24, riak_palm.RpbMapRedResp),
-(25, riak_palm.RpbIndexReq),
-(26, riak_palm.RpbIndexResp),
+    (0, riak_palm.RpbErrorResp),
+    #(1, riak_palm.RpbPingReq),
+    #(2, riak_palm.RpbPingResp),
+    #(3, riak_palm.RpbGetClientIdReq),
+    (4, riak_palm.RpbGetClientIdResp),
+    (5, riak_palm.RpbSetClientIdReq),
+    #(6, riak_palm.RpbSetClientIdResp),
+    #(7, riak_palm.RpbGetServerInfoReq),
+    (8, riak_palm.RpbGetServerInfoResp),
+    (9, riak_palm.RpbGetReq ),
+    (10, riak_palm.RpbGetResp),
+    (11, riak_palm.RpbPutReq ),
+    (12, riak_palm.RpbPutResp),
+    (13, riak_palm.RpbDelReq ),
+    #(14, riak_palm.RpbDelResp),
+    #(15, riak_palm.RpbListBucketsReq),
+    (16, riak_palm.RpbListBucketsResp),
+    (17, riak_palm.RpbListKeysReq),
+    (18, riak_palm.RpbListKeysResp),
+    (19, riak_palm.RpbGetBucketReq),
+    (20, riak_palm.RpbGetBucketResp),
+    (21, riak_palm.RpbSetBucketReq),
+    #(22, riak_palm.RpbSetBucketResp),
+    (23, riak_palm.RpbMapRedReq),
+    (24, riak_palm.RpbMapRedResp),
+    (25, riak_palm.RpbIndexReq),
+    (26, riak_palm.RpbIndexResp),
 ]
 
 resolutions_in_progress = {}
@@ -175,7 +177,7 @@ class Bucket(object):
             inq.put(k)
 
         for x in xrange(min(len(keys), concurrency_limit)):
-            diesel.fork(self._subrequest, inq, outq)
+            fork(self._subrequest, inq, outq)
 
         failure = False
         okay, err = [], []
@@ -299,7 +301,7 @@ class RiakErrorResp(Exception):
     def __repr__(self):
         return "RiakErrorResp: %s" % (self.errmsg)
 
-class RiakClient(diesel.Client):
+class RiakClient(TCPClient):
     """A client for the Riak distributed key/value database.
 
     Instances can be used stand-alone or passed to a Bucket constructor
@@ -308,9 +310,9 @@ class RiakClient(diesel.Client):
     """
     def __init__(self, host='127.0.0.1', port=8087, **kw):
         """Creates a new Riak Client connection object."""
-        diesel.Client.__init__(self, host, port, **kw)
+        super(RiakClient, self).__init__(host, port, **kw)
 
-    @diesel.call
+    @protocol
     def get(self, bucket, key):
         """Get the value of key from named bucket.
 
@@ -324,7 +326,7 @@ class RiakClient(diesel.Client):
         if response:
             return _to_dict(response)
 
-    @diesel.call
+    @protocol
     def put(self, bucket, key, value, indexes=None, **params):
         """Puts the value to the key in the named bucket.
 
@@ -364,7 +366,7 @@ class RiakClient(diesel.Client):
         if response:
             return _to_dict(response)
 
-    @diesel.call
+    @protocol
     def index(self, bucket, idx, key, end=None):
         request = riak_palm.RpbIndexReq(
             bucket=bucket,
@@ -388,14 +390,14 @@ class RiakClient(diesel.Client):
                 return result['keys']
         return None
 
-    @diesel.call
+    @protocol
     def delete(self, bucket, key, vclock=None):
         """Deletes the given key from the named bucket, including all values."""
         request = riak_palm.RpbDelReq(bucket=bucket, key=key)
         self._send(request)
         return self._receive()
 
-    @diesel.call
+    @protocol
     def keys(self, bucket):
         """Gets the keys for the given bucket, is an iterator"""
         request = riak_palm.RpbListKeysReq(bucket=bucket)
@@ -407,16 +409,16 @@ class RiakClient(diesel.Client):
             for key in response.keys:
                 yield key
 
-    @diesel.call
+    @protocol
     def info(self):
         # No protocol buffer object to build or send.
         message_code = 7
         total_size = 1
         fmt = "!iB"
-        diesel.send(struct.pack(fmt, total_size, message_code))
+        send(struct.pack(fmt, total_size, message_code))
         return self._receive()
 
-    @diesel.call
+    @protocol
     def set_bucket_props(self, bucket, props):
         """Sets some properties on the named bucket.
 
@@ -432,7 +434,7 @@ class RiakClient(diesel.Client):
         self._send(request)
         return self._receive()
 
-    @diesel.call
+    @protocol
     def set_client_id(self, client_id):
         """Sets the remote client id for this connection.
 
@@ -445,7 +447,7 @@ class RiakClient(diesel.Client):
         self._send(request)
         return self._receive()
 
-    @diesel.call
+    @protocol
     def _send(self, pb):
         # Send a protocol buffer on the wire as a request.
         message_code = PB_TO_MESSAGE_CODE[pb.__class__]
@@ -453,13 +455,13 @@ class RiakClient(diesel.Client):
         message_size = len(message)
         total_size = message_size + 1 # plus 1 mc byte
         fmt = "!iB%ds" % message_size
-        diesel.send(struct.pack(fmt, total_size, message_code, message))
+        send(struct.pack(fmt, total_size, message_code, message))
 
-    @diesel.call
+    @protocol
     def _receive(self):
         # Receive a protocol buffer from the wire as a response.
-        response_size, = struct.unpack('!i', diesel.receive(4))
-        raw_response = diesel.receive(response_size)
+        response_size, = struct.unpack('!i', receive(4))
+        raw_response = receive(response_size)
         message_code, = struct.unpack('B',raw_response[0])
         response = raw_response[1:]
         if response:
@@ -501,6 +503,8 @@ class Point(object):
 if __name__ == '__main__':
     import cPickle
 
+    from diesel import quickstart, quickstop, sleep
+
     def test_client():
         c = RiakClient()
         c.set_client_id('testing-client')
@@ -513,7 +517,7 @@ if __name__ == '__main__':
         c.delete('testing', 'diff')
         c.delete('testing.pickles', 'here')
         c.delete('testing.pickles', 'there')
-        diesel.sleep(3) # race condition for deleting PickleBucket keys?
+        sleep(3) # race condition for deleting PickleBucket keys?
 
         assert not c.get('testing', 'foo')
         assert c.put('testing', 'foo', '1', return_body=True)
@@ -613,7 +617,7 @@ if __name__ == '__main__':
             assert 0, "UNEXPECTED EXCEPTION: %r" % e
         else:
             assert 0, "DID NOT RAISE"
-        diesel.quickstop()
-    diesel.quickstart(test_client)
+        quickstop()
+    quickstart(test_client)
 
 del Point

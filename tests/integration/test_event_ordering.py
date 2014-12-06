@@ -1,6 +1,6 @@
 import diesel
 
-from diesel import core
+from diesel import runtime
 from diesel.util.queue import Queue
 
 
@@ -28,7 +28,7 @@ def test_pending_events_dont_break_ordering_when_handling_early_values():
     # Force our fake connection into the connection stack for the current
     # loop so we can make network calls (like until_eol).
 
-    loop = core.current_loop
+    loop = runtime.current_loop
     loop.connection_stack.append(conn1)
 
     try:
@@ -63,6 +63,9 @@ class FakeConnection(object):
     def __init__(self, conn_id, delay=None):
         self.conn_id = conn_id
         self.delay = delay
+
+    def check(self):
+        pass
 
     def check_incoming(self, condition, callback):
         diesel.fork(self.delayed_value)

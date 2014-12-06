@@ -7,14 +7,14 @@ diesel event loop. This is a great way to test interactions between various
 diesel green threads and network-based applications built with diesel.
 
 """
-import diesel
 import nose
 
+from diesel.app import quickstart
 from diesel.logmod import levels, set_log_level
 
 def main():
     set_log_level(levels.CRITICAL)
-    diesel.quickstart(nose.main)
+    quickstart(nose.main)
 
 if __name__ == '__main__':
     main()

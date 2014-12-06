@@ -5,8 +5,8 @@ import traceback
 
 from operator import itemgetter
 
-import diesel
-
+from diesel import runtime
+from diesel.core import Loop
 
 address_stripper = re.compile(r' at 0x[0-9a-f]+')
 
@@ -21,9 +21,9 @@ def print_greenlet_stacks():
     stacks = collections.defaultdict(int)
     loops = {}
     for obj in gc.get_objects():
-        if not isinstance(obj, diesel.Loop) or not obj.running:
+        if not isinstance(obj, Loop) or not obj.running:
             continue
-        if obj.id == diesel.core.current_loop.id:
+        if obj.id == runtime.current_loop.id:
             continue
         fr = obj.coroutine.gr_frame
         stack = ''.join(traceback.format_stack(fr))
