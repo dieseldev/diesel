@@ -19,16 +19,16 @@ def setup_module():
     runtime.current_app.add_service(service)
 
 def test_echo_client_can_talk_to_echo_service():
-    client = EchoClient('127.0.0.1', service.port)
+    client = EchoClient(LOCAL_HOST, service.port)
     assert client.echo('hello') == 'hello'
 
 def test_client_can_make_multiple_requests():
-    client = EchoClient('127.0.0.1', service.port)
+    client = EchoClient(LOCAL_HOST, service.port)
     assert client.echo('hello') == 'hello'
     assert client.echo('world') == 'world'
 
 def test_client_knows_if_it_is_closed_or_not():
-    client = EchoClient('127.0.0.1', service.port)
+    client = EchoClient(LOCAL_HOST, service.port)
     assert not client.is_closed
     client.close()
     assert client.is_closed
@@ -36,7 +36,7 @@ def test_client_knows_if_it_is_closed_or_not():
 def test_client_on_connect_callback_called_when_connected():
     # XXX why do we even have a callback though? we're kind of
     # anti-callback in general
-    client = EchoClient('127.0.0.1', service.port)
+    client = EchoClient(LOCAL_HOST, service.port)
     assert client.on_connect_called
     client.close()
 
