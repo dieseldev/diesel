@@ -1,7 +1,7 @@
 # vim:ts=4:sw=4:expandtab
 from logmod import log, levels as loglevels, set_log_level
 import events
-from core import sleep, Loop, wait, fire, thread, until, signal
+from core import sleep, Loop, wait, fire, thread, until, signal, datagram
 from core import until_eol, send, receive, first, fork, fork_child, label, fork_from_thread
 from core import ParentDiedException, TerminateLoop
 from app import Application, quickstart, quickstop, Thunk

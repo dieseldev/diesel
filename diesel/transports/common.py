@@ -33,8 +33,8 @@ class ClientConnectionClosed(Exception):
 class Client(object):
     def __init__(self, addr, port, ssl_ctx=None, timeout=None, source_ip=None):
         self.ssl_ctx = ssl_ctx
-        self.connected = False
-        self.conn = None
+        self.ready = False
+        self.socket_context = None
         self.addr = addr
         self.port = port
 
@@ -52,7 +52,16 @@ class Client(object):
         self.close()
 
     def close(self):
-        raise NotImplementedError()
+        '''Close the socket to the remote host.
+        '''
+        if not self.is_closed:
+            self.socket_context.close()
+            self.socket_context = None
+            self.ready = False
+
+    @property
+    def is_closed(self):
+        return not self.socket_context or self.socket_context.closed
 
     def _resolve(self, name):
         raise NotImplementedError()
@@ -171,13 +180,13 @@ class protocol(object):
     def __call__(self, *args, **kw):
         current_loop = runtime.current_loop
         try:
-            if not self.client.connected:
+            if not self.client.ready:
                 raise ConnectionClosed(
-                        "ClientNotConnected: client is not connected")
+                        "ClientNotReady: client is not ready")
             if self.client.is_closed:
                 raise ConnectionClosed(
                         "Client call failed: client connection was closed")
-            current_loop.connection_stack.append(self.client.conn)
+            current_loop.connection_stack.append(self.client.socket_context)
             try:
                 r = self.f(self.client, *args, **kw)
             finally:

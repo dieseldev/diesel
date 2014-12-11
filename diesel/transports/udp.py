@@ -8,7 +8,7 @@ from OpenSSL import SSL
 from collections import deque
 
 from diesel import runtime
-from diesel.core import Loop
+from diesel.core import Loop, datagram
 from diesel.transports.common import (
         Client, Service, SocketContext, ConnectionClosed,
 )
@@ -29,8 +29,8 @@ class UDPClient(Client):
         if source_ip:
             sock.bind((source_ip, 0))
 
-        self.conn = UDPContext(self, sock, ip, self.port)
-        self.connected = True
+        self.socket_context = UDPContext(self, sock, ip, self.port)
+        self.ready = True
 
     def _resolve(self, addr):
         return addr
@@ -50,6 +50,7 @@ class UDPService(Service):
             sock.bind((self.iface, self.port))
         except socket.error, e:
             self.handle_cannot_bind(str(e))
+        self.iface, self.port = sock.getsockname()
 
         self.sock = sock
         c = UDPContext(self, sock)
@@ -65,6 +66,9 @@ class _Datagram(str):
         inst = str.__new__(self, payload)
         inst.addr = addr
         return inst
+
+    def __repr__(self):
+        return "Datagram(%r, %r)" % (str.__str__(self), self.addr)
 
 class UDPContext(SocketContext):
     def __init__(self, parent, sock, ip=None, port=None):

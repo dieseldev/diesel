@@ -42,18 +42,6 @@ class TCPClient(Client):
     def _resolve(self, name):
         return resolve_dns_name(name)
 
-    def close(self):
-        '''Close the socket to the remote host.
-        '''
-        if not self.is_closed:
-            self.conn.close()
-            self.conn = None
-            self.connected = True
-
-    @property
-    def is_closed(self):
-        return not self.conn or self.conn.closed
-
 class TCPService(Service):
     '''A TCP service listening on a certain port, with a protocol
     implemented by a passed connection handler.
@@ -240,8 +228,8 @@ def _private_connect(client, ip, sock, host, port, timeout=None):
                 lambda: loop.wake(e)
                 )
             else:
-                client.conn = TCPConnection(fsock, ip)
-                client.connected = True
+                client.socket_context = TCPConnection(fsock, ip)
+                client.ready = True
                 hub.schedule(
                 lambda: loop.wake()
                 )
