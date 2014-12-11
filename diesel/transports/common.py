@@ -80,6 +80,7 @@ class Service(object):
 
         Interface defaults to all interfaces, but overridable with `iface`.
         '''
+        self.validate_handler(connection_handler)
         self.port = port
         self.iface = iface
         self.sock = None
@@ -107,6 +108,9 @@ class Service(object):
     @property
     def listening(self):
         return self.sock is not None
+
+    def validate_handler(self, handler):
+        pass
 
 class SocketContext(object):
     def __init__(self, sock, addr):

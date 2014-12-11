@@ -3,7 +3,7 @@ import diesel
 from diesel import datagram
 from diesel import runtime
 from diesel.transports.common import protocol
-from diesel.transports.udp import UDPClient, UDPService
+from diesel.transports.udp import UDPClient, UDPService, BadUDPHandler
 
 
 RANDOM_PORT = 0
@@ -38,6 +38,32 @@ def test_service_interleaves_client_requests():
     assert client2.echo('world') == 'world'
     assert client1.echo('HELLO') == 'HELLO'
     assert client2.echo('WORLD') == 'WORLD'
+
+def test_raises_exception_for_bad_service_handler():
+    try:
+        UDPService(lambda x: None, RANDOM_PORT, LOCAL_HOST)
+    except BadUDPHandler:
+        pass # expected
+    else:
+        assert 0, "expected BadUDPHandler"
+
+def test_allows_instance_method_as_handler():
+    class Foo(object):
+        def handle(self):
+            pass
+    try:
+        UDPService(Foo().handle, RANDOM_PORT, LOCAL_HOST)
+    except BadUDPHandler:
+        assert 0, "instance method with one argument should be ok"
+
+def test_allows_function_with_optional_arg_as_handler():
+    def handle(foo=None):
+        pass
+    try:
+        UDPService(handle, RANDOM_PORT, LOCAL_HOST)
+    except BadUDPHandler:
+        assert 0, "function with optional argument should be ok"
+
 
 # Test helpers
 def echo_handler():

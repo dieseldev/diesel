@@ -1,7 +1,9 @@
 import errno
+import inspect
 import socket
 import sys
 import traceback
+import types
 
 from OpenSSL import SSL
 
@@ -39,6 +41,13 @@ class UDPService(Service):
     '''A UDP service listening on a certain port, with a protocol
     implemented by a passed connection handler.
     '''
+
+    def validate_handler(self, handler):
+        argspec = inspect.getargspec(handler)
+        required_args = len(argspec.args) - len(argspec.defaults or [])
+        method = type(handler) is types.MethodType
+        if (method and required_args > 1) or (not method and required_args):
+            raise BadUDPHandler(handler)
 
     def bind_and_listen(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -172,3 +181,6 @@ class UDPContext(SocketContext):
             self.waiting_callback(
                 ConnectionClosed('Connection closed by remote host')
             )
+
+class BadUDPHandler(Exception):
+    """Thrown when an invalid UDP handler is passed to a UDPService"""
