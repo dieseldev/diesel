@@ -2,19 +2,19 @@ from diesel import runtime
 from diesel.logmod import log
 
 class ClientConnectionError(Exception):
-    '''Raised if a client cannot connect.
-    '''
+    '''Raised if a client cannot connect.'''
 
 class ClientConnectionTimeout(Exception):
-    '''Raised if the client connection timed out before succeeding.
-    '''
+    '''Raised if the client connection timed out before succeeding.'''
 
 class ConnectionClosed(Exception):
-    '''Raised if the client closes the connection.
-    '''
+    '''Raised if the client closes the connection.'''
     def __init__(self, msg, data=None):
         super(ConnectionClosed, self).__init__(msg)
         self.data = data
+
+class NoAssociatedSocket(Exception):
+    '''Raised if there is no socket for the current Loop.'''
 
 class ClientConnectionClosed(Exception):
     '''Raised if the remote server (for a Client call) closes the connection.'''
@@ -172,6 +172,9 @@ class SocketContext(object):
     def shutdown(self, remote_closed=False):
         '''Clean up after the connection_handler ends.'''
         raise NotImplementedError()
+
+    def on_fork_child(self, parent, child):
+        pass
 
 class protocol(object):
     def __init__(self, f, inst=None):

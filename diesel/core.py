@@ -236,6 +236,8 @@ class Loop(object):
         if make_child:
             self.children.add(l)
             l.parent = self
+            for conn in self.connection_stack:
+                conn.on_fork_child(self, l)
         l.loop_label = str(f)
         self.app.add_loop(l, track=self.tracked)
         return l

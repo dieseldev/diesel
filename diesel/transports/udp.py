@@ -181,5 +181,16 @@ class UDPContext(SocketContext):
                 ConnectionClosed('Connection closed by remote host')
             )
 
+    def on_fork_child(self, parent, child):
+        if not parent.connection_stack:
+            return
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # unsure if the following two lines are necessary for UDP
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.setblocking(0)
+        child_context = UDPContext(sock)
+        child_context.remote_addr = self.remote_addr
+        child.connection_stack.append(child_context)
+
 class BadUDPHandler(Exception):
     """Thrown when an invalid UDP handler is passed to a UDPService"""
