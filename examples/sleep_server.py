@@ -3,7 +3,7 @@
 '''
 from diesel import Application, TCPService, until_eol, sleep, send
 
-def delay_echo_server(addr):
+def delay_echo_server(service, addr):
     inp = until_eol()
 
     for x in xrange(4):

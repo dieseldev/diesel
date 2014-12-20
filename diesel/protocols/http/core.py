@@ -75,7 +75,7 @@ class HttpServer(object):
         '''Called when this connection handler is connected to a Service.'''
         self.port = service.port
 
-    def __call__(self, addr):
+    def __call__(self, service, addr):
         '''Since an instance of HttpServer is passed to the Service
         class (with appropriate request_handler established during
         initialization), this __call__ method is what's actually

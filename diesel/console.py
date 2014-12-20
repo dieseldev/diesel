@@ -80,7 +80,7 @@ def console_for(pid):
     """
     os.kill(pid, signal.SIGTRAP)
     banner = "Remote console PID=%d" % pid
-    def interactive(addr):
+    def interactive(service, addr):
         remote_console = LocalConsole()
         remote_console.interact(banner)
         quickstop()

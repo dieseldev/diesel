@@ -3,7 +3,7 @@
 '''
 from diesel import Application, TCPService, until_eol, send
 
-def hi_server(addr):
+def hi_server(service, addr):
     while 1:
         inp = until_eol()
         if inp.strip() == "quit":

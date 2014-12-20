@@ -19,7 +19,8 @@ def setup_module():
     global echo_service, stream_service
     echo_service = UDPService(echo_handler, RANDOM_PORT, LOCAL_HOST)
     runtime.current_app.add_service(echo_service)
-    stream_service = UDPService(stream_dispatcher, RANDOM_PORT, LOCAL_HOST)
+    stream_service = UDPService(
+            stream_dispatcher, RANDOM_PORT, LOCAL_HOST, streaming=True)
     runtime.current_app.add_service(stream_service)
 
 def test_echo_client_can_talk_to_echo_service():
@@ -72,7 +73,7 @@ def test_streaming_to_multiple_clients():
 
 def test_raises_exception_for_bad_service_handler():
     try:
-        UDPService(lambda x: None, RANDOM_PORT, LOCAL_HOST)
+        UDPService(lambda x,y: None, RANDOM_PORT, LOCAL_HOST)
     except BadUDPHandler:
         pass # expected
     else:
@@ -80,15 +81,15 @@ def test_raises_exception_for_bad_service_handler():
 
 def test_allows_instance_method_as_handler():
     class Foo(object):
-        def handle(self):
+        def handle(self, service):
             pass
     try:
         UDPService(Foo().handle, RANDOM_PORT, LOCAL_HOST)
     except BadUDPHandler:
-        assert 0, "instance method with one argument should be ok"
+        assert 0, "instance method with two arguments should be ok"
 
 def test_allows_function_with_optional_arg_as_handler():
-    def handle(foo=None):
+    def handle(service, foo=None):
         pass
     try:
         UDPService(handle, RANDOM_PORT, LOCAL_HOST)
@@ -97,7 +98,7 @@ def test_allows_function_with_optional_arg_as_handler():
 
 
 # Test helpers
-def echo_handler():
+def echo_handler(service):
     while True:
         diesel.send(diesel.receive(datagram))
 
@@ -108,7 +109,7 @@ class EchoClient(UDPClient):
         result = diesel.receive(datagram)
         return result.strip()
 
-def stream_dispatcher():
+def stream_dispatcher(service):
     def stream_handler(request):
         for i in xrange(5):
             diesel.send("%s:%d" % (request, i))

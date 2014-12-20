@@ -11,7 +11,7 @@ from diesel import (
 )
 from diesel.util.queue import Queue
 
-def chat_server(addr):
+def chat_server(service, addr):
     my_nick = until_eol().strip()
     while True:
         evt, data = first(until_eol=True, waits=['chat_message'])

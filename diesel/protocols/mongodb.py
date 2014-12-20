@@ -335,7 +335,7 @@ class MongoProxy(object):
         self.backend_host = backend_host
         self.backend_port = backend_port
 
-    def __call__(self, addr):
+    def __call__(self, service, addr):
         """A persistent client<--proxy-->backend connection handler."""
         try:
             backend = None

@@ -8,7 +8,7 @@ server_ctx = SSL.Context(SSL.TLSv1_METHOD)
 server_ctx.use_privatekey_file('snakeoil-key.pem')
 server_ctx.use_certificate_file('snakeoil-cert.pem')
 
-def handle_echo(remote_addr):
+def handle_echo(service, remote_addr):
     while True:
         message = until('\r\n')
         send("you said: %s" % message)

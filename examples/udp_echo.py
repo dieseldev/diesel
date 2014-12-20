@@ -19,7 +19,7 @@ class EchoClient(UDPClient):
         send(msg)
         return receive(datagram)
 
-def echo_server():
+def echo_server(service):
     """The UDPService callback.
 
     Unlike a standard Service callback that represents a connection and takes

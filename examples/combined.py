@@ -3,7 +3,7 @@ from diesel import send, quickstart, quickstop, until, log
 from diesel.transports.common import protocol
 from diesel.transports.tcp import TCPService, TCPClient
 
-def handle_echo(remote_addr):
+def handle_echo(service, remote_addr):
     while True:
         message = until('\r\n')
         send("you said: %s" % message)

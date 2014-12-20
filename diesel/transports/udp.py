@@ -18,6 +18,9 @@ from diesel.transports.common import (
 # 65535 - 8 (header) - 20 (ipv4 header)
 DATAGRAM_SIZE_MAX = 65507
 
+class UDPDispatchLoop(Loop):
+    pass
+
 class UDPClient(Client):
     def __init__(self, addr, port, source_ip=None):
         super(UDPClient, self).__init__(addr, port, source_ip = source_ip)
@@ -38,15 +41,30 @@ class UDPClient(Client):
         return addr
 
 class UDPService(Service):
-    '''A UDP service listening on a certain port, with a protocol
-    implemented by a passed connection handler.
-    '''
+    """A `Service` that communicates with remote clients via UDP."""
+
+    def __init__(self, handler, port, address='', streaming=False, **kw):
+        """Creates a new UDPService.
+
+        The `handler` will have access to the UDP socket via the `diesel.send`
+        and `diesel.receive` functions. The UDP socket will be bound to the
+        given `address` and `port`. By default it will listen on all
+        addresses.
+
+        If `streaming` is True, any child `Loop`s forked from the `handler`
+        `Loop` will have their own UDP socket. This allows for convenient
+        streaming protocols for multiple remote clients.
+
+        """
+        super(UDPService, self).__init__(handler, port, iface=address, **kw)
+        self.streaming = streaming
 
     def validate_handler(self, handler):
         argspec = inspect.getargspec(handler)
         required_args = len(argspec.args) - len(argspec.defaults or [])
         method = type(handler) is types.MethodType
-        if (method and required_args > 1) or (not method and required_args):
+        if ((method and required_args != 2)
+                or (not method and required_args > 1)):
             raise BadUDPHandler(handler)
 
     def bind_and_listen(self):
@@ -63,7 +81,10 @@ class UDPService(Service):
 
         self.sock = sock
         c = UDPContext(sock)
-        l = Loop(self.connection_handler)
+        if self.streaming:
+            l = UDPDispatchLoop(self.connection_handler, self)
+        else:
+            l = Loop(self.connection_handler, self)
         l.connection_stack.append(c)
         runtime.current_app.add_loop(l)
 
@@ -178,11 +199,11 @@ class UDPContext(SocketContext):
 
         if remote_closed and self.waiting_callback:
             self.waiting_callback(
-                ConnectionClosed('Connection closed by remote host')
-            )
+                ConnectionClosed('Connection closed by remote host'))
 
     def on_fork_child(self, parent, child):
-        if not parent.connection_stack:
+        if (not parent.connection_stack
+                or not isinstance(parent, UDPDispatchLoop)):
             return
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         # unsure if the following two lines are necessary for UDP

@@ -42,7 +42,7 @@ def test_client_on_connect_callback_called_when_connected():
 
 
 # Test helpers
-def echo_handler(addr):
+def echo_handler(service, addr):
     while True:
         diesel.send(diesel.until_eol())
 

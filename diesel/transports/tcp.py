@@ -85,7 +85,7 @@ class TCPService(Service):
         sock.setblocking(0)
         def make_connection():
             c = TCPConnection(sock, addr)
-            l = Loop(self.connection_handler, addr)
+            l = Loop(self.connection_handler, self, addr)
             l.connection_stack.append(c)
             runtime.current_app.add_loop(l, track=self.track)
         if self.ssl_ctx:
