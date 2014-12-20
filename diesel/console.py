@@ -33,9 +33,16 @@ import sys
 
 from cStringIO import StringIO
 
-
 import diesel
 
+from diesel import runtime
+from diesel.app import quickstop, quickstart
+from diesel.core import fork_from_thread, send, receive, sleep
+from diesel.logmod import log, levels as loglevels
+from diesel.transports.common import (
+        protocol, ClientConnectionClosed, ClientConnectionError,
+)
+from diesel.transports.tcp import TCPClient, TCPService
 from diesel.util import debugtools
 
 
@@ -44,7 +51,7 @@ port = 4299
 def install_console_signal_handler():
     """Call this function to provide a remote console in your app."""
     def connect_to_user_console(sig, frame):
-        diesel.fork_from_thread(application_console_endpoint)
+        fork_from_thread(application_console_endpoint)
     signal.signal(signal.SIGTRAP, connect_to_user_console)
 
 class LocalConsole(code.InteractiveConsole):
@@ -57,12 +64,12 @@ class LocalConsole(code.InteractiveConsole):
         if self.current_source:
             sz = len(self.current_source)
             header = struct.pack('>Q', sz)
-            diesel.send("%s%s" % (header, self.current_source))
+            send("%s%s" % (header, self.current_source))
             self.current_source = None
-            header = diesel.receive(8)
+            header = receive(8)
             (sz,) = struct.unpack('>Q', header)
             if sz:
-                data = diesel.receive(sz)
+                data = receive(sz)
                 print data.rstrip()
 
 def console_for(pid):
@@ -76,11 +83,11 @@ def console_for(pid):
     def interactive(addr):
         remote_console = LocalConsole()
         remote_console.interact(banner)
-        diesel.quickstop()
+        quickstop()
     return interactive
 
 
-class RemoteConsoleService(diesel.Client):
+class RemoteConsoleService(TCPClient):
     """Runs the backend console."""
     def __init__(self, *args, **kw):
         self.interpreter = BackendInterpreter({
@@ -89,18 +96,18 @@ class RemoteConsoleService(diesel.Client):
         })
         super(RemoteConsoleService, self).__init__(*args, **kw)
 
-    @diesel.call
+    @protocol
     def handle_command(self):
-        header = diesel.receive(8)
+        header = receive(8)
         (sz,) = struct.unpack('>Q', header)
-        data = diesel.receive(sz)
+        data = receive(sz)
         stdout_patch = StdoutDispatcher()
         with stdout_patch:
             self.interpreter.runsource(data)
         output = stdout_patch.contents
         outsz = len(output)
         outheader = struct.pack('>Q', outsz)
-        diesel.send("%s%s" % (outheader, output))
+        send("%s%s" % (outheader, output))
 
 class BackendInterpreter(code.InteractiveInterpreter):
     def write(self, data):
@@ -108,19 +115,19 @@ class BackendInterpreter(code.InteractiveInterpreter):
 
 def application_console_endpoint():
     """Connects to the console UI and runs until disconnected."""
-    diesel.sleep(1)
+    sleep(1)
     try:
         session = RemoteConsoleService('localhost', port)
-    except diesel.ClientConnectionError:
-        diesel.log.error('Failed to connect to local console')
+    except ClientConnectionError:
+        log.error('Failed to connect to local console')
     else:
-        diesel.log.warning('Connected to local console')
+        log.warning('Connected to local console')
         with session:
             while True:
                 try:
                     session.handle_command()
-                except diesel.ClientConnectionClosed:
-                    diesel.log.warning('Disconnected from local console')
+                except ClientConnectionClosed:
+                    log.warning('Disconnected from local console')
                     break
 
 class StdoutDispatcher(object):
@@ -131,12 +138,12 @@ class StdoutDispatcher(object):
 
     """
     def __init__(self):
-        self.owning_loop = diesel.core.current_loop.id
+        self.owning_loop = runtime.current_loop.id
         self._orig_stdout = sys.stdout
         self._fake_stdout = StringIO()
 
     def __getattr__(self, name):
-        if diesel.core.current_loop.id == self.owning_loop:
+        if runtime.current_loop.id == self.owning_loop:
             return getattr(self._fake_stdout, name)
         else:
             return getattr(self._orig_stdout, name)
@@ -165,17 +172,17 @@ def main():
     if args[0] == 'dummy':
         print "PID", os.getpid()
         def wait_for_signal():
-            log = diesel.log.name('dummy')
-            log.min_level = diesel.loglevels.INFO
+            log_ = log.name('dummy')
+            log_.min_level = loglevels.INFO
             install_console_signal_handler()
             while True:
-                log.info("sleeping")
-                diesel.sleep(5)
-        diesel.quickstart(wait_for_signal)
+                log_.info("sleeping")
+                sleep(5)
+        quickstart(wait_for_signal)
     else:
         pid = int(args[0])
-        svc = diesel.Service(console_for(pid), options.port)
-        diesel.quickstart(svc)
+        svc = TCPService(console_for(pid), options.port)
+        quickstart(svc)
 
 if __name__ == '__main__':
     main()

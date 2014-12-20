@@ -2,8 +2,7 @@
 '''Example of event firing.
 '''
 import time
-import random
-from diesel import (quickstart, quickstop, sleep, 
+from diesel import (quickstart, quickstop, sleep,
                     fire, wait, log, loglevels,
                     set_log_level)
 

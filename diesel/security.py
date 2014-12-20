@@ -1,6 +1,4 @@
 from OpenSSL import SSL
-import traceback
-import sys
 
 def ssl_async_handshake(sock, hub, next):
     def shake():

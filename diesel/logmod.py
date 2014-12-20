@@ -3,7 +3,6 @@
 levels and component-specific subloggers.
 '''
 
-import sys
 import time
 from twiggy import log as olog, levels, outputs, formats, emitters
 try:

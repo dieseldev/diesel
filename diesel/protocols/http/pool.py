@@ -1,9 +1,10 @@
 import urllib
 import urlparse
 
-import diesel
 import diesel.protocols.http.core as http
 import diesel.util.pool as pool
+
+from diesel.transports.common import ClientConnectionClosed
 
 
 # XXX This dictionary can currently grow without bounds. A pool entry gets
@@ -44,7 +45,7 @@ def request(url, method='GET', timeout=60, body=None, headers=None):
             with http_pool_for_url(req_url).connection as conn:
                 resp = conn.request(method, encoded_path, headers, timeout=timeout, body=body_bytes)
             break
-        except diesel.ClientConnectionClosed, e:
+        except ClientConnectionClosed, e:
             # try again with another pool connection
             continue
     else:

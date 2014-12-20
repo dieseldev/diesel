@@ -3,7 +3,9 @@ from __future__ import absolute_import
 import time
 from collections import deque
 
-from diesel import UDPClient, call, send, first, datagram
+from diesel.transports.udp import UDPClient
+from diesel.transports.common import protocol
+from diesel.core import send, first
 
 from dns.message import make_query, from_wire
 from dns.rdatatype import A
@@ -37,7 +39,7 @@ class DNSClient(UDPClient):
             self.primary = self.nameservers[0]
         super(DNSClient, self).__init__(servers[0], port)
 
-    @call
+    @protocol
     def resolve(self, name, orig_timeout=5):
         """Try to resolve name.
 

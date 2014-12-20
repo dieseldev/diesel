@@ -4,9 +4,12 @@ from errno import EAGAIN
 
 import zmq
 
-import diesel
-from diesel import log, loglevels
+from diesel import runtime
+
+from diesel.core import first, fork_child, fire
 from diesel.events import Waiter, StopWaitDispatch
+from diesel.hub import IntWrap
+from diesel.logmod import log, loglevels
 from diesel.util.queue import Queue
 from diesel.util.event import Event
 
@@ -20,8 +23,6 @@ class DieselZMQSocket(Waiter):
         self.zctx = context or zctx
         self.socket = socket
         self._early_value = None
-        from diesel.runtime import current_app
-        from diesel.hub import IntWrap
 
         if bind:
             assert not connect
@@ -30,7 +31,7 @@ class DieselZMQSocket(Waiter):
             assert not bind
             self.socket.connect(connect)
 
-        self.hub = current_app.hub
+        self.hub = runtime.current_app.hub
         self.fd = IntWrap(self.socket.getsockopt(zmq.FD))
 
         self.write_gate = Event()
@@ -103,7 +104,7 @@ class DieselZMQSocket(Waiter):
         '''Handle state change.
         '''
         if not manual:
-            diesel.fire(self)
+            fire(self)
         events = self.socket.getsockopt(zmq.EVENTS)
         if events & zmq.POLLIN:
             self.read_gate.set()
@@ -190,7 +191,7 @@ class DieselZMQService(object):
         queues = [remote_client.incoming, remote_client.outgoing]
         try:
             while True:
-                (evt, value) = diesel.first(waits=queues, sleep=self.timeout)
+                (evt, value) = first(waits=queues, sleep=self.timeout)
                 if evt is remote_client.incoming:
                     assert isinstance(value, Message)
                     # Update return path with latest (in case of reconnect)
@@ -235,11 +236,11 @@ class DieselZMQService(object):
 
     def _handle_all_inbound_and_outbound_traffic(self):
         assert self.zmq_socket
-        self._incoming_loop = diesel.fork_child(self._receive_incoming_messages)
+        self._incoming_loop = fork_child(self._receive_incoming_messages)
         self._incoming_loop.keep_alive = True
         queues = [self.incoming, self.outgoing]
         while self.should_run:
-            (queue, msg) = diesel.first(waits=queues)
+            (queue, msg) = first(waits=queues)
 
             if queue is self.incoming:
                 if msg.remote_identity not in self.clients:
@@ -254,7 +255,7 @@ class DieselZMQService(object):
         remote = RemoteClient.from_message(msg)
         self.clients[msg.remote_identity] = remote
         self.register_client(remote, msg)
-        diesel.fork_child(self._handle_client_requests_and_responses, remote)
+        fork_child(self._handle_client_requests_and_responses, remote)
 
     # Public API
     # ==========

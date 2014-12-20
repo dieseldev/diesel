@@ -1,6 +1,6 @@
-import time, cgi
+import cgi
 
-from diesel import Service, Application, sleep, first
+from diesel import first
 from diesel.web import DieselFlask
 from diesel.protocols.websockets import WebSocketDisconnect
 from diesel.util.queue import Fanout

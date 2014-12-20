@@ -1,11 +1,12 @@
-from contextlib import contextmanager
-from diesel import (Client, call, until_eol, receive,
-                    fire, send, first, fork, sleep)
-from diesel.util.queue import Queue, QueueTimeout
 import time
-import operator as op
-import itertools
 import uuid
+
+from contextlib import contextmanager
+
+from diesel.core import until_eol, receive, fire, send, first, fork, sleep
+from diesel.transports.common import protocol
+from diesel.transports.tcp import TCPClient
+from diesel.util.queue import Queue, QueueTimeout
 
 def flatten_arg_pairs(l):
     o = []
@@ -17,103 +18,103 @@ REDIS_PORT = 6379
 
 class RedisError(Exception): pass
 
-class RedisClient(Client):
+class RedisClient(TCPClient):
     def __init__(self, host='localhost', port=REDIS_PORT, password=None, **kw):
         self.password = password
-        Client.__init__(self, host, port, **kw)
+        super(RedisClient, self).__init__(host, port, **kw)
 
     ##################################################
     ### GENERAL OPERATIONS
-    @call
+    @protocol
     def auth(self):
         self._send('AUTH', self.password)
         resp = self._get_response()
         return bool(resp)
-    @call
+    @protocol
     def exists(self, k):
         self._send('EXISTS', k)
         resp = self._get_response()
         return bool(resp)
 
-    @call
+    @protocol
     def delete(self, k):
         self._send('DEL', k)
         resp = self._get_response()
         return bool(resp)
 
-    @call
+    @protocol
     def type(self, k):
         self._send('TYPE', k)
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def keys(self, pat):
         self._send('KEYS', pat)
         resp = self._get_response()
         return set(resp)
 
-    @call
+    @protocol
     def randomkey(self):
         self._send('RANDOMKEY')
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def rename(self, old, new):
         self._send('RENAME', old, new)
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def renamenx(self, old, new):
         self._send('RENAMENX', old, new)
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def dbsize(self):
         self._send('DBSIZE')
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def expire(self, key, seconds):
         self._send('EXPIRE', key, seconds)
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def expireat(self, key, when):
         unix_time = time.mktime(when.timetuple())
         self._send('EXPIREAT', key, unix_time)
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def ttl(self, key):
         self._send('TTL', key)
         resp = self._get_response()
         resp = None if resp == -1 else int(resp)
         return resp
 
-    @call
+    @protocol
     def select(self, idx):
         self._send('SELECT', idx)
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def move(self, key, idx):
         self._send('MOVE', key, idx)
 
-    @call
+    @protocol
     def flushdb(self):
         self._send('FLUSHDB')
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def flushall(self):
         self._send('FLUSHALL')
         resp = self._get_response()
@@ -122,25 +123,25 @@ class RedisClient(Client):
     ##################################################
     ### TRANSACTION OPERATIONS
     ### http://redis.io/topics/transactions
-    @call
+    @protocol
     def multi(self):
         """Starts a transaction."""
         self._send('MULTI')
         return self._get_response()
 
-    @call
+    @protocol
     def exec_(self):
         """Atomically executes queued commands in a transaction."""
         self._send('EXEC')
         return self._get_response()
 
-    @call
+    @protocol
     def discard(self):
         """Discards any queued commands and aborts a transaction."""
         self._send('DISCARD')
         return self._get_response()
 
-    @call
+    @protocol
     def watch(self, keys):
         """Sets up keys to be watched in preparation for a transaction."""
         self._send('WATCH', list=keys)
@@ -168,103 +169,103 @@ class RedisClient(Client):
 
     ##################################################
     ### STRING OPERATIONS
-    @call
+    @protocol
     def set(self, k, v):
         self._send('SET', k, v)
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def get(self, k):
         self._send('GET', k)
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def getset(self, k, v):
         self._send('GETSET', k, v)
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def mget(self, keylist):
         self._send('MGET', list=keylist)
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def setnx(self, k, v):
         self._send('SETNX', k, v)
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def setex(self, k, tm, v):
         self._send('SETEX', k, tm, v)
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def mset(self, d):
         self._send('MSET', list=flatten_arg_pairs(d.iteritems()))
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def msetnx(self, d):
         self._send('MSETNX', list=flatten_arg_pairs(d.iteritems()))
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def incr(self, k):
         self._send('INCR', k)
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def incrby(self, k, amt):
         self._send('INCRBY', k, amt)
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def decr(self, k):
         self._send('DECR', k)
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def decrby(self, k, amt):
         self._send('DECRBY', k, amt)
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def append(self, k, value):
         self._send('APPEND', k, value)
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def substr(self, k, start, end):
         self._send('SUBSTR', k, start, end)
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def getbit(self, k, offset):
         self._send('GETBIT', k, offset)
         resp = self._get_response()
         return int(resp)
 
-    @call
+    @protocol
     def setbit(self, k, offset, value):
         self._send('SETBIT', k, offset, value)
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def strlen(self, k):
         self._send('STRLEN', k)
         resp = self._get_response()
@@ -273,67 +274,67 @@ class RedisClient(Client):
 
     ##################################################
     ### LIST OPERATIONS
-    @call
+    @protocol
     def rpush(self, k, v):
         self._send('RPUSH', k, v)
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def lpush(self, k, v):
         self._send('LPUSH', k, v)
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def llen(self, k):
         self._send('LLEN', k)
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def lrange(self, k, start, end):
         self._send('LRANGE', k, start, end)
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def ltrim(self, k, start, end):
         self._send('LTRIM', k, start, end)
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def lindex(self, k, idx):
         self._send('LINDEX', k, idx)
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def lset(self, k, idx, v):
         self._send('LSET', k, idx,  v)
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def lrem(self, k, v, count=0):
         self._send('LREM', k, count, v)
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def lpop(self, k):
         self._send('LPOP', k)
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def rpop(self, k):
         self._send('RPOP', k)
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def blpop(self, keylist, timeout=0):
         self._send('BLPOP', list=list(keylist) + [timeout])
         resp = self._get_response()
@@ -344,7 +345,7 @@ class RedisClient(Client):
             resp = None
         return resp
 
-    @call
+    @protocol
     def brpop(self, keylist, timeout=0):
         self._send('BRPOP', list=list(keylist) + [timeout])
         resp = self._get_response()
@@ -355,7 +356,7 @@ class RedisClient(Client):
             resp = None
         return resp
 
-    @call
+    @protocol
     def rpoplpush(self, src, dest):
         self._send('RPOPLPUSH', src, dest)
         resp = self._get_response()
@@ -363,88 +364,88 @@ class RedisClient(Client):
 
     ##################################################
     ### SET OPERATIONS
-    @call
+    @protocol
     def sadd(self, k, v):
         self._send('SADD', k, v)
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def srem(self, k, v):
         self._send('SREM', k, v)
         resp = self._get_response()
         return bool(resp)
 
-    @call
+    @protocol
     def spop(self, k):
         self._send('SPOP', k)
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def smove(self, src, dst, v):
         self._send('SMOVE', src, dst, v)
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def scard(self, k):
         self._send('SCARD', k)
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def sismember(self, k, v):
         self._send('SISMEMBER', k, v)
         resp = self._get_response()
         return bool(resp)
 
-    @call
+    @protocol
     def sinter(self, keylist):
         self._send('SINTER', list=keylist)
         resp = self._get_response()
         return set(resp)
 
-    @call
+    @protocol
     def sinterstore(self, dst, keylist):
         flist = [dst] + list(keylist)
         self._send('SINTERSTORE', list=flist)
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def sunion(self, keylist):
         self._send('SUNION', list=keylist)
         resp = self._get_response()
         return set(resp)
 
-    @call
+    @protocol
     def sunionstore(self, dst, keylist):
         flist = [dst] + list(keylist)
         self._send('SUNIONSTORE', list=flist)
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def sdiff(self, keylist):
         self._send('SDIFF', list=keylist)
         resp = self._get_response()
         return set(resp)
 
-    @call
+    @protocol
     def sdiffstore(self, dst, keylist):
         flist = [dst] + list(keylist)
         self._send('SDIFFSTORE', list=flist)
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def smembers(self, key):
         self._send('SMEMBERS', key)
         resp = self._get_response()
         return set(resp)
 
-    @call
+    @protocol
     def srandmember(self, key):
         self._send('SRANDMEMBER', key)
         resp = self._get_response()
@@ -457,19 +458,19 @@ class RedisClient(Client):
         return [(resp[x], float(resp[x+1]))
                 for x in xrange(0, len(resp), 2)]
 
-    @call
+    @protocol
     def zadd(self, key, score, member):
         self._send('ZADD', key, score, member)
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def zrem(self, key, member):
         self._send('ZREM', key, member)
         resp = self._get_response()
         return bool(resp)
 
-    @call
+    @protocol
     def zrange(self, key, start, end, with_scores=False):
         args = 'ZRANGE', key, start, end
         if with_scores:
@@ -480,7 +481,7 @@ class RedisClient(Client):
             return self.__pair_with_scores(resp)
         return resp
 
-    @call
+    @protocol
     def zrevrange(self, key, start, end, with_scores=False):
         args = 'ZREVRANGE', key, start, end
         if with_scores:
@@ -491,37 +492,37 @@ class RedisClient(Client):
             return self.__pair_with_scores(resp)
         return resp
 
-    @call
+    @protocol
     def zcard(self, key):
         self._send('ZCARD', key)
         resp = self._get_response()
         return int(resp)
 
-    @call
+    @protocol
     def zscore(self, key, member):
         self._send('ZSCORE', key, member)
         resp = self._get_response()
         return float(resp) if resp is not None else None
 
-    @call
+    @protocol
     def zincrby(self, key, increment, member):
         self._send('ZINCRBY', key, increment, member)
         resp = self._get_response()
         return float(resp)
 
-    @call
+    @protocol
     def zrank(self, key, member):
         self._send('ZRANK', key, member)
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def zrevrank(self, key, member):
         self._send('ZREVRANK', key, member)
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def zrangebyscore(self, key, min, max, offset=None, count=None, with_scores=False):
         args = 'ZRANGEBYSCORE', key, min, max
         if offset:
@@ -538,19 +539,19 @@ class RedisClient(Client):
 
         return resp
 
-    @call
+    @protocol
     def zcount(self, key, min, max):
         self._send('ZCOUNT', key, min, max)
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def zremrangebyrank(self, key, min, max):
         self._send('ZREMRANGEBYRANK', key, min, max)
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def zremrangebyscore(self, key, min, max):
         self._send('ZREMRANGEBYSCORE', key, min, max)
         resp = self._get_response()
@@ -558,20 +559,20 @@ class RedisClient(Client):
 
     ##################################################
     ### HASH OPERATIONS
-    @call
+    @protocol
     def hset(self, key, field, value):
         self._send('HSET', key, field, value)
         resp = self._get_response()
         return bool(resp)
 
-    @call
+    @protocol
     def hget(self, key, field):
         self._send('HGET', key, field)
         resp = self._get_response()
         return resp
 
 
-    @call
+    @protocol
     def hmset(self, key, d):
         if not d:
             return True
@@ -581,7 +582,7 @@ class RedisClient(Client):
         resp = self._get_response()
         return bool(resp)
 
-    @call
+    @protocol
     def hmget(self, key, l):
         if not l:
             return {}
@@ -590,49 +591,49 @@ class RedisClient(Client):
         resp = self._get_response()
         return dict(zip(l, resp))
 
-    @call
+    @protocol
     def hincrby(self, key, field, amt):
         self._send('HINCRBY', key, field, amt)
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def hexists(self, key, field):
         self._send('HEXISTS', key, field)
         resp = self._get_response()
         return bool(resp)
 
-    @call
+    @protocol
     def hdel(self, key, field):
         self._send('HDEL', key, field)
         resp = self._get_response()
         return bool(resp)
 
-    @call
+    @protocol
     def hlen(self, key):
         self._send('HLEN', key)
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def hkeys(self, key):
         self._send('HKEYS', key)
         resp = self._get_response()
         return set(resp)
 
-    @call
+    @protocol
     def hvals(self, key):
         self._send('HVALS', key)
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def hgetall(self, key):
         self._send('HGETALL', key)
         resp = self._get_response()
         return dict(resp[x:x+2] for x in xrange(0, len(resp), 2))
 
-    @call
+    @protocol
     def hsetnx(self, key, field, value):
         self._send('HSETNX', key, field, value)
         resp = self._get_response()
@@ -640,7 +641,7 @@ class RedisClient(Client):
 
     ##################################################
     ### Sorting...
-    @call
+    @protocol
     def sort(self, key, pattern=None, limit=None,
     get=None, order='ASC', alpha=False, store=None):
 
@@ -666,7 +667,7 @@ class RedisClient(Client):
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def subscribe(self, *channels):
         '''Subscribe to the given channels.
 
@@ -675,7 +676,7 @@ class RedisClient(Client):
         self._send('SUBSCRIBE', *channels)
         return None
 
-    @call
+    @protocol
     def unsubscribe(self, *channels):
         '''Unsubscribe from the given channels, or all of them if none are given.
 
@@ -684,7 +685,7 @@ class RedisClient(Client):
         self._send('UNSUBSCRIBE', *channels)
         return None
 
-    @call
+    @protocol
     def psubscribe(self, *channels):
         '''Subscribe to the given glob pattern-matched channels.
 
@@ -693,7 +694,7 @@ class RedisClient(Client):
         self._send('PSUBSCRIBE', *channels)
         return None
 
-    @call
+    @protocol
     def punsubscribe(self, *channels):
         '''Unsubscribe from the given glob pattern-matched channels, or all of them if none are given.
 
@@ -702,7 +703,7 @@ class RedisClient(Client):
         self._send('PUNSUBSCRIBE', *channels)
         return None
 
-    @call
+    @protocol
     def get_from_subscriptions(self, wake_sig=None):
         '''Wait for a published message on a subscribed channel.
 
@@ -729,7 +730,7 @@ class RedisClient(Client):
                 return None
 
 
-    @call
+    @protocol
     def publish(self, channel, message):
         '''Publish a message on the given channel.
 
@@ -739,7 +740,7 @@ class RedisClient(Client):
         resp = self._get_response()
         return resp
 
-    @call
+    @protocol
     def send_raw_command(self, arguments):
         cmd, rest = arguments[0], arguments[1:]
         self._send(cmd, list=rest)

@@ -6,8 +6,8 @@ a friend to do the same.
 '''
 import sys
 from diesel import (
-    Application, Service, until_eol, fire, first, send, Client, call, thread,
-    fork, Loop,
+    Application, TCPService, until_eol, fire, first, send, TCPClient, protocol,
+    thread, fork, Loop,
 )
 from diesel.util.queue import Queue
 
@@ -21,9 +21,9 @@ def chat_server(addr):
             nick, message = data
             send("<%s> %s\r\n"  % (nick, message))
 
-class ChatClient(Client):
+class ChatClient(TCPClient):
     def __init__(self, *args, **kw):
-        Client.__init__(self, *args, **kw)
+        TCPClient.__init__(self, *args, **kw)
         self.input = Queue()
 
     def read_chat_message(self, prompt):
@@ -38,7 +38,7 @@ class ChatClient(Client):
             msg = thread(self.read_chat_message, "").strip()
             self.input.put(msg)
 
-    @call
+    @protocol
     def chat(self):
         fork(self.input_handler)
         nick = self.input.get()
@@ -56,7 +56,7 @@ def chat_client():
 
 app = Application()
 if sys.argv[1] == "server":
-    app.add_service(Service(chat_server, 8000))
+    app.add_service(TCPService(chat_server, 8000))
 elif sys.argv[1] == "client":
     app.add_loop(Loop(chat_client))
 else:

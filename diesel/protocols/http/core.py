@@ -6,22 +6,26 @@ import cStringIO
 import os
 import urllib
 import time
+
 from datetime import datetime
 from urlparse import urlparse
+
 from flask import Request, Response
 from OpenSSL import SSL
-
-utcnow = datetime.utcnow
 
 try:
     from http_parser.parser import HttpParser
 except ImportError:
     from http_parser.pyparser import HttpParser
 
-from diesel import receive, ConnectionClosed, send, log, Client, call, first
+from diesel.core import receive, send, first
+from diesel.logmod import log
+from diesel.transports.common import ConnectionClosed, protocol
+from diesel.transports.tcp import TCPClient
 
 SERVER_TAG = 'diesel-http-server'
 
+utcnow = datetime.utcnow
 hlog = log.name("http-error")
 
 HOSTNAME = os.uname()[1] # win32?
@@ -178,7 +182,7 @@ def cgi_name(n):
     else:
         return 'HTTP_' + n.upper().replace('-', '_')
 
-class HttpClient(Client):
+class HttpClient(TCPClient):
     '''An HttpClient instance that issues 1.1 requests,
     including keep-alive behavior.
 
@@ -186,7 +190,8 @@ class HttpClient(Client):
     be a string.
     '''
     url_scheme = "http"
-    @call
+
+    @protocol
     def request(self, method, url, headers=None, body=None, timeout=None):
         '''Issues a `method` request to `path` on the
         connected server.  Sends along `headers`, and

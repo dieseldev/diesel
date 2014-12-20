@@ -2,14 +2,13 @@
 
 mold.
 '''
-import traceback
-
 from flask import * # we're essentially republishing
 from werkzeug.debug import tbtools
-from diesel.protocols.websockets import WebSocketServer
 
-from app import Application, Service, quickstart
-from diesel import log, set_log_level, loglevels
+from diesel.app import Application, quickstart
+from diesel.logmod import log, levels as loglevels
+from diesel.protocols.websockets import WebSocketServer
+from diesel.transports.tcp import TCPService
 
 
 class _FlaskTwiggyLogProxy(object):
@@ -86,7 +85,7 @@ class DieselFlask(Flask):
             self.debug = True
 
         from diesel.protocols.http import HttpServer
-        http_service = Service(HttpServer(self.handle_request), port, iface)
+        http_service = TCPService(HttpServer(self.handle_request), port, iface)
 
         return http_service
 

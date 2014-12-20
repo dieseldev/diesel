@@ -8,14 +8,19 @@ Not implemented:
     * Extension support.
 
 """
-from .http import HttpServer, Response
-from diesel.util.queue import Queue
-from diesel import fork, until, receive, first, ConnectionClosed, send
-from simplejson import dumps, loads, JSONDecodeError
 import hashlib
+
 from struct import pack, unpack
 from base64 import b64encode
 from array import array
+
+from simplejson import dumps, loads, JSONDecodeError
+
+from .http import HttpServer, Response
+from diesel.util.queue import Queue
+from diesel.core import fork, until, receive, first, send
+from diesel.transports.common import ConnectionClosed
+
 
 class WebSocketDisconnect(object): pass
 class WebSocketData(dict): pass

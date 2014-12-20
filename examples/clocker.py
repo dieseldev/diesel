@@ -1,4 +1,3 @@
-import os
 from diesel import Loop, fork, Application, sleep
 from diesel.util.stats import CPUStats
 

@@ -1,12 +1,12 @@
 # TODO -- more types
+import itertools
 
 from contextlib import contextmanager
-import itertools
 from struct import pack, unpack
 
-from diesel import Client, call, sleep, send, until, receive, first, Loop, Application, ConnectionClosed, quickstop
-
-izip = itertools.izip
+from diesel.core import send, receive, until
+from diesel.transports.common import protocol
+from diesel.transports.tcp import TCPClient
 
 class Rollback(Exception): pass
 
@@ -37,7 +37,7 @@ class PgRowDescriptor(object):
         return self.values[self.lookup[n]]
 
     def load_row(self, ts):
-        for x, (conv, v) in enumerate(izip(self.convs, ts)):
+        for x, (conv, v) in enumerate(itertools.izip(self.convs, ts)):
             self.values[x] = conv(v) if v is not None else None
 
     def __str__(self):
@@ -49,7 +49,7 @@ class PgRowDescriptor(object):
 
 class PgServerError(Exception): pass
 
-class PostgreSQLClient(Client):
+class PostgreSQLClient(TCPClient):
     def __init__(self, host='localhost', port=5432, user='postgres', database='template1', **kw):
         self.in_query = False
         self.user = user
@@ -60,7 +60,7 @@ class PostgreSQLClient(Client):
         self.state = None
         self.prepare_gen = itertools.count(0)
         self.prepared = {}
-        Client.__init__(self, host, port, **kw)
+        super(PostgreSQLClient, self).__init__(host, port, **kw)
 
     def on_connect(self):
         self.send_startup()
@@ -69,25 +69,25 @@ class PostgreSQLClient(Client):
             self.do_authentication(auth)
         self.wait_for_queries()
 
-    @call
+    @protocol
     def send_startup(self):
         params='user\0{0}\0database\0{1}\0\0'.format(self.user, self.database)
         send(pack('!ii', 8 + len(params), 3 << 16 | 0))
         send(params)
 
-    @call
+    @protocol
     def wait_for_queries(self):
         while True:
             self.read_message()
             if self.state == 'I':
                 break
 
-    @call
+    @protocol
     def wait_for_state(self):
         s = self.read_message()
         assert isinstance(s, PgStateChange)
 
-    @call
+    @protocol
     def read_message(self):
         b = receive(1)
         return self.msg_handlers[b](self)
@@ -182,11 +182,11 @@ class PostgreSQLClient(Client):
 
         return PgRowDescriptor(names, types)
 
-    @call
+    @protocol
     def close(self):
         if not self.is_closed:
             send('X' + pack('!i', 4))
-        Client.close(self)
+        super(PostgreSQLClient, self).close()
 
     def handle_data(self):
         (size, n) = unpack("!ih", receive(6))
@@ -225,13 +225,13 @@ class PostgreSQLClient(Client):
         send(code + pack("!i", len(thing) + 4))
         send(thing)
 
-    @call
+    @protocol
     def _query(self, q):
         assert self.state != "E"
         self._simple_send("Q", q + '\0')
         return self.read_message()
 
-    @call
+    @protocol
     def prepare(self, q, id):
         print 'PREP'
         q += '\0'
@@ -241,7 +241,7 @@ class PostgreSQLClient(Client):
         send(q)
         send(pack('!h', 0))
 
-    @call
+    @protocol
     def _execute(self, rows=0, describe=False):
 
         if describe:
@@ -271,11 +271,11 @@ class PostgreSQLClient(Client):
         send('B' + pack('!i', len(t) + 4))
         send(t)
 
-    @call
+    @protocol
     def _sync(self):
         send('S' + pack('!i', 4))
 
-    @call
+    @protocol
     def _queue_query(self, q, args):
         prep = False
         if q in self.prepared:
@@ -293,7 +293,7 @@ class PostgreSQLClient(Client):
         row_oids = self.read_message()
         assert isinstance(row_oids, PgParameterDescription)
 
-    @call
+    @protocol
     def execute(self, q, *args):
         prepared = self._queue_query(q, args)
         self._execute()
@@ -309,7 +309,7 @@ class PostgreSQLClient(Client):
 
         self.wait_for_state()
 
-    @call
+    @protocol
     def query_one(self, *args, **kw):
         i = self.query(*args, **kw)
         vs = list(i)
@@ -321,7 +321,7 @@ class PostgreSQLClient(Client):
 
         return vs[0]
 
-    @call
+    @protocol
     def query(self, q, *args, **kw):
         rows = kw.pop('buffer', 0)
         assert not kw, ("unknown keyword arguments: %r" % kw)

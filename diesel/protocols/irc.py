@@ -1,9 +1,12 @@
 '''Experimental support for Internet Relay Chat'''
 
-from diesel import Client, call, sleep, send, until_eol, receive, first, Loop, Application, ConnectionClosed, quickstop
 from OpenSSL import SSL
 import os, pwd
 from types import GeneratorType
+
+from diesel.core import send, until_eol
+from diesel.transports.common import protocol
+from diesel.transports.tcp import TCPClient
 
 LOCAL_HOST = os.uname()[1]
 DEFAULT_REAL_NAME = "Diesel IRC"
@@ -44,19 +47,19 @@ class IrcCommand(object):
     def __str__(self):
         return "%s (%s) %r" % (self.command, self.from_nick, self.params)
 
-class IrcClient(Client):
+class IrcClient(TCPClient):
     def __init__(self, nick, host='localhost', port=6667,
         user=DEFAULT_USER, name=DEFAULT_REAL_NAME, password=None,
         **kw):
+        super(IrcClient, self).__init__(host, port, **kw)
         self.nick = nick
         self.user = user
         self.name = name
         self.host = host
         self.logged_in = False
         self.password = password
-        Client.__init__(self, host, port, **kw)
 
-    @call
+    @protocol
     def on_connect(self):
         self.do_login()
         self.on_logged_in()
@@ -64,17 +67,17 @@ class IrcClient(Client):
     def on_logged_in(self):
         pass
 
-    @call
+    @protocol
     def do_login(self):
         if self.password:
             self.send_command("PASS", self.password)
         self.send_command("NICK", self.nick)
         self.send_command("USER",
-            '%s@%s' % (self.user, LOCAL_HOST), 
+            '%s@%s' % (self.user, LOCAL_HOST),
             8, '*', self.name)
         self.logged_in = True
 
-    @call
+    @protocol
     def send_command(self, cmd, *args):
         if self.logged_in:
             send(":%s " % self.nick)
@@ -88,7 +91,7 @@ class IrcClient(Client):
                 acc.append(ax)
         send(' '.join(acc) + "\r\n")
 
-    @call
+    @protocol
     def recv_command(self):
         cmd = None
         while True:

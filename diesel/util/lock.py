@@ -1,6 +1,6 @@
-from uuid import uuid4
-from diesel import wait, fire
 from collections import defaultdict
+
+from diesel.core import wait, fire
 from diesel.events import Waiter, StopWaitDispatch
 
 class Lock(Waiter):

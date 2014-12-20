@@ -1,9 +1,9 @@
 
-from diesel import core
+from diesel import runtime
 
 class CPUStats(object):
     def __init__(self):
-        self.caller = core.current_loop
+        self.caller = runtime.current_loop
         self.cpu_seconds = 0.0
 
     def __enter__(self):

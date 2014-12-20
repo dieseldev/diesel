@@ -1,6 +1,7 @@
 import thread
+
+from diesel.core import fork_from_thread
 from diesel.util.queue import Queue
-from diesel import fork_from_thread
 
 def put_stream_token(q, line):
     q.put(line)

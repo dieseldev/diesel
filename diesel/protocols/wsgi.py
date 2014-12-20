@@ -4,8 +4,9 @@ diesel's HTTP module.
 
 Note: not well-tested.  Contributions welcome.
 """
-from diesel import Application, Service
+from diesel.app import Application
 from diesel.protocols.http import HttpServer, Response
+from diesel.transports.tcp import TCPService
 
 import functools
 
@@ -30,7 +31,6 @@ class WSGIRequestHandler(object):
 
     def __call__(self, req):
         env = req.environ
-        buf = []
         r = Response()
         env['diesel.response'] = r
         for output in self.wsgi_callable(env,
@@ -52,7 +52,7 @@ class WSGIApplication(Application):
         Application.__init__(self)
         self.port = port
         self.wsgi_callable = wsgi_callable
-        http_service = Service(HttpServer(WSGIRequestHandler(wsgi_callable, port)), port, iface)
+        http_service = TCPService(HttpServer(WSGIRequestHandler(wsgi_callable, port)), port, iface)
         self.add_service(http_service)
 
 if __name__ == '__main__':

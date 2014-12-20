@@ -1,5 +1,4 @@
-from diesel import Application, Loop, sleep
-import time
+from diesel import Application, Loop
 
 def restart():
     print "I should restart"

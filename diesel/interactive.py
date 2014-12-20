@@ -13,6 +13,7 @@ import sys
 sys.path.insert(0, '.')
 
 import diesel
+from diesel.app import quickstart, quickstop
 from diesel.util.streams import create_line_input_stream
 
 try:
@@ -47,22 +48,22 @@ def interact_python():
         return inp.get().rstrip('\n')
 
     code.interact(None, diesel_input, env)
-    diesel.quickstop()
+    quickstop()
 
 def interact_ipython():
     """Starts an IPython instance; halts the diesel app when finished."""
     IPShell(user_ns={'diesel':diesel}).mainloop()
-    diesel.quickstop()
+    quickstop()
 
 # Interpreter entry points:
 # =========================
 
 def python():
-    diesel.quickstart(interact_python)
+    quickstart(interact_python)
 
 def ipython():
     if not IPYTHON_AVAILABLE:
         print >> sys.stderr, "IPython not found."
         raise SystemExit(1)
-    diesel.quickstart(interact_ipython)
+    quickstart(interact_ipython)
 

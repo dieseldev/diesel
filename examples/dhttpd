@@ -5,11 +5,8 @@
 
 Takes a few thttpd-like arguments (-h for help)
 '''
-import os
-import mimetypes
 
-from diesel import Application, Service, log
-from diesel.protocols import http
+from diesel import log
 from diesel.web import send_from_directory, DieselFlask
 
 log = log.name("dhttpd")
