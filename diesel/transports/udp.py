@@ -31,7 +31,7 @@ class UDPClient(Client):
         if source_ip:
             sock.bind((source_ip, 0))
 
-        self.socket_context = UDPContext(self, sock, ip, self.port)
+        self.socket_context = UDPContext(sock, ip, self.port)
         self.ready = True
 
     def _resolve(self, addr):
@@ -62,7 +62,7 @@ class UDPService(Service):
         self.iface, self.port = sock.getsockname()
 
         self.sock = sock
-        c = UDPContext(self, sock)
+        c = UDPContext(sock)
         l = Loop(self.connection_handler)
         l.connection_stack.append(c)
         runtime.current_app.add_loop(l)
@@ -80,10 +80,9 @@ class _Datagram(str):
         return "Datagram(%r, %r)" % (str.__str__(self), self.addr)
 
 class UDPContext(SocketContext):
-    def __init__(self, parent, sock, ip=None, port=None):
+    def __init__(self, sock, ip=None, port=None):
         super(UDPContext, self).__init__(sock, ip)
         self.port = port
-        self.parent = parent
         self.outgoing = deque([])
         self.incoming = deque([])
         self.remote_addr = (ip, port)
