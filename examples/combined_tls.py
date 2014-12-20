@@ -1,7 +1,8 @@
 from OpenSSL import SSL
 import time
-from diesel import Service, Client, send, quickstart, quickstop
-from diesel import until, call, log
+from diesel import send, quickstart, quickstop, until, log
+from diesel.transports.common import protocol
+from diesel.transports.tcp import TCPService, TCPClient
 
 server_ctx = SSL.Context(SSL.TLSv1_METHOD)
 server_ctx.use_privatekey_file('snakeoil-key.pem')
@@ -12,8 +13,8 @@ def handle_echo(remote_addr):
         message = until('\r\n')
         send("you said: %s" % message)
 
-class EchoClient(Client):
-    @call
+class EchoClient(TCPClient):
+    @protocol
     def echo(self, message):
         send(message + '\r\n')
         back = until("\r\n")
@@ -31,4 +32,4 @@ def do_echos():
         log.info('5000 loops in {0:.2f}s', time.time() - t)
     quickstop()
 
-quickstart(Service(handle_echo, port=8000, ssl_ctx=server_ctx), do_echos)
+quickstart(TCPService(handle_echo, port=8000, ssl_ctx=server_ctx), do_echos)

@@ -5,7 +5,7 @@ Check out crawler.py for more advanced behaviors involving
 many concurrent clients.
 '''
 
-from diesel import Application, Loop, log, quickstart, quickstop
+from diesel import log, quickstart, quickstop
 from diesel.protocols.http import HttpClient
 
 def req_loop():

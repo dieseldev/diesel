@@ -6,7 +6,7 @@ from flask import * # we're essentially republishing
 from werkzeug.debug import tbtools
 
 from diesel.app import Application, quickstart
-from diesel.logmod import log, loglevels
+from diesel.logmod import log, levels as loglevels
 from diesel.protocols.websockets import WebSocketServer
 from diesel.transports.tcp import TCPService
 

@@ -3,7 +3,7 @@
 '''
 import sys
 from diesel import (
-    UDPService, UDPClient, call, send, datagram, quickstart, receive,
+    UDPService, UDPClient, protocol, send, datagram, quickstart, receive,
 )
 
 
@@ -14,7 +14,7 @@ class EchoClient(UDPClient):
     from the wire.
 
     """
-    @call
+    @protocol
     def say(self, msg):
         send(msg)
         return receive(datagram)
