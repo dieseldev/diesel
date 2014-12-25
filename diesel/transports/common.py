@@ -185,6 +185,7 @@ class protocol(object):
 
     def __call__(self, *args, **kw):
         current_loop = runtime.current_loop
+        current_loop.client_refs.add(self.client)
         try:
             if not self.client.ready:
                 raise ConnectionClosed(

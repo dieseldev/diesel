@@ -163,6 +163,7 @@ class Loop(object):
         self.fire_due = False
         self.connection_stack = []
         self.coroutine = None
+        self.client_refs = set()
 
     def enable_tracking(self):
         self.tracked = True
@@ -186,6 +187,13 @@ class Loop(object):
             if self.connection_stack:
                 assert len(self.connection_stack) == 1
                 self.connection_stack.pop().close()
+        for client in self.client_refs:
+            if not client.is_closed:
+                log.warning(
+                    'cleaning up client after loop death - '
+                    'loop: %s, client: %s'
+                    % (self.loop_label, client))
+                client.close()
         self.deaths += 1
         self.running = False
         self.app.running.remove(self)
