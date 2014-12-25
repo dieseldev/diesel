@@ -113,10 +113,9 @@ class Service(object):
         pass
 
 class SocketContext(object):
-    def __init__(self, sock, addr):
+    def __init__(self, sock):
         self.hub = runtime.current_app.hub
         self.sock = sock
-        self.addr = addr
         self.hub.register(
                 sock, self.handle_read, self.handle_write, self.handle_error)
         self._writable = False

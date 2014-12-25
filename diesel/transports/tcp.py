@@ -98,7 +98,7 @@ class TCPService(Service):
 
 class TCPConnection(SocketContext):
     def __init__(self, sock, addr):
-        super(TCPConnection, self).__init__(sock, addr)
+        super(TCPConnection, self).__init__(sock)
         self.pipeline = pipeline.Pipeline()
         self.buffer = buffer.Buffer()
 

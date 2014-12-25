@@ -10,10 +10,6 @@ from diesel.protocols.zeromq import DieselZMQService
 # ==========
 
 def test_incoming_message_loop_is_kept_alive():
-    def stop_after_10_sends(sock):
-        if sock.send_calls == 10:
-            raise StopIteration
-
     svc = MisbehavingService('something', max_ticks=10)
     loop = diesel.fork(svc.run)
     diesel.sleep()

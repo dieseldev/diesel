@@ -9,7 +9,7 @@ from diesel import runtime
 from diesel.core import first, fork_child, fire
 from diesel.events import Waiter, StopWaitDispatch
 from diesel.hub import IntWrap
-from diesel.logmod import log, loglevels
+from diesel.logmod import log, levels as loglevels
 from diesel.util.queue import Queue
 from diesel.util.event import Event
 

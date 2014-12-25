@@ -102,7 +102,7 @@ class _Datagram(str):
 
 class UDPContext(SocketContext):
     def __init__(self, sock, ip=None, port=None):
-        super(UDPContext, self).__init__(sock, ip)
+        super(UDPContext, self).__init__(sock)
         self.port = port
         self.outgoing = deque([])
         self.incoming = deque([])
@@ -119,8 +119,7 @@ class UDPContext(SocketContext):
             self.remote_addr = value.addr
             return value
         def _wrap(value):
-            if isinstance(value, _Datagram):
-                self.remote_addr = value.addr
+            self.remote_addr = value.addr
             return callback(value)
         return _wrap
 
