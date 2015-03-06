@@ -1,3 +1,5 @@
+.. image:: https://travis-ci.org/touilleMan/diesel.svg?branch=py3k
+    :target: https://travis-ci.org/touilleMan/diesel
 
 Why Diesel?
 ===========
