@@ -46,7 +46,7 @@ Other bundled protocols include MongoDB, Riak, and Redis client libraries.
         "diesel.util",
         "diesel.util.patches",
         "diesel.protocols.http",
-    ],
+    ] + ([] if sys.version_info[0] == 2 else ["twiggy", "twiggy.lib", "twiggy.features"]),
     scripts=["examples/dhttpd"],
     entry_points={
         'console_scripts': [
@@ -58,10 +58,9 @@ Other bundled protocols include MongoDB, Riak, and Redis client libraries.
     },
     install_requires=([
         "greenlet",
-        "twiggy",
         "pyopenssl",
         "flask",
         "http-parser >= 0.7.12",
-        "dnspython" if sys.version_info.major == 2 else "dnspython3",
-    ] + additional_requires),
+        "dnspython" if sys.version_info[0] == 2 else "dnspython3",
+    ] + (["twiggy"] if sys.version_info[0] == 2 else [])),
     )
