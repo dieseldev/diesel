@@ -52,7 +52,7 @@ class Buffer(object):
         elif self._atterm is None:
             return None
         else:
-            all = ''.join(self._atinbuf)
+            all = b''.join(self._atinbuf)
             res = all.find(self._atterm)
             if res != -1:
                 ind = res + len(self._atterm)
@@ -60,7 +60,7 @@ class Buffer(object):
             return None
         self._atterm = None # this terminator was used
         if all is None:
-            all = ''.join(self._atinbuf)
+            all = b''.join(self._atinbuf)
         use = all[:ind]
         new_all = all[ind:]
         self._atinbuf = [new_all]
@@ -69,7 +69,7 @@ class Buffer(object):
         return use
 
     def pop(self):
-        b = ''.join(self._atinbuf)
+        b = b''.join(self._atinbuf)
         self._atinbuf = []
         self._atmark = 0
         return b

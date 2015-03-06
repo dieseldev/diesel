@@ -73,7 +73,7 @@ class WebSocketServer(HttpServer):
 
             protocol = req.headers.get('Sec-WebSocket-Protocol', None)
             key = req.headers.get('Sec-WebSocket-Key')
-            accept = b64encode(hashlib.sha1(key + self.GUID).digest())
+            accept = b64encode(hashlib.sha1((key + self.GUID).encode()).digest())
             headers = {
                 'Upgrade' : 'websocket',
                 'Connection' : 'Upgrade',
@@ -203,7 +203,7 @@ class WebSocketServer(HttpServer):
                         break
                     disconnecting = True
                 else:
-                    payload = dumps(val)
+                    payload = dumps(val).encode()
 
                     b1 = 0x80 | (1 & 0x0f) # FIN + opcode
 
@@ -214,7 +214,6 @@ class WebSocketServer(HttpServer):
                         header = pack('>BBH', b1, 126, payload_len)
                     elif payload_len >= 65536:
                         header = pack('>BBQ', b1, 127, payload_len)
-
                     send(header + payload)
 
     def handle_non_rfc_frames(self, inq, outq):

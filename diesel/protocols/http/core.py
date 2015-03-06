@@ -106,7 +106,7 @@ class HttpServer(object):
                 env.update({
                     'wsgi.version' : (1,0),
                     'wsgi.url_scheme' : 'http', # XXX incomplete
-                    'wsgi.input' : io.BytesIO(''.join(body)),
+                    'wsgi.input' : io.BytesIO(b''.join(body)),
                     'wsgi.errors' : FileLikeErrorLogger(hlog),
                     'wsgi.multithread' : False,
                     'wsgi.multiprocess' : False,
@@ -150,8 +150,8 @@ class HttpServer(object):
         else:
             sendfile = None
 
-        send("HTTP/%s %s %s\r\n" % (('%s.%s' % version), resp.status_code, resp.status))
-        send(bytes(resp.headers))
+        send(("HTTP/%s %s %s\r\n" % (('%s.%s' % version), resp.status_code, resp.status)).encode())
+        send((str(resp.headers)).encode())
 
         if sendfile:
             send(open(sendfile, 'rb')) # diesel can stream fds
@@ -218,7 +218,7 @@ class HttpClient(Client):
             'QUERY_STRING' : url_info[4],
             'wsgi.version' : (1,0),
             'wsgi.url_scheme' : 'http', # XXX incomplete
-            'wsgi.input' : io.BytesIO(body or ''),
+            'wsgi.input' : io.BytesIO(body or b''),
             'wsgi.errors' : FileLikeErrorLogger(hlog),
             'wsgi.multithread' : False,
             'wsgi.multiprocess' : False,
@@ -230,9 +230,9 @@ class HttpClient(Client):
 
         url = bytes(req.path)
         if req.query_string:
-            url += '?' + bytes(req.query_string)
+            url += b'?' + bytes(req.query_string)
 
-        send('%s %s HTTP/1.1\r\n%s' % (req.method, url, bytes(req.headers)))
+        send(('%s %s HTTP/1.1\r\n%s' % (req.method, url, bytes(req.headers))).encode())
 
         if body:
             send(body)

@@ -8,7 +8,7 @@ try:
 except ImportError:
     raise ImportError("cStringIO is required")
 
-from builtins import bytes
+from builtins import bytes, str
 from bisect import bisect_right
 # functools.total_ordering is not available for Python < 2.7
 try:
@@ -60,6 +60,8 @@ class PipelineClosed(Exception): pass
 @total_ordering
 class PipelineItem(object):
     def __init__(self, d):
+        if isinstance(d, str):
+            d = d.encode()
         if isinstance(d, bytes):
             self.f = make_SIO(d)
             self.length = len(d)
