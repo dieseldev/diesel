@@ -9,10 +9,39 @@ except ImportError:
     raise ImportError("cStringIO is required")
 
 from bisect import bisect_right
-from functools import total_ordering
+# functools.total_ordering is not available for Python < 2.7
+try:
+    from functools import total_ordering
+except ImportError:
+    def total_ordering(cls):  # noqa
+        """Class decorator that fills in missing ordering methods"""
+        convert = {
+            '__lt__': [('__gt__', lambda self, other: other < self),
+                    ('__le__', lambda self, other: not other < self),
+                    ('__ge__', lambda self, other: not self < other)],
+            '__le__': [('__ge__', lambda self, other: other <= self),
+                    ('__lt__', lambda self, other: not other <= self),
+                    ('__gt__', lambda self, other: not self <= other)],
+            '__gt__': [('__lt__', lambda self, other: other > self),
+                    ('__ge__', lambda self, other: not other > self),
+                    ('__le__', lambda self, other: not self > other)],
+            '__ge__': [('__le__', lambda self, other: other >= self),
+                    ('__gt__', lambda self, other: not other >= self),
+                    ('__lt__', lambda self, other: not self >= other)]
+        }
+        roots = set(dir(cls)) & set(convert)
+        if not roots:
+            raise ValueError('must define at least one ordering operation: < > <= >=')  # noqa
+        root = max(roots)       # prefer __lt__ to __le__ to __gt__ to __ge__
+        for opname, opfunc in convert[root]:
+            if opname not in roots:
+                opfunc.__name__ = opname
+                opfunc.__doc__ = getattr(int, opname).__doc__
+                setattr(cls, opname, opfunc)
+        return cls
 
 # Python2 consider str type as bytes where it is unicode for Python3
-if sys.version_info.major == 2:
+if sys.version_info[0] == 2:
     _obj_SIO = io.BytesIO
 else:
     _obj_SIO = io.StringIO
