@@ -27,7 +27,7 @@ class ChatClient(Client):
         self.input = Queue()
 
     def read_chat_message(self, prompt):
-        msg = raw_input(prompt)
+        msg = input(prompt)
         return msg
 
     def input_handler(self):
@@ -46,7 +46,7 @@ class ChatClient(Client):
         while True:
             evt, data = first(until_eol=True, waits=[self.input])
             if evt == "until_eol":
-                print data.strip()
+                print(data.strip())
             else:
                 send("%s\r\n" % data)
 
@@ -60,6 +60,6 @@ if sys.argv[1] == "server":
 elif sys.argv[1] == "client":
     app.add_loop(Loop(chat_client))
 else:
-    print "USAGE: python %s [server|client]" % sys.argv[0]
+    print("USAGE: python %s [server|client]" % sys.argv[0])
     raise SystemExit(1)
 app.run()

@@ -2,8 +2,8 @@ from diesel import Application, Loop, sleep
 import time
 
 def l():
-    for x in xrange(2):
-        print "hi"
+    for x in range(2):
+        print("hi")
         time.sleep(1)
         sleep(5)
     a.halt()

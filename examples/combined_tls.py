@@ -24,7 +24,7 @@ log = log.name('echo-system')
 def do_echos():
     with EchoClient('localhost', 8000, ssl_ctx=SSL.Context(SSL.TLSv1_METHOD)) as client:
         t = time.time()
-        for x in xrange(5000):
+        for x in range(5000):
             msg = "hello, world #%s!" % x
             echo_result = client.echo(msg)
             assert echo_result.strip() == "you said: %s" % msg

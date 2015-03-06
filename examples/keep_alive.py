@@ -2,7 +2,7 @@ from diesel import Application, Loop, sleep
 import time
 
 def restart():
-    print "I should restart"
+    print("I should restart")
     a = b
 
 a = Application()

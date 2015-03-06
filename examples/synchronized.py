@@ -9,7 +9,7 @@ def free_loop():
     free += 1
     sleep(random.random())
     free -= 1
-    print 'FREE', free
+    print('FREE', free)
 
 def sync_loop():
     global sync
@@ -17,7 +17,7 @@ def sync_loop():
         sync += 1
         sleep(random.random())
         sync -= 1
-        print 'SYNC', sync
+        print('SYNC', sync)
 
 def manage():
     sleep(10)
@@ -25,7 +25,7 @@ def manage():
 
 a = Application()
 for l in (free_loop, sync_loop):
-    for x in xrange(10):
+    for x in range(10):
         a.add_loop(Loop(l))
 a.add_loop(Loop(manage))
 a.run()

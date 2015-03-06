@@ -4,7 +4,7 @@ Clients + Loops
 '''
 
 import sys, time, re, os
-from urlparse import urlparse, urljoin
+from urllib.parse import urlparse, urljoin
 
 url, folder = sys.argv[1:]
 
@@ -82,6 +82,6 @@ def stop():
 
 t = time.time()
 
-pool = ThreadPool(CONCURRENCY, follow_loop, req_loop().next, stop)
+pool = ThreadPool(CONCURRENCY, follow_loop, req_loop().__next__, stop)
 
 quickstart(pool)

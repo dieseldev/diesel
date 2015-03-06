@@ -35,7 +35,7 @@ def main():
     client.delete(key)
     client.set(incr_key, 0)
 
-    for _ in xrange(500):
+    for _ in range(500):
         fork(take_lock)
         if random.random() > 0.1:
             sleep(random.random() / 10)

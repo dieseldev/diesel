@@ -19,7 +19,7 @@ log = log.name('echo-system')
 def do_echos():
     client = EchoClient('localhost', 8000)
     t = time.time()
-    for x in xrange(5000):
+    for x in range(5000):
         msg = "hello, world #%s!" % x
         echo_result = client.echo(msg)
         assert echo_result.strip() == "you said: %s" % msg

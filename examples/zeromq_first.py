@@ -5,13 +5,13 @@ import time
 def get_messages():
     outsock = DieselZMQSocket(zctx.socket(zmq.DEALER), bind="tcp://127.0.0.1:5000")
 
-    for x in xrange(1000):
+    for x in range(1000):
         t, m = first(sleep=1.0, waits=[outsock])
 
         if t == 'sleep':
-            print "sleep timeout!"
+            print("sleep timeout!")
         else:
-            print "zmq:", m
+            print("zmq:", m)
 
     quickstop()
 

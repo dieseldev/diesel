@@ -6,19 +6,19 @@ from diesel.protocols.nitro import (
 import uuid
 
 NUM_CLIENTS = 300
-cids = range(NUM_CLIENTS)
+cids = list(range(NUM_CLIENTS))
 dead = 0
 
 def echo_client():
     global dead
     id = str(uuid.uuid4())
     s = DieselNitroSocket(connect='tcp://127.0.0.1:4321')
-    for i in xrange(50):
+    for i in range(50):
         s.send(NitroFrame('%s|m%d' % (id, i)))
         r = s.recv()
         assert r.data == 'm%d:%d' % (i, i + 1)
     dead += 1
-    print 'done!', dead
+    print('done!', dead)
 
 class EchoService(DieselNitroService):
     def handle_client_packet(self, packet, ctx):
@@ -30,8 +30,8 @@ class EchoService(DieselNitroService):
         return raw.split('|')
 
     def cleanup_client(self, client):
-        print 'client timed out', client.identity
+        print('client timed out', client.identity)
 
 echo_svc = EchoService('tcp://*:4321')
-diesel.quickstart(echo_svc.run, *(echo_client for i in xrange(NUM_CLIENTS)))
+diesel.quickstart(echo_svc.run, *(echo_client for i in range(NUM_CLIENTS)))
 

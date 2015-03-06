@@ -6,7 +6,7 @@ from diesel import Application, Service, until_eol, sleep, send
 def delay_echo_server(addr):
     inp = until_eol()
 
-    for x in xrange(4):
+    for x in range(4):
         sleep(2)
         send(str(x) + '\r\n')
     send("you said %s" % inp)

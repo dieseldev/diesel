@@ -22,22 +22,22 @@ class KvNode(ConvoyRole):
         sender.respond(SetOkay())
 
 def run_sets():
-    print "I am here!"
+    print("I am here!")
     convoy.send(SetRequest(key="foo", value="bar"))
-    print "I am here 2!"
+    print("I am here 2!")
     convoy.send(SetRequest(key="foo", value="bar"))
-    print "I am here 3!"
-    print convoy.rpc(GetRequest(key="foo")).single
-    print "I am here 4!"
+    print("I am here 3!")
+    print(convoy.rpc(GetRequest(key="foo")).single)
+    print("I am here 4!")
 
     import time
     t = time.time()
-    for x in xrange(5000):
+    for x in range(5000):
         convoy.send(SetRequest(key="foo", value="bar"))
         r = convoy.rpc(GetRequest(key="foo")).single
-    print 5000.0 / (time.time() - t), "/ s"
-    print ''
-    print r
+    print(5000.0 / (time.time() - t), "/ s")
+    print('')
+    print(r)
 
 if __name__ == '__main__':
     convoy.run_with_nameserver("localhost:11111", ["localhost:11111"], KvNode(), run_sets)

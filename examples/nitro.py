@@ -13,7 +13,7 @@ def server():
 
 def client():
     with DieselNitroSocket(connect=loc) as sock:
-        for x in xrange(100000):
+        for x in range(100000):
             sock.send(NitroFrame("Hello, dude!"))
             m = sock.recv()
             assert m.data == "you said: Hello, dude!"

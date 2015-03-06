@@ -4,15 +4,15 @@ from diesel.util.stats import CPUStats
 
 def not_always_busy_worker():
     with CPUStats() as stats:
-        for _ in xrange(12):
-            for i in xrange(10000000): # do some work to forward cpu seconds
+        for _ in range(12):
+            for i in range(10000000): # do some work to forward cpu seconds
                 pass
             sleep(0.1) # give up control
 
-    print "cpu seconds ",  stats.cpu_seconds
+    print("cpu seconds ",  stats.cpu_seconds)
 
 def spawn_busy_workers():
-    for _ in xrange(0,3):
+    for _ in range(0,3):
         fork(not_always_busy_worker)
 
 a = Application()
