@@ -18,6 +18,7 @@ from diesel.security import ssl_async_handshake
 from diesel import runtime
 from diesel import log
 from diesel.events import EarlyValue
+import collections
 
 class ConnectionClosed(socket.error):
     '''Raised if the client closes the connection.
@@ -191,7 +192,7 @@ class call(object):
                 r = self.f(self.client, *args, **kw)
             finally:
                 current_loop.connection_stack.pop()
-        except ConnectionClosed, e:
+        except ConnectionClosed as e:
             raise ClientConnectionClosed(str(e), addr=self.client.addr, port=self.client.port)
         return r
 
@@ -212,7 +213,7 @@ class Loop(object):
         self.keep_alive = False
         self.hub = runtime.current_app.hub
         self.app = runtime.current_app
-        self.id = ids.next()
+        self.id = next(ids)
         self.children = set()
         self.parent = None
         self.deaths = 0
@@ -326,7 +327,7 @@ class Loop(object):
                 return mark
             return deco
 
-        f_sent = filter(None, (receive_any, receive, until, until_eol, datagram))
+        f_sent = [_f for _f in (receive_any, receive, until, until_eol, datagram) if _f]
         assert len(f_sent) <= 1,(
         "only 1 of (receive_any, receive, until, until_eol, datagram) may be provided")
         sentinel = None
@@ -427,7 +428,7 @@ class Loop(object):
             except socket.error:
                 try:
                     d = sock.recv(1)
-                except socket.error, e:
+                except socket.error as e:
                     if e.errno == errno.ECONNREFUSED:
                         d = ''
                     else:
@@ -568,7 +569,7 @@ class Loop(object):
         conn = self.check_connection()
         cb = cb_maker(self.wake)
         res = conn.check_incoming(sentinel, cb)
-        if callable(res):
+        if isinstance(res, collections.Callable):
             cb = res
         elif res:
             return res
@@ -669,7 +670,7 @@ class Connection(object):
             else:
                 try:
                     bsent = self.sock.send(data)
-                except socket.error, e:
+                except socket.error as e:
                     code, s = e
                     if code in (errno.EAGAIN, errno.EINTR):
                         self.pipeline.backup(data)
@@ -704,7 +705,7 @@ class Connection(object):
             return
         try:
             data = self.sock.recv(BUFSIZ)
-        except socket.error, e:
+        except socket.error as e:
             code, s = e
             if code in (errno.EAGAIN, errno.EINTR):
                 return
@@ -771,7 +772,7 @@ class UDPSocket(Connection):
             dgram = self.outgoing.popleft()
             try:
                 bsent = self.sock.sendto(dgram, dgram.addr)
-            except socket.error, e:
+            except socket.error as e:
                 code, s = e
                 if code in (errno.EAGAIN, errno.EINTR):
                     self.outgoing.appendleft(dgram)
@@ -801,7 +802,7 @@ class UDPSocket(Connection):
         try:
             data, addr = self.sock.recvfrom(BUFSIZ)
             dgram = Datagram(data, addr)
-        except socket.error, e:
+        except socket.error as e:
             code, s = e
             if code in (errno.EAGAIN, errno.EINTR):
                 return

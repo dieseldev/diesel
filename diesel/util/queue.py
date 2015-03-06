@@ -39,7 +39,7 @@ class Queue(Waiter):
     def __iter__(self):
         return self
 
-    def next(self):
+    def __next__(self):
         return self.get()
 
     @property

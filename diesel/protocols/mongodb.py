@@ -2,7 +2,7 @@
 """A mongodb client library for Diesel"""
 
 # needed to make diesel work with python 2.5
-from __future__ import with_statement
+
 
 import itertools
 import struct
@@ -57,7 +57,7 @@ class MongoClient(Client):
 
     @property
     def _msg_id(self):
-        return self._msg_id_counter.next()
+        return next(self._msg_id_counter)
 
     def _put_request_get_response(self, op, data):
         self._put_request(op, data)
@@ -223,7 +223,7 @@ class MongoIter(object):
         self.cursor = cursor
         self.cache = deque()
 
-    def next(self):
+    def __next__(self):
         try:
             return self.cache.popleft()
         except IndexError:
@@ -232,7 +232,7 @@ class MongoIter(object):
                 raise StopIteration()
             else:
                 self.cache.extend(more)
-                return self.next()
+                return next(self)
         
 class MongoCursor(object):
     def __init__(self, col, client, spec, fields, skip, limit):
@@ -358,7 +358,7 @@ class MongoProxy(object):
 
     def handle_request(self, info, body):
         length, id, to, opcode = info
-        print "saw request with opcode", opcode
+        print("saw request with opcode", opcode)
         return None, info, body
 
     def handle_response(self, response):

@@ -62,6 +62,6 @@ Other bundled protocols include MongoDB, Riak, and Redis client libraries.
         "pyopenssl",
         "flask",
         "http-parser >= 0.7.12",
-        "dnspython",
+        "dnspython" if sys.version_info.major == 2 else "dnspython3",
     ] + additional_requires),
     )

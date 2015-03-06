@@ -2,12 +2,12 @@
 '''HTTP/1.1 implementation of client and server.
 '''
 
-import cStringIO
+import io
 import os
-import urllib
+import urllib.request, urllib.parse, urllib.error
 import time
 from datetime import datetime
-from urlparse import urlparse
+from urllib.parse import urlparse
 from flask import Request, Response
 from OpenSSL import SSL
 
@@ -34,7 +34,7 @@ def parse_request_line(line):
     items[0] = items[0].upper()
     if len(items) == 2:
         return tuple(items) + ('0.9',)
-    items[1] = urllib.unquote(items[1])
+    items[1] = urllib.parse.unquote(items[1])
     items[2] = items[2].split('/')[-1].strip()
     return tuple(items)
 
@@ -101,7 +101,7 @@ class HttpServer(object):
                 env.update({
                     'wsgi.version' : (1,0),
                     'wsgi.url_scheme' : 'http', # XXX incomplete
-                    'wsgi.input' : cStringIO.StringIO(''.join(body)),
+                    'wsgi.input' : io.StringIO(''.join(body)),
                     'wsgi.errors' : FileLikeErrorLogger(hlog),
                     'wsgi.multithread' : False,
                     'wsgi.multiprocess' : False,
@@ -199,7 +199,7 @@ class HttpClient(Client):
         headers = headers or {}
         url_info = urlparse(url)
         fake_wsgi = dict(
-        (cgi_name(n), str(v).strip()) for n, v in headers.iteritems())
+        (cgi_name(n), str(v).strip()) for n, v in headers.items())
 
         if body and 'CONTENT_LENGTH' not in fake_wsgi:
             # If the caller hasn't set their own Content-Length but submitted
@@ -213,7 +213,7 @@ class HttpClient(Client):
             'QUERY_STRING' : url_info[4],
             'wsgi.version' : (1,0),
             'wsgi.url_scheme' : 'http', # XXX incomplete
-            'wsgi.input' : cStringIO.StringIO(body or ''),
+            'wsgi.input' : io.StringIO(body or ''),
             'wsgi.errors' : FileLikeErrorLogger(hlog),
             'wsgi.multithread' : False,
             'wsgi.multiprocess' : False,

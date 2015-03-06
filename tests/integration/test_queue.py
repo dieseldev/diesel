@@ -35,7 +35,7 @@ class QueueHarness(object):
                 self.results.append(v)
                 self.handled[myid] += 1
                 self.done.tick()
-        for i in xrange(W):
+        for i in range(W):
             diesel.fork(worker, i)
 
     def trigger(self):
@@ -44,22 +44,22 @@ class QueueHarness(object):
             assert 0, "timed out"
 
     def test_results_are_ordered_as_expected(self):
-        assert self.results == range(N), self.results
+        assert self.results == list(range(N)), self.results
 
     def test_results_are_balanced(self):
-        for wid, count in self.handled.iteritems():
+        for wid, count in self.handled.items():
             assert count == N/W, count
 
 class TestConsumersOnFullQueue(QueueHarness):
     def populate(self):
-        for i in xrange(N):
+        for i in range(N):
             self.queue.put(i)
 
 class TestConsumersOnEmptyQueue(QueueHarness):
     def populate(self):
         def go():
             diesel.wait('ready')
-            for i in xrange(N):
+            for i in range(N):
                 self.queue.put(i)
         diesel.fork(go)
 

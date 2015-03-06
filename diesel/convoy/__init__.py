@@ -18,6 +18,7 @@ from .consensus.client import (ConvoyNameService, ConsensusSet,
 from .messagenet import (me, ConvoyService,
                          MESSAGE_RES, MESSAGE_OUT,
                          host_loop)
+import collections
 
 class ConvoyRemoteException(object):
     def __init__(self, s):
@@ -75,7 +76,7 @@ class Convoy(object):
             runem.append(
                 Thunk(lambda: run_consensus_server(self.run_nameserver, nameservers)))
         runem.append(self)
-        handler_functions = dict((v, k) for k, v in self.local_handlers.iteritems())
+        handler_functions = dict((v, k) for k, v in self.local_handlers.items())
         final_o = []
         for o in objs:
             if type(o.__class__) is ConvoyRegistrar:
@@ -155,8 +156,8 @@ class Convoy(object):
     def add_target_role(self, o):
         self.roles.add(o)
         self.role_by_name[o.name()] = o
-        for k, v in o.__dict__.iteritems():
-            if k.startswith("handle_") and callable(v):
+        for k, v in o.__dict__.items():
+            if k.startswith("handle_") and isinstance(v, collections.Callable):
                 handler_for = k.split("_", 1)[-1]
                 assert handler_for in self.classes, "protobuf class not recognized; register() the module"
                 self.role_messages[o].append(handler_for)
@@ -194,7 +195,7 @@ class Convoy(object):
                     MESSAGE_RES, None)
             try:
                 r(sender, inst)
-            except Exception, e:
+            except Exception as e:
                 s = str(e)
                 back.result = MessageResponse.EXCEPTION
                 back.error_message = s
@@ -352,8 +353,7 @@ class ConvoyRegistrar(type):
             convoy.add_target_role(t)
         return t
 
-class ConvoyRole(object):
-    __metaclass__ = ConvoyRegistrar
+class ConvoyRole(object, metaclass=ConvoyRegistrar):
     limit = 0
 
     @classmethod

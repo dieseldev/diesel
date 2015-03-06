@@ -173,7 +173,7 @@ class DieselNitroService(object):
                     remote_client.async_frame = value.orig_frame
                     resp = self.handle_client_packet(value.data, remote_client.context)
                     if resp:
-                        if isinstance(resp, basestring):
+                        if isinstance(resp, str):
                             output = [resp]
                         else:
                             output = iter(resp)

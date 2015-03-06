@@ -62,7 +62,7 @@ def python():
 
 def ipython():
     if not IPYTHON_AVAILABLE:
-        print >> sys.stderr, "IPython not found."
+        print("IPython not found.", file=sys.stderr)
         raise SystemExit(1)
     diesel.quickstart(interact_ipython)
 

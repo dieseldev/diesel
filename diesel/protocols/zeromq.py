@@ -46,7 +46,7 @@ class DieselZMQSocket(Waiter):
         while True:
             try:
                 self.socket.send(message, zmq.NOBLOCK | flags)
-            except zmq.ZMQError, e:
+            except zmq.ZMQError as e:
                 if e.errno == EAGAIN:
                     self.handle_transition(True) # force re-evaluation of EVENTS
                     self.write_gate.wait()
@@ -62,7 +62,7 @@ class DieselZMQSocket(Waiter):
             self.read_gate.wait()
             try:
                 m = self.socket.recv(zmq.NOBLOCK, copy=copy)
-            except zmq.ZMQError, e:
+            except zmq.ZMQError as e:
                 if e.errno == EAGAIN:
                     self.handle_transition(True) # force re-evaluation of EVENTS
                     self.read_gate.wait()
@@ -88,7 +88,7 @@ class DieselZMQSocket(Waiter):
     def ready_early(self):
         try:
             m = self.socket.recv(zmq.NOBLOCK, copy=False)
-        except zmq.ZMQError, e:
+        except zmq.ZMQError as e:
             if e.errno == EAGAIN:
                 return False
             else:
@@ -201,7 +201,7 @@ class DieselZMQService(object):
                 elif evt == 'sleep':
                     break
                 if resp:
-                    if isinstance(resp, basestring):
+                    if isinstance(resp, str):
                         output = [resp]
                     else:
                         output = iter(resp)

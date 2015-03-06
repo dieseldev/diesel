@@ -114,7 +114,7 @@ class ConvoyConsensusClient(Client):
     @call
     def wait(self, timeout, clocks):
         parts = chain([timeout], 
-                *clocks.iteritems())
+                *iter(clocks.items()))
         rest = ' '.join(map(str, parts))
         send("BLOCKON " + rest + "\r\n")
 
@@ -178,9 +178,9 @@ cargo = ConvoyNameService([('localhost', 1111), ('localhost', 1112), ('localhost
 
 if __name__ == '__main__':
     def run():
-        print cargo.clear("foo")
-        print cargo.set("foo", "bar")
-        print cargo.lookup("foo")
+        print(cargo.clear("foo"))
+        print(cargo.set("foo", "bar"))
+        print(cargo.lookup("foo"))
         quickstop()
     from diesel import quickstart, quickstop
     quickstart(cargo, run)

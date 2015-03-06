@@ -8,7 +8,7 @@ from flask import * # we're essentially republishing
 from werkzeug.debug import tbtools
 from diesel.protocols.websockets import WebSocketServer
 
-from app import Application, Service, quickstart
+from .app import Application, Service, quickstart
 from diesel import log, set_log_level, loglevels
 
 
@@ -70,7 +70,7 @@ class DieselFlask(Flask):
         with self.request_context(req):
             try:
                 response = self.full_dispatch_request()
-            except Exception, e:
+            except Exception as e:
                 self.log_exception(e)
                 try:
                     response = self.make_response(self.handle_exception(e))

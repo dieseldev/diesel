@@ -17,12 +17,12 @@ class Client(object):
         self._setup_socket(ip, timeout, source_ip)
 
     def _resolve(self, addr):
-        from resolver import resolve_dns_name
+        from .resolver import resolve_dns_name
         return resolve_dns_name(addr)
 
     def _setup_socket(self, ip, timeout, source_ip=None):
     
-        from core import _private_connect
+        from .core import _private_connect
         remote_addr = (ip, self.port)
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.setblocking(0)
@@ -32,7 +32,7 @@ class Client(object):
     
         try:
             sock.connect(remote_addr)
-        except socket.error, e:
+        except socket.error as e:
             if e.args[0] == errno.EINPROGRESS:
                 _private_connect(self, ip, sock, self.addr, self.port, timeout=timeout)
             else:
@@ -64,7 +64,7 @@ class UDPClient(Client):
         super(UDPClient, self).__init__(addr, port, source_ip = source_ip)
 
     def _setup_socket(self, ip, timeout, source_ip=None):
-        from core import UDPSocket
+        from .core import UDPSocket
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.setblocking(0)
 

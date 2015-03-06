@@ -18,7 +18,7 @@ class TestRedis(RedisHarness):
         r.delete('foo3')
         assert not r.exists('foo3')
 
-        for x in xrange(5000):
+        for x in range(5000):
             r.set('foo', 'bar')
 
         assert r.get('foo') == 'bar'

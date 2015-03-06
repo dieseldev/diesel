@@ -28,7 +28,7 @@ class ConnectionPool(object):
         self.poll_max_timeout = poll_max_timeout
         if pool_max:
             self.remaining_conns = Queue()
-            for _ in xrange(pool_max):
+            for _ in range(pool_max):
                 self.remaining_conns.inp.append(None)
         else:
             self.remaining_conns = InfiniteQueue()
@@ -116,7 +116,7 @@ class ThreadPool(object):
         self.running = 0
         try:
             while True:
-                for x in xrange(self.concurrency - self.running):
+                for x in range(self.concurrency - self.running):
                     self.running += 1
                     fork(self.handler_wrap)
 
@@ -132,7 +132,7 @@ class ThreadPool(object):
                 self.q.put(n)
                 sleep()
         finally:
-            for x in xrange(self.concurrency):
+            for x in range(self.concurrency):
                 self.q.put(ThreadPoolDie)
             if self.finalizer:
                 self.finished.wait()

@@ -76,7 +76,7 @@ class FakeConnection(object):
             "This connection requires more items in its delay list for further requests."
         delay = self.delay.pop(0)
         if delay is not None:
-            print diesel.sleep(delay)
+            print(diesel.sleep(delay))
         if self.waiting_callback:
             self.waiting_callback('expected value %s\r\n' % self.conn_id)
 

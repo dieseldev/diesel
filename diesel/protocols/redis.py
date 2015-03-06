@@ -206,13 +206,13 @@ class RedisClient(Client):
 
     @call
     def mset(self, d):
-        self._send('MSET', list=flatten_arg_pairs(d.iteritems()))
+        self._send('MSET', list=flatten_arg_pairs(iter(d.items())))
         resp = self._get_response()
         return resp
 
     @call
     def msetnx(self, d):
-        self._send('MSETNX', list=flatten_arg_pairs(d.iteritems()))
+        self._send('MSETNX', list=flatten_arg_pairs(iter(d.items())))
         resp = self._get_response()
         return resp
 
@@ -455,7 +455,7 @@ class RedisClient(Client):
 
     def __pair_with_scores(self, resp):
         return [(resp[x], float(resp[x+1]))
-                for x in xrange(0, len(resp), 2)]
+                for x in range(0, len(resp), 2)]
 
     @call
     def zadd(self, key, score, member):
@@ -575,7 +575,7 @@ class RedisClient(Client):
     def hmset(self, key, d):
         if not d:
             return True
-        args = [key] + flatten_arg_pairs(d.iteritems())
+        args = [key] + flatten_arg_pairs(iter(d.items()))
 
         self._send('HMSET', list=args)
         resp = self._get_response()
@@ -588,7 +588,7 @@ class RedisClient(Client):
         args = [key] + l
         self._send('HMGET', list=args)
         resp = self._get_response()
-        return dict(zip(l, resp))
+        return dict(list(zip(l, resp)))
 
     @call
     def hincrby(self, key, field, amt):
@@ -630,7 +630,7 @@ class RedisClient(Client):
     def hgetall(self, key):
         self._send('HGETALL', key)
         resp = self._get_response()
-        return dict(resp[x:x+2] for x in xrange(0, len(resp), 2))
+        return dict(resp[x:x+2] for x in range(0, len(resp), 2))
 
     @call
     def hsetnx(self, key, field, value):
@@ -758,7 +758,7 @@ class RedisClient(Client):
             if nargs == -1:
                 return line_one
             out = line_one
-            for x in xrange(nargs):
+            for x in range(nargs):
                 head = until_eol()
                 out += head
                 out += receive(int(head[1:])) + until_eol()
@@ -797,7 +797,7 @@ class RedisClient(Client):
             resp = []
             if count == -1:
                 return None
-            for x in xrange(count):
+            for x in range(count):
                 hl = until_eol()
                 assert hl[0] in ['$', ':', '+']
                 if hl[0] == '$':

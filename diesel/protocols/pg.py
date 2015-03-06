@@ -37,7 +37,7 @@ class PgRowDescriptor(object):
         return self.values[self.lookup[n]]
 
     def load_row(self, ts):
-        for x, (conv, v) in enumerate(izip(self.convs, ts)):
+        for x, (conv, v) in enumerate(zip(self.convs, ts)):
             self.values[x] = conv(v) if v is not None else None
 
     def __str__(self):
@@ -171,7 +171,7 @@ class PostgreSQLClient(Client):
 
         names = []
         types = []
-        for x in xrange(n):
+        for x in range(n):
             name = until('\0')[:-1]
             names.append(name)
             taboid, fattnum, typoid, sz, typmod, fmt = \
@@ -191,7 +191,7 @@ class PostgreSQLClient(Client):
     def handle_data(self):
         (size, n) = unpack("!ih", receive(6))
         values = PgDataRow()
-        for x in xrange(n):
+        for x in range(n):
             (l,) = unpack('!i', receive(4))
             if l == -1:
                 values.append(None)
@@ -233,7 +233,7 @@ class PostgreSQLClient(Client):
 
     @call
     def prepare(self, q, id):
-        print 'PREP'
+        print('PREP')
         q += '\0'
         sid = id + '\0'
         send('P' + pack('!i', 4 + len(q) + len(sid) + 2))
@@ -281,7 +281,7 @@ class PostgreSQLClient(Client):
         if q in self.prepared:
             id = self.prepared[q]
         else:
-            id = 'q%d' % self.prepare_gen.next()
+            id = 'q%d' % next(self.prepare_gen)
             self.prepare(q, id)
             self.prepared[q] = id
             prep = True
@@ -379,7 +379,7 @@ def py_to_pg(o):
     return {
         bool : lambda d: 't' if d else 'f',
         str : str,
-        unicode : lambda a: a.encode('utf8'),
+        str : lambda a: a.encode('utf8'),
         int : str,
     }[t](o)
 
@@ -390,8 +390,8 @@ def oid_to_conv(id):
         21 : int,
         23 : int,
         26 : str,
-        1042 : lambda s: unicode(s, 'utf-8'),
-        1043 : lambda s: unicode(s, 'utf-8'),
+        1042 : lambda s: str(s, 'utf-8'),
+        1043 : lambda s: str(s, 'utf-8'),
     }[id]
 
 if __name__ == '__main__':
@@ -406,19 +406,19 @@ if __name__ == '__main__':
                 #    print row.name
                 #    print row.id
                 for row in client.query("SELECT * FROM typtest", buffer=500):
-                    print row
+                    print(row)
 
             client.execute("UPDATE companies set name = $1 where id < $2",
             "marky co", 5)
 
-        print '\n\n~~~done!~~~'
+        print('\n\n~~~done!~~~')
 
     def g():
         with PostgreSQLClient(database="test", user="test") as client:
-            for x in xrange(500):
+            for x in range(500):
                 r = client.query_one(
                 "select * from counters where id = $1 for update", 1)
-        print 'done'
+        print('done')
 
 
     from diesel import quickstart

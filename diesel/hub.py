@@ -18,12 +18,18 @@ import errno
 import fcntl
 import os
 import signal
-import thread
+try:
+    import _thread
+except ImportError:
+    import thread as _thread
 
 from collections import deque, defaultdict
 from operator import attrgetter
 from time import time
-from Queue import Queue, Empty
+try:
+    from queue import Queue, Empty
+except ImportError:
+    from Queue import Queue, Empty
 
 TRIGGER_COMPARE = attrgetter('trigger_time')
 
@@ -121,16 +127,16 @@ class AbstractEventHub(object):
         def wrap():
             try:
                 res = f(*args, **kw)
-            except Exception, e:
+            except Exception as e:
                 self.thread_comp_in.put((reschedule, e))
             else:
                 self.thread_comp_in.put((reschedule, res))
             self.wake_from_other_thread()
-        thread.start_new_thread(wrap, ())
+        _thread.start_new_thread(wrap, ())
 
     def wake_from_other_thread(self):
         try:
-            os.write(self._t_wakeup, '\0')
+            os.write(self._t_wakeup, b'\0')
         except IOError:
             pass
 
@@ -279,7 +285,7 @@ class EPollEventHub(AbstractEventHub):
 
                 if not self.run:
                     return
-        except IOError, e:
+        except IOError as e:
             if e.errno == errno.EINTR:
                 while self.run_now and self.run:
                     self.run_now.popleft()()

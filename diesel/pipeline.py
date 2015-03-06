@@ -2,15 +2,21 @@
 '''An outgoing pipeline that can handle
 strings or files.
 '''
+import sys
 try:
-    import cStringIO
+    import io
 except ImportError:
-    raise ImportError, "cStringIO is required"
+    raise ImportError("cStringIO is required")
 
 from bisect import bisect_right
+from functools import total_ordering
 
-_obj_SIO = cStringIO.StringIO
-_type_SIO = cStringIO.OutputType
+# Python2 consider str type as bytes where it is unicode for Python3
+if sys.version_info.major == 2:
+    _obj_SIO = io.BytesIO
+else:
+    _obj_SIO = io.StringIO
+
 def make_SIO(d):
     t = _obj_SIO()
     t.write(d)
@@ -27,9 +33,10 @@ def get_file_length(f):
 class PipelineCloseRequest(Exception): pass
 class PipelineClosed(Exception): pass
 
+@total_ordering
 class PipelineItem(object):
     def __init__(self, d):
-        if type(d) is str:
+        if isinstance(d, str):
             self.f = make_SIO(d)
             self.length = len(d)
             self.is_sio = True
@@ -55,10 +62,10 @@ class PipelineItem(object):
     def done(self):
         return self.f.tell() == self.length
 
-    def __cmp__(self, other):
+    def __lt__(self, other):
         if other is PipelineStandIn:
-            return -1
-        return cmp(self, other) 
+            return True
+        return self < other
 
 class PipelineStandIn(object): pass
 
@@ -82,7 +89,7 @@ class Pipeline(object):
 
         dummy = (priority, PipelineStandIn)
         ind = bisect_right(self.line, dummy)
-        if ind > 0 and type(d) is str and self.line[ind - 1][-1].is_sio:
+        if ind > 0 and isinstance(d, str) and self.line[ind - 1][-1].is_sio:
             a_pri, adjacent = self.line[ind - 1]
             if adjacent.is_sio and a_pri == priority:
                 adjacent.merge(d)
@@ -108,19 +115,19 @@ class Pipeline(object):
         if not self.current and not self.line:
             if self.want_close:
                 raise PipelineCloseRequest()
-            return ''
+            return u''
 
         if not self.current:
             _, self.current = self.line.pop(0)
             self.current.reset()
 
-        out = ''
+        out = u''
         while len(out) < amt:
             try:
                 data = self.current.read(amt - len(out))
             except ValueError:
-                data = ''
-            if data == '':
+                data = u''
+            if not data:
                 if not self.line:
                     self.current = None
                     break

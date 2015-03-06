@@ -1,7 +1,11 @@
 #12345678
 # That comment above matters (used in the test!)
 from diesel.pipeline import Pipeline, PipelineClosed, PipelineCloseRequest
-from cStringIO import StringIO
+# Python3's StringIO works with unicode where Python2 version use bytes
+try:
+    from StringIO import StringIO
+except ImportError:
+    from io import StringIO
 
 FILE = __file__
 if FILE.endswith('.pyc') or FILE.endswith('.pyo'):

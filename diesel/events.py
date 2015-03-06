@@ -35,7 +35,7 @@ class WaitPool(object):
         self.loop_refs = defaultdict(set)
 
     def wait(self, who, what):
-        if isinstance(what, basestring):
+        if isinstance(what, str):
             what = StringWaiter(what)
 
         if what.ready_early():
@@ -46,7 +46,7 @@ class WaitPool(object):
         return what.wait_id
 
     def fire(self, what, value):
-        if isinstance(what, basestring):
+        if isinstance(what, str):
             what = StringWaiter(what)
 
         static = False

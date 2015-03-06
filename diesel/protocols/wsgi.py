@@ -20,7 +20,7 @@ class WSGIRequestHandler(object):
 
     def _start_response(self, env, status, response_headers, exc_info=None):
         if exc_info:
-            raise exc_info[0], exc_info[1], exc_info[2]
+            raise exc_info[0](exc_info[1]).with_traceback(exc_info[2])
         else:
             r = env['diesel.response']
             r.status = status

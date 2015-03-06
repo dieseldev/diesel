@@ -1,5 +1,5 @@
-import urllib
-import urlparse
+import urllib.request, urllib.parse, urllib.error
+import urllib.parse
 
 import diesel
 import diesel.protocols.http.core as http
@@ -18,11 +18,11 @@ class InvalidUrlScheme(Exception):
     pass
 
 def request(url, method='GET', timeout=60, body=None, headers=None):
-    if body and (not isinstance(body, basestring)):
-        body_bytes = urllib.urlencode(body)
+    if body and (not isinstance(body, str)):
+        body_bytes = urllib.parse.urlencode(body)
     else:
         body_bytes = body
-    req_url = urlparse.urlparse(url)
+    req_url = urllib.parse.urlparse(url)
     if not headers:
         headers = {}
     headers.update({
@@ -39,12 +39,12 @@ def request(url, method='GET', timeout=60, body=None, headers=None):
         req_path = req_url.path
     encoded_path = req_path.encode('utf-8')
     # Loop to retry if the connection was closed.
-    for i in xrange(POOL_SIZE):
+    for i in range(POOL_SIZE):
         try:
             with http_pool_for_url(req_url).connection as conn:
                 resp = conn.request(method, encoded_path, headers, timeout=timeout, body=body_bytes)
             break
-        except diesel.ClientConnectionClosed, e:
+        except diesel.ClientConnectionClosed as e:
             # try again with another pool connection
             continue
     else:

@@ -31,7 +31,7 @@ import signal
 import struct
 import sys
 
-from cStringIO import StringIO
+from io import StringIO
 
 
 import diesel
@@ -63,7 +63,7 @@ class LocalConsole(code.InteractiveConsole):
             (sz,) = struct.unpack('>Q', header)
             if sz:
                 data = diesel.receive(sz)
-                print data.rstrip()
+                print(data.rstrip())
 
 def console_for(pid):
     """Sends a SIGTRAP to the pid and returns a console UI handler.
@@ -163,7 +163,7 @@ def main():
         parser.print_usage()
         raise SystemExit(1)
     if args[0] == 'dummy':
-        print "PID", os.getpid()
+        print("PID", os.getpid())
         def wait_for_signal():
             log = diesel.log.name('dummy')
             log.min_level = diesel.loglevels.INFO

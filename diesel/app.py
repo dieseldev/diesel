@@ -15,6 +15,7 @@ from diesel import log, Connection, UDPSocket, Loop
 from diesel.security import ssl_async_handshake
 from diesel import runtime
 from diesel.events import WaitPool
+import collections
 
 
 YES_PROFILE = ['1', 'on', 'true', 'yes']
@@ -80,7 +81,7 @@ class Application(object):
                 except ApplicationEnd:
                     log.warning("-- ApplicationEnd raised.. exiting main loop --")
                     break
-                except Exception, e:
+                except Exception as e:
                     log.error("-- Unhandled Exception rose to main loop --")
                     log.error(traceback.format_exc())
 
@@ -99,7 +100,7 @@ class Application(object):
                 config['filename'] = statsfile
             try:
                 cProfile.runctx('_real_main()', globals(), locals(), **config)
-            except TypeError, e:
+            except TypeError as e:
                 if "sort" in e.args[0]:
                     del config['sort']
                     cProfile.runctx('_real_main()', globals(), locals(), **config)
@@ -177,7 +178,7 @@ class Service(object):
         # Call this last so the connection_handler has a fully-instantiated
         # Service instance at its disposal.
         if hasattr(connection_handler, 'on_service_init'):
-            if callable(connection_handler.on_service_init):
+            if isinstance(connection_handler.on_service_init, collections.Callable):
                 connection_handler.on_service_init(self)
 
     def handle_cannot_bind(self, reason):
@@ -200,7 +201,7 @@ class Service(object):
 
         try:
             sock.bind((self.iface, self.port))
-        except socket.error, e:
+        except socket.error as e:
             self.handle_cannot_bind(str(e))
 
         sock.listen(self.LQUEUE_SIZ)
@@ -214,7 +215,7 @@ class Service(object):
     def accept_new_connection(self):
         try:
             sock, addr = self.sock.accept()
-        except socket.error, e:
+        except socket.error as e:
             code, s = e
             if code in (errno.EAGAIN, errno.EINTR):
                 return
@@ -255,7 +256,7 @@ class UDPService(Service):
 
         try:
             sock.bind((self.iface, self.port))
-        except socket.error, e:
+        except socket.error as e:
             self.handle_cannot_bind(str(e))
 
         self.sock = sock
@@ -283,10 +284,10 @@ def quickstart(*args, **kw):
             app.add_service(a)
         elif isinstance(a, Loop):
             app.add_loop(a)
-        elif callable(a):
+        elif isinstance(a, collections.Callable):
             app.add_loop(Loop(a))
     app.run()
 
 def quickstop():
-    from runtime import current_app
+    from .runtime import current_app
     current_app.halt()

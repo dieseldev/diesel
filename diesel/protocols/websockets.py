@@ -187,7 +187,7 @@ class WebSocketServer(HttpServer):
                     payload = array('B', receive(length))
                     if disconnecting:
                         continue
-                    for i in xrange(len(payload)):
+                    for i in range(len(payload)):
                         payload[i] ^= mask[i % 4]
 
                     try:

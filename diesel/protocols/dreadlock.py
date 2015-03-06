@@ -51,8 +51,8 @@ if __name__ == '__main__':
     def f():
         with locker.hold("foo"):
             id = uuid.uuid4()
-            print "start!", id
+            print("start!", id)
             sleep(5)
-            print "end!", id
+            print("end!", id)
 
     quickstart(f, f)

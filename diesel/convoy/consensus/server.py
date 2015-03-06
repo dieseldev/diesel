@@ -4,7 +4,7 @@ import random
 import uuid
 import time
 import hashlib
-from itertools import chain, izip
+from itertools import chain
 
 from diesel import (until_eol, send, log,
         quickstart, Service, first, fork, 
@@ -45,10 +45,10 @@ class StoredValue(object):
         self.proposal_id = proposal_id
         self.transactions = set()
 
-    def __cmp__(self, other):
+    def __lt__(self, other):
         if other is None:
-            return cmp(1, None)
-        return cmp(self.proposal_id, other.proposal_id)
+            return False
+        return self.proposal_id < other.proposal_id
 
     def __repr__(self):
         return str((self.v, self.proposal_id, self.transactions))
@@ -79,7 +79,7 @@ class Storage(dict):
             for t in trigs:
                 t.set()
 
-        for k, trigs in self._pfx_watches.items():
+        for k, trigs in list(self._pfx_watches.items()):
             if key.startswith(k):
                 for t in trigs:
                     t.set()
@@ -101,7 +101,7 @@ class Storage(dict):
         return None
 
     def get_with_prefix(self, pfx):
-        for k, v in self.iteritems():
+        for k, v in self.items():
             if k.startswith(pfx):
                 yield k, v
 
@@ -127,7 +127,7 @@ class LockManager(object):
 
     def scan(self):
         now = time.time()
-        for cid, (t, ls) in self.clients.items():
+        for cid, (t, ls) in list(self.clients.items()):
             if now - t > self.TIMEOUT:
                 nls = []
                 for l, rollback in ls:
@@ -179,7 +179,7 @@ class HostGroup(object):
             self.get_qs.append(gq)
 
     def network_set(self, client, key, value, new):
-        proposal_id = idgen.next()
+        proposal_id = next(idgen)
         resq = Queue()
         if new:
             rollback = '|' + new + ':' + proposal_id
@@ -229,7 +229,7 @@ class HostGroup(object):
         ans = None
 
         # XXX - timeout
-        for x in xrange(self.num_hosts):
+        for x in range(self.num_hosts):
             value = resq.get()
             answers[value] += 1
             if answers[value] == self.quorum_size:
@@ -248,7 +248,7 @@ class HostGroup(object):
 PROPOSE_SUCCESS,
 PROPOSE_FAIL,
 SAVE_SUCCESS,
-) = range(3)
+) = list(range(3))
 
 
 class Timer(object):
@@ -308,7 +308,7 @@ def manage_peer_connection(host, port, proposals, saves, gets):
                             gets.put(v) # retry
                             raise
 
-        except ClientConnectionError, e:
+        except ClientConnectionError as e:
             clog.error("Connection problem to (%s, %s): %s" % (
                 host, port, e))
             sleep(sleep_time)
@@ -329,7 +329,7 @@ class PeerClient(Client):
 
     @call
     def sync(self):
-        for k, v in store.iteritems():
+        for k, v in store.items():
             send("SYNC %s %s\r\n" % (
                 (k, ' '.join(v.to_sync_atoms()))))
 
@@ -366,7 +366,7 @@ class PeerClient(Client):
         alive = []
         TIMEOUT = 15 # XXX
         now = time.time()
-        for c, t in clients.items():
+        for c, t in list(clients.items()):
             if c is None or time.time() - t > TIMEOUT:
                 del clients[c]
 
@@ -395,7 +395,7 @@ def encode_nulls(l):
 
 class CommonHandler(object):
     def send_header(self, cmd, *args):
-        out = ' '.join([cmd.upper()] + map(str, args)) + '\r\n'
+        out = ' '.join([cmd.upper()] + list(map(str, args))) + '\r\n'
         send(out)
 
     def get_command_header(self):
@@ -435,7 +435,7 @@ class PeerHandler(CommonHandler):
         if key not in store or id > store[key].proposal_id:
             ans = StoredValue(value, id)
             store.set(key, ans)
-            for owner, rollback in izip(owners[::2], owners[1::2]):
+            for owner, rollback in zip(owners[::2], owners[1::2]):
                 locker.add_lock(owner, key, rollback)
                 store[key].transactions.add((owner, rollback))
             clog.error("sync-repair %s" % ans)
@@ -501,12 +501,12 @@ class ClientHandler(CommonHandler):
 
     @command("BLOCKON")
     def handle_blockon(self, timeout, *args):
-        valmap = dict(izip(args[0::2], args[1::2]))
+        valmap = dict(zip(args[0::2], args[1::2]))
         timeout = float(timeout)
         blocktimer = Timer(timeout, start=False)
         blockevent = Event()
         while True:
-            for v, pid in valmap.iteritems():
+            for v, pid in valmap.items():
                 if v in store and store[v].proposal_id != pid:
                     return self.send_header("BLOCKON-DONE", v)
 
