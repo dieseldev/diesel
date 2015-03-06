@@ -8,6 +8,7 @@ try:
 except ImportError:
     raise ImportError("cStringIO is required")
 
+from builtins import bytes
 from bisect import bisect_right
 # functools.total_ordering is not available for Python < 2.7
 try:
@@ -40,14 +41,8 @@ except ImportError:
                 setattr(cls, opname, opfunc)
         return cls
 
-# Python2 consider str type as bytes where it is unicode for Python3
-if sys.version_info[0] == 2:
-    _obj_SIO = io.BytesIO
-else:
-    _obj_SIO = io.StringIO
-
 def make_SIO(d):
-    t = _obj_SIO()
+    t = io.BytesIO()
     t.write(d)
     t.seek(0)
     return t
@@ -65,7 +60,7 @@ class PipelineClosed(Exception): pass
 @total_ordering
 class PipelineItem(object):
     def __init__(self, d):
-        if isinstance(d, str):
+        if isinstance(d, bytes):
             self.f = make_SIO(d)
             self.length = len(d)
             self.is_sio = True
@@ -75,7 +70,7 @@ class PipelineItem(object):
             self.length = get_file_length(d)
             self.is_sio = False
         else:
-            raise ValueError("argument to add() must be either a str or a file-like object")
+            raise ValueError("argument to add() must be either bytes or a file-like object")
         self.read = self.f.read
 
     def merge(self, s):
@@ -118,7 +113,7 @@ class Pipeline(object):
 
         dummy = (priority, PipelineStandIn)
         ind = bisect_right(self.line, dummy)
-        if ind > 0 and isinstance(d, str) and self.line[ind - 1][-1].is_sio:
+        if ind > 0 and isinstance(d, bytes) and self.line[ind - 1][-1].is_sio:
             a_pri, adjacent = self.line[ind - 1]
             if adjacent.is_sio and a_pri == priority:
                 adjacent.merge(d)
@@ -144,18 +139,18 @@ class Pipeline(object):
         if not self.current and not self.line:
             if self.want_close:
                 raise PipelineCloseRequest()
-            return u''
+            return b''
 
         if not self.current:
             _, self.current = self.line.pop(0)
             self.current.reset()
 
-        out = ''
+        out = b''
         while len(out) < amt:
             try:
                 data = self.current.read(amt - len(out))
             except ValueError:
-                data = ''
+                data = b''
             if not data:
                 if not self.line:
                     self.current = None

@@ -14,6 +14,7 @@ from datetime import datetime
 from urllib.parse import urlparse
 from flask import Request, Response
 from OpenSSL import SSL
+from builtins import bytes
 
 utcnow = datetime.utcnow
 
@@ -23,12 +24,6 @@ except ImportError:
     from http_parser.pyparser import HttpParser
 
 from diesel import receive, ConnectionClosed, send, log, Client, call, first
-
-# Python2 consider str type as bytes where it is unicode for Python3
-if sys.version_info[0] == 2:
-    _obj_SIO = io.BytesIO
-else:
-    _obj_SIO = io.StringIO
 
 SERVER_TAG = 'diesel-http-server'
 
@@ -111,14 +106,14 @@ class HttpServer(object):
                 env.update({
                     'wsgi.version' : (1,0),
                     'wsgi.url_scheme' : 'http', # XXX incomplete
-                    'wsgi.input' : _obj_SIO(''.join(body)),
+                    'wsgi.input' : io.BytesIO(''.join(body)),
                     'wsgi.errors' : FileLikeErrorLogger(hlog),
                     'wsgi.multithread' : False,
                     'wsgi.multiprocess' : False,
                     'wsgi.run_once' : False,
                     'REMOTE_ADDR' : addr[0],
                     'SERVER_NAME' : HOSTNAME,
-                    'SERVER_PORT': str(self.port),
+                    'SERVER_PORT': bytes(self.port),
                     })
                 req = Request(env)
                 if req.headers.get('Connection', '').lower() == 'upgrade':
@@ -151,12 +146,12 @@ class HttpServer(object):
         if 'X-Sendfile' in resp.headers:
             sendfile = resp.headers.pop('X-Sendfile')
             size = os.stat(sendfile).st_size
-            resp.headers.set('Content-Length', str(size))
+            resp.headers.set('Content-Length', bytes(size))
         else:
             sendfile = None
 
         send("HTTP/%s %s %s\r\n" % (('%s.%s' % version), resp.status_code, resp.status))
-        send(str(resp.headers))
+        send(bytes(resp.headers))
 
         if sendfile:
             send(open(sendfile, 'rb')) # diesel can stream fds
@@ -209,12 +204,12 @@ class HttpClient(Client):
         headers = headers or {}
         url_info = urlparse(url)
         fake_wsgi = dict(
-        (cgi_name(n), str(v).strip()) for n, v in headers.items())
+        (cgi_name(n), bytes(v).strip()) for n, v in headers.items())
 
         if body and 'CONTENT_LENGTH' not in fake_wsgi:
             # If the caller hasn't set their own Content-Length but submitted
             # a body, we auto-set the Content-Length header here.
-            fake_wsgi['CONTENT_LENGTH'] = str(len(body))
+            fake_wsgi['CONTENT_LENGTH'] = bytes(len(body))
 
         fake_wsgi.update({
             'REQUEST_METHOD' : method,
@@ -223,7 +218,7 @@ class HttpClient(Client):
             'QUERY_STRING' : url_info[4],
             'wsgi.version' : (1,0),
             'wsgi.url_scheme' : 'http', # XXX incomplete
-            'wsgi.input' : _obj_SIO(body or ''),
+            'wsgi.input' : io.BytesIO(body or ''),
             'wsgi.errors' : FileLikeErrorLogger(hlog),
             'wsgi.multithread' : False,
             'wsgi.multiprocess' : False,
@@ -233,11 +228,11 @@ class HttpClient(Client):
 
         timeout_handler = TimeoutHandler(timeout or 60)
 
-        url = str(req.path)
+        url = bytes(req.path)
         if req.query_string:
-            url += '?' + str(req.query_string)
+            url += '?' + bytes(req.query_string)
 
-        send('%s %s HTTP/1.1\r\n%s' % (req.method, url, str(req.headers)))
+        send('%s %s HTTP/1.1\r\n%s' % (req.method, url, bytes(req.headers)))
 
         if body:
             send(body)
