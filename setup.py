@@ -62,5 +62,7 @@ Other bundled protocols include MongoDB, Riak, and Redis client libraries.
         "flask",
         "http-parser >= 0.7.12",
         "dnspython" if sys.version_info[0] == 2 else "dnspython3",
+        "simplejson",
+        "future"
     ] + (["twiggy"] if sys.version_info[0] == 2 else [])),
     )

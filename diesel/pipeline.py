@@ -150,12 +150,12 @@ class Pipeline(object):
             _, self.current = self.line.pop(0)
             self.current.reset()
 
-        out = u''
+        out = ''
         while len(out) < amt:
             try:
                 data = self.current.read(amt - len(out))
             except ValueError:
-                data = u''
+                data = ''
             if not data:
                 if not self.line:
                     self.current = None

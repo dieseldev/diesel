@@ -2,8 +2,12 @@
 '''HTTP/1.1 implementation of client and server.
 '''
 
+from future.standard_library import install_aliases
+install_aliases()
+
 import io
 import os
+import sys
 import urllib.request, urllib.parse, urllib.error
 import time
 from datetime import datetime
@@ -19,6 +23,12 @@ except ImportError:
     from http_parser.pyparser import HttpParser
 
 from diesel import receive, ConnectionClosed, send, log, Client, call, first
+
+# Python2 consider str type as bytes where it is unicode for Python3
+if sys.version_info[0] == 2:
+    _obj_SIO = io.BytesIO
+else:
+    _obj_SIO = io.StringIO
 
 SERVER_TAG = 'diesel-http-server'
 
@@ -101,7 +111,7 @@ class HttpServer(object):
                 env.update({
                     'wsgi.version' : (1,0),
                     'wsgi.url_scheme' : 'http', # XXX incomplete
-                    'wsgi.input' : io.StringIO(''.join(body)),
+                    'wsgi.input' : _obj_SIO(''.join(body)),
                     'wsgi.errors' : FileLikeErrorLogger(hlog),
                     'wsgi.multithread' : False,
                     'wsgi.multiprocess' : False,
@@ -213,7 +223,7 @@ class HttpClient(Client):
             'QUERY_STRING' : url_info[4],
             'wsgi.version' : (1,0),
             'wsgi.url_scheme' : 'http', # XXX incomplete
-            'wsgi.input' : io.StringIO(body or ''),
+            'wsgi.input' : _obj_SIO(body or ''),
             'wsgi.errors' : FileLikeErrorLogger(hlog),
             'wsgi.multithread' : False,
             'wsgi.multiprocess' : False,
