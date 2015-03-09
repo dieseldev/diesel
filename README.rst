@@ -49,6 +49,15 @@ For More Information
 Documentation and more can be found on the diesel_ website.
 
 
+Python 3?
+=========
+
+Not yet. Here are dependencies blocking the transition:
+
+.. image:: https://caniusepython3.com/project/diesel.svg
+    :target: https://caniusepython3.com/project/diesel
+
+
 .. _Python: http://www.python.org/
 .. _greenlets: http://readthedocs.org/docs/greenlet/en/latest/
 .. _nose: http://readthedocs.org/docs/nose/en/latest/
