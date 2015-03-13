@@ -1,3 +1,5 @@
+from builtins import int, object
+
 # vim:ts=4:sw=4:expandtab
 class BufAny(object):
     pass
@@ -17,9 +19,8 @@ class Buffer(object):
     def set_term(self, term):
         '''Set the current sentinel.
 
-        `term` is either an int, for a byte count, or
-        a string, for a sequence of characters that needs
-        to occur in the byte stream.
+        :param term: Either an int, for a bytes count, or bytes, for a
+        sequence of characters that needs to occur in the byte stream.
         '''
         self._atterm = term
 
@@ -46,7 +47,7 @@ class Buffer(object):
             if self.has_data:
                 return self.pop()
             return None
-        if type(self._atterm) is int:
+        if isinstance(self._atterm, int):
             if self._atmark >= self._atterm:
                 ind = self._atterm
         elif self._atterm is None:

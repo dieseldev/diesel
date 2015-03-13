@@ -65,8 +65,14 @@ class TerminateLoop(Exception):
     is one associated with the loop.
     '''
 
-CRLF = '\r\n'
+CRLF = b'\r\n'
 BUFSIZ = 2 ** 14
+TOK_RECEIVE_ANY = 'receive_any'
+TOK_RECEIVE = 'receive'
+TOK_UNTIL = 'until'
+TOK_UNTIL_EOL = 'until_eol'
+TOK_DATAGRAM = 'datagram'
+TOK_SLEEP = 'sleep'
 
 def until(sentinel):
     """Returns data from the underlying connection, terminated by sentinel.
@@ -76,8 +82,8 @@ def until(sentinel):
     off the socket beyond the sentinel is buffered.
 
     :param sentinel: The sentinel to wait for before returning data.
-    :type sentinel: A byte string (str).
-    :return: A byte string (str).
+    :type sentinel: bytes
+    :return: bytes
 
     """
     return current_loop.input_op(sentinel)
@@ -89,7 +95,7 @@ def until_eol():
     a carriage return and a line feed (CRLF). Data that has been read off the
     socket beyond the CRLF is buffered.
 
-    :return: A byte string (str).
+    :return: bytes
 
     """
     return until(CRLF)
@@ -279,8 +285,7 @@ class Loop(object):
         return self.id
 
     def __str__(self):
-        return '<Loop id=%s callable=%s>' % (self.id,
-        str(self.loop_callable))
+        return '<Loop id=%s callable=%s>' % (self.id, str(self.loop_callable))
 
     def clear_pending_events(self):
         '''When a loop is rescheduled, cancel any other timers or waits.
@@ -328,24 +333,24 @@ class Loop(object):
             return deco
 
         f_sent = [_f for _f in (receive_any, receive, until, until_eol, datagram) if _f]
-        assert len(f_sent) <= 1,(
-        "only 1 of (receive_any, receive, until, until_eol, datagram) may be provided")
+        assert len(f_sent) <= 1, ("only 1 of (receive_any, receive, until,"
+                                  " until_eol, datagram) may be provided")
         sentinel = None
         if receive_any:
             sentinel = buffer.BufAny
-            tok = 'receive_any'
+            tok = TOK_RECEIVE_ANY
         elif receive:
             sentinel = receive
-            tok = 'receive'
+            tok = TOK_RECEIVE
         elif until:
             sentinel = until
-            tok = 'until'
+            tok = TOK_UNTIL
         elif until_eol:
-            sentinel = "\r\n"
-            tok = 'until_eol'
+            sentinel = CRLF
+            tok = TOK_UNTIL_EOL
         elif datagram:
             sentinel = _datagram
-            tok = 'datagram'
+            tok = TOK_DATAGRAM
         if sentinel:
             early_val = self._input_op(sentinel, marked_cb(tok))
             if early_val:
@@ -353,7 +358,7 @@ class Loop(object):
             # othewise.. process others and dispatch
 
         if sleep is not None:
-            self._sleep(sleep, marked_cb('sleep'))
+            self._sleep(sleep, marked_cb(TOK_SLEEP))
 
         if waits:
             for w in waits:
@@ -430,11 +435,11 @@ class Loop(object):
                     d = sock.recv(1)
                 except socket.error as e:
                     if e.errno == errno.ECONNREFUSED:
-                        d = ''
+                        d = b''
                     else:
                         d = None
 
-                if d != '':
+                if d != b'':
                     log.error("internal error: expected empty read on disconnected socket")
 
                 if cancel_timer is not None:
@@ -483,7 +488,7 @@ class Loop(object):
 
     def wait(self, event):
         v = self._wait(event)
-        if type(v) is EarlyValue:
+        if isinstance(v, EarlyValue):
             self.reschedule_with_this_value(v.val)
         return self.dispatch()
 
@@ -494,7 +499,7 @@ class Loop(object):
                 rcb(d)
             self.hub.schedule(call_in)
         v = self.app.waits.wait(self, event)
-        if type(v) is EarlyValue:
+        if isinstance(v, EarlyValue):
             return v
         self.fire_handlers[v] = cb
 
@@ -685,7 +690,7 @@ class Connection(object):
                     self.shutdown(True)
                 except:
                     sys.stderr.write("Unknown Error on send():\n%s"
-                    % traceback.format_exc())
+                                     % traceback.format_exc())
                     self.shutdown(True)
 
                 else:
@@ -718,7 +723,7 @@ class Connection(object):
             data = ''
         except:
             sys.stderr.write("Unknown Error on recv():\n%s"
-            % traceback.format_exc())
+                             % traceback.format_exc())
             data = ''
 
         if not data:
@@ -732,9 +737,9 @@ class Connection(object):
     def handle_error(self):
         self.shutdown(True)
 
-class Datagram(str):
+class Datagram(bytes):
     def __new__(self, payload, addr):
-        inst = str.__new__(self, payload)
+        inst = bytes.__new__(self, payload)
         inst.addr = addr
         return inst
 
@@ -787,7 +792,7 @@ class UDPSocket(Connection):
                 self.shutdown(True)
             except:
                 sys.stderr.write("Unknown Error on send():\n%s"
-                % traceback.format_exc())
+                                 % traceback.format_exc())
                 self.shutdown(True)
             else:
                 assert bsent == len(dgram), "complete datagram not sent!"
@@ -806,17 +811,17 @@ class UDPSocket(Connection):
             code, s = e
             if code in (errno.EAGAIN, errno.EINTR):
                 return
-            dgram = Datagram('', (None, None))
+            dgram = Datagram(b'', (None, None))
         except (SSL.WantReadError, SSL.WantWriteError, SSL.WantX509LookupError):
             return
         except SSL.ZeroReturnError:
-            dgram = Datagram('', (None, None))
+            dgram = Datagram(b'', (None, None))
         except SSL.SysCallError:
-            dgram = Datagram('', (None, None))
+            dgram = Datagram(b'', (None, None))
         except:
             sys.stderr.write("Unknown Error on recv():\n%s"
-            % traceback.format_exc())
-            dgram = Datagram('', (None, None))
+                             % traceback.format_exc())
+            dgram = Datagram(b'', (None, None))
 
         if not dgram:
             self.shutdown(True)

@@ -60,8 +60,10 @@ class PipelineClosed(Exception): pass
 @total_ordering
 class PipelineItem(object):
     def __init__(self, d):
+        # TODO : error on str
         if isinstance(d, str):
             d = d.encode()
+            import pdb; pdb.set_trace()
         if isinstance(d, bytes):
             self.f = make_SIO(d)
             self.length = len(d)
@@ -96,7 +98,7 @@ class PipelineItem(object):
 class PipelineStandIn(object): pass
 
 class Pipeline(object):
-    '''A pipeline that supports appending strings or
+    '''A pipeline that supports appending bytes or
     files and can read() transparently across object
     boundaries in the outgoing buffer.
     '''

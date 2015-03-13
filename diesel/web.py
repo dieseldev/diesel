@@ -1,6 +1,4 @@
-'''Slight wrapper around flask to fit the diesel
-
-mold.
+'''Slight wrapper around flask to fit the diesel mold.
 '''
 import traceback
 
