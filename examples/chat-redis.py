@@ -107,7 +107,9 @@ def pubsub_socket(req, inq, outq):
     with hub.subq('foo') as group:
         while True:
             q, v = first(waits=[inq, group])
-            if q == inq: # getting message from client
+            if isinstance(v, WebSocketDisconnect): # getting a disconnect signal
+                return
+            elif q == inq: # getting message from client
                 print("(inq) %s" % v)
                 cmd = v.get("cmd", "")
                 if cmd=="":
@@ -126,8 +128,6 @@ def pubsub_socket(req, inq, outq):
                     outq.put(data)
                 except JSONDecodeError:
                     print("error decoding message %s" % msg_str)
-            elif isinstance(v, WebSocketDisconnect): # getting a disconnect signal
-                return
             else:
                 print("oops %s" % v)
 
