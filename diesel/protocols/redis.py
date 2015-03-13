@@ -6,6 +6,7 @@ import time
 import operator as op
 import itertools
 import uuid
+from builtins import (bytes, chr, str, int, object)
 
 def flatten_arg_pairs(l):
     o = []
@@ -18,9 +19,37 @@ REDIS_PORT = 6379
 class RedisError(Exception): pass
 
 class RedisClient(Client):
-    def __init__(self, host='localhost', port=REDIS_PORT, password=None, **kw):
+    def __init__(self, host='localhost', port=REDIS_PORT, password=None,
+                 encoding='utf-8', encoding_errors='strict',
+                 decode_responses=False, **kw):
         self.password = password
+        self.encoding = encoding
+        self.encoding_errors = encoding_errors
+        self.decode_responses = decode_responses
         Client.__init__(self, host, port, **kw)
+
+    def _decode_response(self, resp):
+        """If requested, convert response into unicode"""
+        if isinstance(resp, bytes) and self.decode_responses:
+            return resp.decode(self.encoding)
+        elif not isinstance(resp, str) and resp != None:
+            import pdb; pdb.set_trace()
+        else:
+            return resp
+
+    def _encode(self, value):
+        "Return a bytestring representation of the value"
+        if isinstance(value, bytes):
+            return value
+        elif isinstance(value, int):
+            value = str(value)
+        elif isinstance(value, float):
+            value = repr(value)
+        elif not isinstance(value, str):
+            value = str(value)
+        if isinstance(value, str):
+            value = value.encode(self.encoding, self.encoding_errors)
+        return value
 
     ##################################################
     ### GENERAL OPERATIONS
@@ -766,11 +795,11 @@ class RedisClient(Client):
 
     def _send(self, cmd, *args, **kwargs):
         if 'list' in kwargs:
-            args = kwargs['list']
-        all = (cmd,) + tuple(str(s) for s in args)
-        send('*%s\r\n' % len(all))
+            args = tuple(kwargs['list'])
+        all = tuple(map(self._encode, (cmd,) + args))
+        send(('*%s\r\n' % len(all)).encode())
         for i in all:
-            send(('$%s\r\n' % len(i)) + i + '\r\n')
+            send(('$%s\r\n' % len(i)).encode() + i + b'\r\n')
 
     def _get_response(self, wake_sig=None):
         if wake_sig:
@@ -781,9 +810,9 @@ class RedisClient(Client):
         else:
             fl = until_eol().strip()
 
-        c = fl[0]
+        c = chr(bytes(fl)[0])
         if c == '+':
-            return fl[1:]
+            return self._decode_response(fl[1:])
         elif c == '$':
             l = int(fl[1:])
             if l == -1:
@@ -791,7 +820,7 @@ class RedisClient(Client):
             else:
                 resp = receive(l)
                 until_eol() # noop
-            return resp
+            return self._decode_response(resp)
         elif c == '*':
             count = int(fl[1:])
             resp = []
@@ -799,18 +828,19 @@ class RedisClient(Client):
                 return None
             for x in range(count):
                 hl = until_eol()
-                assert hl[0] in ['$', ':', '+']
-                if hl[0] == '$':
+                c_hl = chr(bytes(hl)[0])
+                assert c_hl in ['$', ':', '+'], c_hl
+                if c_hl == '$':
                     l = int(hl[1:])
                     if l == -1:
                         resp.append(None)
                     else:
-                        resp.append(receive(l))
+                        resp.append(self._decode_response(receive(l)))
                         until_eol() # noop
-                elif hl[0] == ':':
+                elif c_hl == ':':
                     resp.append(int(hl[1:]))
-                elif hl[0] == '+':
-                    resp.append(hl[1:].strip())
+                elif c_hl == '+':
+                    resp.append(self._decode_response(hl[1:].strip()))
             return resp
         elif c == ':':
             return int(fl[1:])

@@ -1,9 +1,11 @@
+# -*- coding: utf-8 -*-
+
 import diesel
 from diesel.protocols.redis import *
 
 class RedisHarness(object):
     def setup(self):
-        self.client = RedisClient()
+        self.client = RedisClient(encoding='utf-8', decode_responses=True)
         self.client.select(11)
         self.client.flushdb()
 
@@ -256,3 +258,38 @@ class TestRedis(RedisHarness):
             assert transaction.aborted
         else:
             assert 0, "DID NOT RAISE"
+
+    def test_unicode(self):
+        r = self.client
+        assert r.get(u'明天') == None
+        r.set(u'明天', u'不好')
+        assert r.exists(u'明天')
+        assert r.get(u'明天') == r.get(u'明天'.encode('utf-8')) == u'不好' 
+        r.delete(u'明天')
+        assert not r.exists(u'明天')
+        r.set(u'明天', u'不好')
+        r.set(u'今天', u'很好')
+        assert r.keys(u'*天') == set([u'明天', u'今天'])
+        assert r.keys(u'不*') == set()
+
+
+class RedisNoDecodeResponses(object):
+    """RedisClient is configured to return raw bytes instead of decoded unicode"""
+    def setup(self):
+        self.client = RedisClient()
+        self.client.select(11)
+        self.client.flushdb()
+
+    def test_unicode(self):
+        encode = lambda x: x.encode('utf-8')
+        r = self.client
+        assert r.get(encode(u'明天')) == None
+        r.set(encode(u'明天'), encode(u'不好'))
+        assert r.exists(encode(u'明天'))
+        assert r.get(encode(u'明天')) == encode(u'不好')
+        r.delete(encode(u'明天'))
+        assert not r.exists(encode(u'明天'))
+        r.set(encode(u'明天'), encode(u'不好'))
+        r.set(encode(u'今天'), encode(u'很好'))
+        assert r.keys(uencode('*天')) == set([encode(u'明天'), encode(u'今天')])
+        assert r.keys(encode(u'不*')) == set()
