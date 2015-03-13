@@ -4,6 +4,7 @@
 # needed to make diesel work with python 2.5
 
 
+from builtins import object
 import itertools
 import struct
 from collections import deque
@@ -11,7 +12,7 @@ from diesel import Client, call, sleep, send, receive, first, Loop, Application,
 from bson import BSON, _make_c_string, decode_all
 from bson.son import SON
 
-_ZERO = "\x00\x00\x00\x00"
+_ZERO = b"\x00\x00\x00\x00"
 HEADER_SIZE = 16
 
 class MongoOperationalError(Exception): pass
@@ -71,7 +72,7 @@ class MongoClient(Client):
 
     def _put_request(self, op, data):
         req = struct.pack('<4i', HEADER_SIZE + len(data), self._msg_id, 0, op)
-        send("%s%s" % (req, data))
+        send(req + data)
 
     def _handle_response(self, cursor, resp):
         cid, start, numret, result = resp
@@ -181,7 +182,7 @@ class Ops(object):
                 data.append(BSON.encode(fields))
             else:
                 data.append(BSON.encode(dict.fromkeys(fields, 1)))
-        return "".join(data)
+        return b"".join(data)
 
     @staticmethod
     def get_more(col, limit, id):
@@ -200,7 +201,7 @@ class Ops(object):
             flags |= 1 << 1
         fmt = '<i%dsi' % len(colname)
         part = struct.pack(fmt, 0, colname, flags)
-        return "%s%s%s" % (part, BSON.encode(spec), BSON.encode(doc))
+        return part + BSON.encode(spec) + BSON.encode(doc)
 
     @staticmethod
     def insert(col, doc_or_docs):
@@ -209,14 +210,14 @@ class Ops(object):
             doc_or_docs = [doc_or_docs]
         except AttributeError:
             pass
-        doc_data = "".join(BSON.encode(doc) for doc in doc_or_docs)
+        doc_data = b"".join(BSON.encode(doc) for doc in doc_or_docs)
         colname = _make_c_string(col)
-        return "%s%s%s" % (_ZERO, colname, doc_data)
+        return _ZERO + colname + doc_data
 
     @staticmethod
     def delete(col, spec):
         colname = _make_c_string(col)
-        return "%s%s%s%s" % (_ZERO, colname, _ZERO, BSON.encode(spec))
+        return _ZERO + colname + _ZERO + BSON.encode(spec)
 
 class MongoIter(object):
     def __init__(self, cursor):

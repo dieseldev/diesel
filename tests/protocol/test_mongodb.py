@@ -29,11 +29,11 @@ class TestMongoDB(MongoDbHarness):
         d1 = {'one' : 'two'}
         d2 = {'three' : 'four'}
         inp = [d1, d2]
-        inp.sort()
+        # inp.sort()
         assert self.db.imult.insert(inp)['err'] == None
         all = self.db.imult.find().all()
         list(map(self.filt, all))
-        all.sort()
+        # all.sort()
         assert all == inp
 
     # UPDATE
@@ -228,7 +228,6 @@ class TestMongoDB(MongoDbHarness):
 
         snap = self.db.c2.find().sort('x', 1).all()
 
-        print(snap)
         assert [d['x'] for d in snap] == list(range(500))
 
         snap = self.db.c2.find().sort('x', -1).all()

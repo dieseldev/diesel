@@ -8,7 +8,7 @@ try:
 except ImportError:
     raise ImportError("cStringIO is required")
 
-from builtins import bytes, str
+from builtins import object, bytes, str
 from bisect import bisect_right
 # functools.total_ordering is not available for Python < 2.7
 try:
