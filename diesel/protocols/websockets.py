@@ -8,6 +8,7 @@ Not implemented:
     * Extension support.
 
 """
+from builtins import object
 from .http import HttpServer, Response
 from diesel.util.queue import Queue
 from diesel import fork, until, receive, first, ConnectionClosed, send

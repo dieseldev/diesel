@@ -22,6 +22,16 @@ class RedisClient(Client):
     def __init__(self, host='localhost', port=REDIS_PORT, password=None,
                  encoding='utf-8', encoding_errors='strict',
                  decode_responses=False, **kw):
+        """
+        :param host: host of the redis server
+        :param port: port of the redis server
+        :param password: password of the redis server
+        :param decode_responses: If true, the incomming socket bytes will be
+        decoded using the `encoding` charset
+        :param encoding: Encoding to use to encode/decode data given the
+        socket level communication must be done with bytes
+        :param encoding_errors: errors handling when encoding unicode
+        """
         self.password = password
         self.encoding = encoding
         self.encoding_errors = encoding_errors
@@ -745,15 +755,15 @@ class RedisClient(Client):
 
         -- OR -- None, if wake_sig was fired
 
-        NOTE: The message will always be a string.  Handle this as you see fit.
+        NOTE: The message will always be of bytes type.  Handle this as you see fit.
         NOTE: subscribe/unsubscribe acks are ignored here
         '''
         while True:
             r = self._get_response(wake_sig)
             if r:
-                if r[0] == 'message':
+                if r[0] == b'message':
                     return [r[1]] + r[1:]
-                elif r[0] == 'pmessage':
+                elif r[0] == b'pmessage':
                     return r[1:]
             else:
                 return None
@@ -775,15 +785,15 @@ class RedisClient(Client):
         self._send(cmd, list=rest)
 
         line_one = until_eol()
-        if line_one[0] in ('+', '-', ':'):
+        c = chr(bytes(line_one)[0])
+        if c in ('+', '-', ':'):
             return line_one
-
-        if line_one[0] == '$':
+        if c == '$':
             amt = int(line_one[1:])
             if amt == -1:
                 return line_one
             return line_one + receive(amt) + until_eol()
-        if line_one[0] == '*':
+        if c == '*':
             nargs = int(line_one[1:])
             if nargs == -1:
                 return line_one
@@ -945,7 +955,22 @@ class RedisLock(object):
 #########################################
 ## Hub, an abstraction of sub behavior, etc
 class RedisSubHub(object):
-    def __init__(self, host='127.0.0.1', port=REDIS_PORT, password=None):
+    def __init__(self, host='127.0.0.1', port=REDIS_PORT, password=None,
+                 encoding='utf-8', encoding_errors='strict',
+                 decode_responses=False):
+        """
+        :param host: host of the redis server
+        :param port: port of the redis server
+        :param password: password of the redis server
+        :param decode_responses: If true, the incomming socket bytes will be
+        decoded using the `encoding` charset
+        :param encoding: Encoding to use to encode/decode data given the
+        socket level communication must be done with bytes
+        :param encoding_errors: errors handling when encoding unicode
+        """
+        self.encoding = encoding
+        self.encoding_errors = encoding_errors
+        self.decode_responses = decode_responses
         self.host = host
         self.port = port
         self.password= password
@@ -954,14 +979,31 @@ class RedisSubHub(object):
         self.sub_rms = []
         self.subs = {}
 
+    def _encode(self, value):
+        "Return a bytestring representation of the value"
+        if isinstance(value, bytes):
+            return value
+        elif isinstance(value, int):
+            value = str(value)
+        elif isinstance(value, float):
+            value = repr(value)
+        elif not isinstance(value, str):
+            value = str(value)
+        if isinstance(value, str):
+            value = value.encode(self.encoding, self.encoding_errors)
+        return value
+
     def make_client(self):
-        client = RedisClient(self.host, self.port, self.password)
+        client = RedisClient(self.host, self.port, self.password,
+                             encoding=self.encoding,
+                             encoding_errors=self.encoding_errors,
+                             decode_responses=self.decode_responses)
         if self.password != None:
             client.auth()
         return  client
 
     def __isglob(self, glob):
-        return '*' in glob or '?' in glob or ('[' in glob and ']' and glob)
+        return b'*' in glob or b'?' in glob or (b'[' in glob and b']' and glob)
 
     def __call__(self):
         with self.make_client() as conn:
@@ -1020,6 +1062,7 @@ class RedisSubHub(object):
     def subq(self, classes):
         if type(classes) not in (set, list, tuple):
             classes = [classes]
+        classes = [self._encode(classe) for classe in classes]
 
         q = Queue()
 
@@ -1039,6 +1082,7 @@ class RedisSubHub(object):
     def sub(self, classes):
         if type(classes) not in (set, list, tuple):
             classes = [classes]
+        classes = [self._encode(classe) for classe in classes]
 
         hb = self
         q = Queue()
