@@ -11,7 +11,7 @@ def c():
     for x in range(0, 20):
         yield x
 
-make_it = c().__next__
+make_it = c()
 
 def stop_it():
     quickstop()
