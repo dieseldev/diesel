@@ -138,9 +138,9 @@ def send(data, priority=5):
     :param priority: The priority
 
     """
-    # TODO : remove me, sanity check for py3k port
     if not isinstance(data, bytes):
-        import pdb; pdb.set_trace()
+        raise RuntimeError("Can only send bytes (if string, you should "
+                           "use `encode` prior to call this function)")
     return current_loop.send(data, priority=priority)
 
 def wait(*args, **kw):
