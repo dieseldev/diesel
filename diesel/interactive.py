@@ -8,6 +8,7 @@ Supports both the standard Python interactive interpreter and IPython (if
 installed).
 
 """
+from __future__ import print_function
 import code
 import sys
 sys.path.insert(0, '.')
