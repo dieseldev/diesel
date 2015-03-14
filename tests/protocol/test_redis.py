@@ -302,8 +302,8 @@ class TestRedisSubHub(object):
         app = diesel.runtime.current_app
         app.add_loop(diesel.Loop(self.hub))
         app.run()
-        # self.client.select(11)
-        # self.client.flushdb()
+        self.client.select(11)
+        self.client.flushdb()
 
     def test_subq(self):
         messages = [b'1rst message', b'2nd message', b'3rd message']
