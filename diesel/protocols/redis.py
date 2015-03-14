@@ -921,9 +921,10 @@ class RedisLock(object):
     def __init__(self, client, key, timeout=30):
         assert timeout >= 2, 'Timeout must be greater than 2 to guarantee the transaction'
         self.client = client
-        self.key = key
+        assert isinstance(key, (str, bytes))
+        self.key = key if isinstance(key, bytes) else key.encode()
         self.timeout = timeout
-        self.me = str(uuid.uuid4())
+        self.me = uuid.uuid4().bytes
 
     def __enter__(self):
         trans = self.client.transaction(watch=[self.key])
