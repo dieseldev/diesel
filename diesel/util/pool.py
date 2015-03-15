@@ -125,7 +125,7 @@ class ThreadPool(object):
                     self.trigger.clear()
 
                 try:
-                    n = self.generator()
+                    n = next(self.generator)
                 except StopIteration:
                     break
 

@@ -14,7 +14,6 @@ from datetime import datetime
 from urllib.parse import urlparse
 from flask import Request, Response
 from OpenSSL import SSL
-from builtins import bytes
 
 utcnow = datetime.utcnow
 
@@ -113,7 +112,7 @@ class HttpServer(object):
                     'wsgi.run_once' : False,
                     'REMOTE_ADDR' : addr[0],
                     'SERVER_NAME' : HOSTNAME,
-                    'SERVER_PORT': bytes(self.port),
+                    'SERVER_PORT': str(self.port),
                     })
                 req = Request(env)
                 if req.headers.get('Connection', '').lower() == 'upgrade':
@@ -146,12 +145,13 @@ class HttpServer(object):
         if 'X-Sendfile' in resp.headers:
             sendfile = resp.headers.pop('X-Sendfile')
             size = os.stat(sendfile).st_size
-            resp.headers.set('Content-Length', bytes(size))
+            resp.headers.set('Content-Length', str(size))
         else:
             sendfile = None
-
-        send(("HTTP/%s %s %s\r\n" % (('%s.%s' % version), resp.status_code, resp.status)).encode())
-        send((str(resp.headers)).encode())
+        if 'Content-Length' not in resp.headers:
+            resp.headers['Content-Length'] = resp.calculate_content_length()
+        send(('HTTP/%i.%i %i %s\r\n' % (version + (resp.status_code, resp.status))).encode(resp.charset))
+        send(str(resp.headers).encode(resp.charset))
 
         if sendfile:
             send(open(sendfile, 'rb')) # diesel can stream fds
@@ -195,21 +195,27 @@ class HttpClient(Client):
     def request(self, method, url, headers=None, body=None, timeout=None):
         '''Issues a `method` request to `path` on the
         connected server.  Sends along `headers`, and
-        body.
+        `body`.
 
-        Very low level--you must set "host" yourself,
-        for example.  It will set Content-Length,
-        however.
+        :param headers: Request's headers. If not provided, `Host` and
+        `Content-Length` will be automatically provided
         '''
         headers = headers or {}
         url_info = urlparse(url)
-        fake_wsgi = dict(
-        (cgi_name(n), bytes(v).strip()) for n, v in headers.items())
+        fake_wsgi = {cgi_name(n): str(v).strip() for n, v in headers.items()}
+
+        if 'HTTP_HOST' not in fake_wsgi:
+            # HTTP host header omit the port if 80
+            # http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.23
+            if self.port == 80:
+                fake_wsgi['HTTP_HOST'] = self.addr
+            else:
+                fake_wsgi['HTTP_HOST'] = '%s:%i' % (self.addr, self.port)
 
         if body and 'CONTENT_LENGTH' not in fake_wsgi:
             # If the caller hasn't set their own Content-Length but submitted
             # a body, we auto-set the Content-Length header here.
-            fake_wsgi['CONTENT_LENGTH'] = bytes(len(body))
+            fake_wsgi['CONTENT_LENGTH'] = str(len(body) if body else 0)
 
         fake_wsgi.update({
             'REQUEST_METHOD' : method,
@@ -228,14 +234,14 @@ class HttpClient(Client):
 
         timeout_handler = TimeoutHandler(timeout or 60)
 
-        url = bytes(req.path)
+        # Werkzeug desn't encode path but encodes query_string...
+        url = req.path
         if req.query_string:
-            url += b'?' + bytes(req.query_string)
-
-        send(('%s %s HTTP/1.1\r\n%s' % (req.method, url, bytes(req.headers))).encode())
+            url += '?' + req.query_string.decode('latin-1')
+        send(('%s %s HTTP/1.1\r\n%s' % (req.method, url, str(req.headers))).encode(req.charset))
 
         if body:
-            send(body)
+            send(body.encode())
 
         h = HttpParser()
         body = []
@@ -253,7 +259,7 @@ class HttpClient(Client):
             data = val
 
         resp = Response(
-            response=''.join(body),
+            response=b''.join(body),
             status=h.get_status_code(),
             headers=h.get_headers(),
             )

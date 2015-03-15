@@ -30,7 +30,6 @@ class WSGIRequestHandler(object):
 
     def __call__(self, req):
         env = req.environ
-        buf = []
         r = Response()
         env['diesel.response'] = r
         for output in self.wsgi_callable(env,

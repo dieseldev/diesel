@@ -1,3 +1,4 @@
+from future.utils import with_metaclass
 from collections import defaultdict
 from uuid import uuid4
 from time import time
@@ -353,7 +354,7 @@ class ConvoyRegistrar(type):
             convoy.add_target_role(t)
         return t
 
-class ConvoyRole(object, metaclass=ConvoyRegistrar):
+class ConvoyRole(with_metaclass(object, ConvoyRegistrar)):
     limit = 0
 
     @classmethod
