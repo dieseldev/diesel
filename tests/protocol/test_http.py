@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-import re
 from diesel import runtime, fork, sleep, wait, first, fire, quickstop, Service, ClientConnectionClosed
 from diesel.protocols.wsgi import WSGIRequestHandler
 from diesel.protocols.http import HttpServer, HttpClient, Response
@@ -15,13 +14,13 @@ class TestHttpClient(object):
     def test_simple(self):
         with HttpClient('www.google.com', 80) as client:
             resp = client.request('GET', '/', {})
-        assert resp.status_code == 302, resp
-        redirect = re.search(b'<A HREF="(.+)">here</A>', resp.data).group(1)
-        assert redirect, resp.data
-        url = urlsplit(redirect.decode('latin-1'))
-        assert url.netloc, url
-        with HttpClient(url.netloc, 80) as client:
-            resp = client.request('GET', '%s?%s' % (url.path, url.query), {})
+        while resp.status_code == 302:
+            redirect = resp.headers['location']
+            assert redirect
+            url = urlsplit(redirect)
+            assert url.netloc, url
+            with HttpClient(url.netloc, 80) as client:
+                resp = client.request('GET', '%s?%s' % (url.path, url.query), {})
         assert resp.status_code == 200, resp
 
 
