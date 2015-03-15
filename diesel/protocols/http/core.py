@@ -202,7 +202,7 @@ class HttpClient(Client):
         '''
         headers = headers or {}
         url_info = urlparse(url)
-        fake_wsgi = {cgi_name(n): str(v).strip() for n, v in headers.items()}
+        fake_wsgi = dict((cgi_name(n), str(v).strip()) for n, v in headers.items())
 
         if 'HTTP_HOST' not in fake_wsgi:
             # HTTP host header omit the port if 80
