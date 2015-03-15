@@ -299,9 +299,7 @@ class TestRedisSubHub(object):
     def setup(self):
         self.hub = RedisSubHub()
         self.client = self.hub.make_client()
-        app = diesel.runtime.current_app
-        app.add_loop(diesel.Loop(self.hub))
-        app.run()
+        diesel.runtime.current_app.add_loop(diesel.Loop(self.hub))
         self.client.select(11)
         self.client.flushdb()
 
