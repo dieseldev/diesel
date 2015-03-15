@@ -64,6 +64,7 @@ Other bundled protocols include MongoDB, Riak, and Redis client libraries.
         "dnspython" if sys.version_info[0] == 2 else "dnspython3",
         "simplejson",
         "future",
-        "twiggy"
+        "twiggy",
+        "bson"
     ])
     )
