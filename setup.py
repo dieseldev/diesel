@@ -65,6 +65,7 @@ Other bundled protocols include MongoDB, Riak, and Redis client libraries.
         "simplejson",
         "future",
         "twiggy",
-        "bson"
+        "pymongo",
+        "pyzmq"
     ])
     )
