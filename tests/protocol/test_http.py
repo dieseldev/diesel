@@ -12,8 +12,8 @@ except ImportError:
 
 class TestHttpClient(object):
     def test_simple(self):
-        with HttpClient('www.google.com', 80) as client:
-            resp = client.request('GET', '/', {})
+        with HttpClient('http://httpbin.org', 80) as client:
+            resp = client.request('GET', '/get', {})
         while resp.status_code == 302:
             redirect = resp.headers['location']
             assert redirect
@@ -45,44 +45,44 @@ class TestWSGI(object):
         global APP
         APP = app
 
-    # def test_simple(self):
-    #     def simple_app(environ, start_response):
-    #         """Simplest possible application object"""
-    #         status = '200 OK'
-    #         response_headers = [('Content-type','text/plain')]
-    #         start_response(status, response_headers)
-    #         return ["Hello World!"]
-    #     self.register_app(simple_app)
-    #     def client_app():
-    #         with HttpClient('localhost', 8000) as client:
-    #             try:
-    #                 resp = client.request('GET', '/', {})
-    #             except ClientConnectionClosed as e:
-    #                 fire('error', str(e))
-    #         fire('success', resp.data)
-    #     fork(client_app)
-    #     event, msg = first(waits=['success', 'error'])
-    #     assert event == 'success', msg
-    #     assert msg == 'Hello World!', msg
+    def test_simple(self):
+        def simple_app(environ, start_response):
+            """Simplest possible application object"""
+            status = '200 OK'
+            response_headers = [('Content-type','text/plain')]
+            start_response(status, response_headers)
+            return ["Hello World!"]
+        self.register_app(simple_app)
+        def client_app():
+            with HttpClient('localhost', 8000) as client:
+                try:
+                    resp = client.request('GET', '/', {})
+                except ClientConnectionClosed as e:
+                    fire('error', str(e))
+            fire('success', resp.data)
+        fork(client_app)
+        event, msg = first(waits=['success', 'error'])
+        assert event == 'success', msg
+        assert msg == 'Hello World!', msg
 
-    # def test_unicode(self):
-    #     def unicode_app(environ, start_response):
-    #         status = '200 OK'
-    #         response_headers = [('Content-type','text/plain')]
-    #         start_response(status, response_headers)
-    #         return [u"你好!".encode('utf-8')]
-    #     self.register_app(unicode_app)
-    #     def client_app():
-    #         with HttpClient('localhost', 8000) as client:
-    #             try:
-    #                 resp = client.request('GET', '/', {})
-    #             except ClientConnectionClosed as e:
-    #                 fire('error', str(e))
-    #         fire('success', resp.data)
-    #     fork(client_app)
-    #     event, msg = first(waits=['success', 'error'])
-    #     assert event == 'success', msg
-    #     assert msg == u"你好!".encode('utf-8'), msg
+    def test_unicode(self):
+        def unicode_app(environ, start_response):
+            status = '200 OK'
+            response_headers = [('Content-type','text/plain')]
+            start_response(status, response_headers)
+            return [u"你好!".encode('utf-8')]
+        self.register_app(unicode_app)
+        def client_app():
+            with HttpClient('localhost', 8000) as client:
+                try:
+                    resp = client.request('GET', '/', {})
+                except ClientConnectionClosed as e:
+                    fire('error', str(e))
+            fire('success', resp.data)
+        fork(client_app)
+        event, msg = first(waits=['success', 'error'])
+        assert event == 'success', msg
+        assert msg == u"你好!".encode('utf-8'), msg
 
 if __name__ == '__main__':
     TestWSGI().test_simple()
