@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
-from diesel import runtime, fork, sleep, wait, first, fire, quickstop, Service, ClientConnectionClosed
+from diesel import runtime, fork, sleep, wait, first, fire, quickstop, TCPService
+from diesel.transports.common import ClientConnectionClosed
 from diesel.protocols.wsgi import WSGIRequestHandler
 from diesel.protocols.http import HttpServer, HttpClient, Response
 
@@ -37,7 +38,7 @@ class TestWSGI(object):
             if not APP:
                 raise RuntimeError('missing app !')
             return APP(environ, start_response)
-        http_service = Service(HttpServer(WSGIRequestHandler(app_proxy, self.PORT)), self.PORT, '')
+        http_service = TCPService(HttpServer(WSGIRequestHandler(app_proxy, self.PORT)), self.PORT, '')
         runtime.current_app.add_service(http_service)
         TestWSGI.SERVER_STARTED = True
 

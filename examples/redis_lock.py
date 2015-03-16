@@ -1,11 +1,11 @@
+"""Implement the Redis INCR command using a lock. Obviously this is inefficient, but it's a good
+example of how to use the RedisLock class"""
+
 import random
 
 from diesel import fork, quickstop, quickstart, sleep
 from diesel.protocols.redis import RedisClient, RedisTransactionError, RedisLock, LockNotAcquired
 
-
-"""Implement the Redis INCR command using a lock. Obviously this is inefficient, but it's a good
-example of how to use the RedisLock class"""
 
 key = 'test-lock-key'
 incr_key = 'test-incr-key'
@@ -15,7 +15,6 @@ counter = 0
 """If sleep_factor > lock_timeout you are exercising the timeout loop, otherwise, that loop should be a noop"""
 lock_timeout = 3
 sleep_factor = 1
-
 
 
 def take_lock():
@@ -29,6 +28,7 @@ def take_lock():
         counter += 1
     except LockNotAcquired:
         pass
+
 
 def main():
     client = RedisClient('localhost', 6379)

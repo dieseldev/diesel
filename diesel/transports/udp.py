@@ -4,9 +4,7 @@ import socket
 import sys
 import traceback
 import types
-
 from OpenSSL import SSL
-
 from collections import deque
 
 from diesel import runtime
@@ -15,11 +13,14 @@ from diesel.transports.common import (
         Client, Service, SocketContext, ConnectionClosed,
 )
 
+
 # 65535 - 8 (header) - 20 (ipv4 header)
 DATAGRAM_SIZE_MAX = 65507
 
+
 class UDPDispatchLoop(Loop):
     pass
+
 
 class UDPClient(Client):
     def __init__(self, addr, port, source_ip=None):
@@ -39,6 +40,7 @@ class UDPClient(Client):
 
     def _resolve(self, addr):
         return addr
+
 
 class UDPService(Service):
     """A `Service` that communicates with remote clients via UDP."""
@@ -75,7 +77,7 @@ class UDPService(Service):
 
         try:
             sock.bind((self.iface, self.port))
-        except socket.error, e:
+        except socket.error as e:
             self.handle_cannot_bind(str(e))
         self.iface, self.port = sock.getsockname()
 
@@ -91,14 +93,16 @@ class UDPService(Service):
     def register(self, app):
         pass
 
-class _Datagram(str):
+
+class _Datagram(bytes):
     def __new__(self, payload, addr):
-        inst = str.__new__(self, payload)
+        inst = bytes.__new__(self, payload)
         inst.addr = addr
         return inst
 
     def __repr__(self):
         return "Datagram(%r, %r)" % (str.__str__(self), self.addr)
+
 
 class UDPContext(SocketContext):
     def __init__(self, sock, ip=None, port=None):
@@ -131,7 +135,7 @@ class UDPContext(SocketContext):
             dgram = self.outgoing.popleft()
             try:
                 bsent = self.sock.sendto(dgram, dgram.addr)
-            except socket.error, e:
+            except socket.error as e:
                 code, s = e
                 if code in (errno.EAGAIN, errno.EINTR):
                     self.outgoing.appendleft(dgram)
@@ -161,21 +165,21 @@ class UDPContext(SocketContext):
         try:
             data, addr = self.sock.recvfrom(DATAGRAM_SIZE_MAX)
             dgram = _Datagram(data, addr)
-        except socket.error, e:
+        except socket.error as e:
             code, s = e
             if code in (errno.EAGAIN, errno.EINTR):
                 return
-            dgram = _Datagram('', (None, None))
+            dgram = _Datagram(b'', (None, None))
         except (SSL.WantReadError, SSL.WantWriteError, SSL.WantX509LookupError):
             return
         except SSL.ZeroReturnError:
-            dgram = _Datagram('', (None, None))
+            dgram = _Datagram(b'', (None, None))
         except SSL.SysCallError:
-            dgram = _Datagram('', (None, None))
+            dgram = _Datagram(b'', (None, None))
         except:
             sys.stderr.write("Unknown Error on recv():\n%s"
             % traceback.format_exc())
-            dgram = _Datagram('', (None, None))
+            dgram = _Datagram(b'', (None, None))
 
         if not dgram:
             self.shutdown(True)
@@ -211,6 +215,7 @@ class UDPContext(SocketContext):
         child_context = UDPContext(sock)
         child_context.remote_addr = self.remote_addr
         child.connection_stack.append(child_context)
+
 
 class BadUDPHandler(Exception):
     """Thrown when an invalid UDP handler is passed to a UDPService"""

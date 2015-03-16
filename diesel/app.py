@@ -5,7 +5,7 @@ import os
 import gc
 import cProfile
 import traceback
-
+import collections
 from greenlet import greenlet
 
 from diesel import runtime
@@ -73,9 +73,6 @@ class Application(object):
                     raise
                 except KeyboardInterrupt:
                     log.warning("-- KeyboardInterrupt raised.. exiting main loop --")
-                    break
-                except ApplicationEnd:
-                    log.warning("-- ApplicationEnd raised.. exiting main loop --")
                     break
                 except Exception as e:
                     log.error("-- Unhandled Exception rose to main loop --")

@@ -5,7 +5,7 @@ telnet, type your name, hit enter, then chat.  Invite
 a friend to do the same.
 '''
 import sys
-
+from diesel.transports.common import ConnectionClosed
 from diesel import (
     Application, TCPService, until_eol, fire, first, send, TCPClient, protocol,
     thread, fork, Loop,
@@ -33,7 +33,7 @@ def decode(buff):
 
 
 def chat_server(service, addr):
-    my_nick = 'unamed'
+    my_nick = b'unamed'
     try:
         my_nick = until_eol().strip()
         while True:

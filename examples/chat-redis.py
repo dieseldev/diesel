@@ -1,6 +1,6 @@
 import time, cgi
 
-from diesel import Service, Application, sleep, first, Loop
+from diesel import Application, sleep, first, Loop
 
 from diesel.web import DieselFlask
 from diesel.protocols.websockets import WebSocketDisconnect

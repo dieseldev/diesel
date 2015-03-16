@@ -1,8 +1,11 @@
 import random
+
 from diesel import Application, Loop, fire, wait, sleep
+
 
 deer_group = []
 elf_group = []
+
 
 def santa():
     while True:
@@ -12,6 +15,7 @@ def santa():
         if elves_ready:
             work_with_group('elf', elf_group, 'meet in my study')
         sleep(random.random() * 1)
+
 
 def actor(name, type, group, task, max_group, max_sleep):
     def actor_event_loop():
@@ -24,15 +28,18 @@ def actor(name, type, group, task, max_group, max_sleep):
                 wait('%s-group-done' % type)
     return actor_event_loop
 
+
 def work_with_group(name, group, message):
     print("Ho! Ho! Ho! Let's", message)
     fire('%s-group-started' % name)
     sleep(random.random() * 3)
     excuse_group(name, group)
 
+
 def excuse_group(name, group):
     group[:] = []
     fire('%s-group-done' % name, True)
+
 
 def main():
     app = Application()
@@ -51,6 +58,7 @@ def main():
         app.add_loop(Loop(actor(name, 'deer', deer_group, deer_do, 9, 9)))
 
     app.run()
+
 
 if __name__ == '__main__':
     main()

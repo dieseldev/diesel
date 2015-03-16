@@ -1,11 +1,14 @@
 from diesel import runtime
 from diesel.logmod import log
 
+
 class ClientConnectionError(Exception):
     '''Raised if a client cannot connect.'''
 
+
 class ClientConnectionTimeout(Exception):
     '''Raised if the client connection timed out before succeeding.'''
+
 
 class ConnectionClosed(Exception):
     '''Raised if the client closes the connection.'''
@@ -13,8 +16,10 @@ class ConnectionClosed(Exception):
         super(ConnectionClosed, self).__init__(msg)
         self.data = data
 
+
 class NoAssociatedSocket(Exception):
     '''Raised if there is no socket for the current Loop.'''
+
 
 class ClientConnectionClosed(Exception):
     '''Raised if the remote server (for a Client call) closes the connection.'''
@@ -29,6 +34,7 @@ class ClientConnectionClosed(Exception):
         if self.addr and self.port:
             s += ' (addr=%s, port=%s)' % (self.addr, self.port)
         return s
+
 
 class Client(object):
     def __init__(self, addr, port, ssl_ctx=None, timeout=None, source_ip=None):
@@ -68,6 +74,7 @@ class Client(object):
 
     def on_connect(self):
         pass
+
 
 class Service(object):
     '''A network service listening on a certain port, with a protocol
@@ -111,6 +118,7 @@ class Service(object):
 
     def validate_handler(self, handler):
         pass
+
 
 class SocketContext(object):
     def __init__(self, sock):
@@ -175,6 +183,7 @@ class SocketContext(object):
     def on_fork_child(self, parent, child):
         pass
 
+
 class protocol(object):
     def __init__(self, f, inst=None):
         self.f = f
@@ -198,7 +207,6 @@ class protocol(object):
                 r = self.f(self.client, *args, **kw)
             finally:
                 current_loop.connection_stack.pop()
-        except ConnectionClosed, e:
+        except ConnectionClosed as e:
             raise ClientConnectionClosed(str(e), addr=self.client.addr, port=self.client.port)
         return r
-

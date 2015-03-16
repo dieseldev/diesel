@@ -99,7 +99,7 @@ def send(data, priority=5):
     if not isinstance(data, bytes):
         raise RuntimeError("Can only send bytes (if string, you should "
                            "use `encode` prior to call this function)")
-    return current_loop.send(data, priority=priority)
+    return _current_loop.send(data, priority=priority)
 
 
 def wait(*args, **kw):
@@ -213,7 +213,8 @@ class Loop(object):
             raise
         except ParentDiedException:
             parent_died = True
-        except:
+        except Exception as e:
+            print(e)
             log.trace().error("-- Unhandled Exception in local loop <%s> --" % self.loop_label)
         finally:
             if self.connection_stack:
