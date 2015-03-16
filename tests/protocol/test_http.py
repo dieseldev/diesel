@@ -12,7 +12,7 @@ except ImportError:
 
 class TestHttpClient(object):
     def test_simple(self):
-        with HttpClient('http://httpbin.org', 80) as client:
+        with HttpClient('httpbin.org', 80) as client:
             resp = client.request('GET', '/get', {})
         while resp.status_code == 302:
             redirect = resp.headers['location']
@@ -63,7 +63,7 @@ class TestWSGI(object):
         fork(client_app)
         event, msg = first(waits=['success', 'error'])
         assert event == 'success', msg
-        assert msg == 'Hello World!', msg
+        assert msg == b'Hello World!', msg
 
     def test_unicode(self):
         def unicode_app(environ, start_response):
