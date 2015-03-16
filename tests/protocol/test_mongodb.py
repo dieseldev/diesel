@@ -29,11 +29,11 @@ class TestMongoDB(MongoDbHarness):
         d1 = {'one' : 'two'}
         d2 = {'three' : 'four'}
         inp = [d1, d2]
-        inp.sort()
+        # inp.sort()
         assert self.db.imult.insert(inp)['err'] == None
         all = self.db.imult.find().all()
-        map(self.filt, all)
-        all.sort()
+        list(map(self.filt, all))
+        # all.sort()
         assert all == inp
 
     # UPDATE
@@ -141,7 +141,7 @@ class TestMongoDB(MongoDbHarness):
     def test_query_basic(self):
         d = {'one' : 'two'}
         assert self.db.onerec.insert(d)['err'] == None
-        assert map(self.filt, self.db.onerec.find().all()) == [d]
+        assert list(map(self.filt, self.db.onerec.find().all())) == [d]
         assert self.filt(self.db.onerec.find().one()) == d
 
         x = 0
@@ -166,21 +166,21 @@ class TestMongoDB(MongoDbHarness):
     def test_query_subfields(self):
         d = {'one' : 'two', 'three' : 'four'}
         assert self.db.q2.insert(d)['err'] == None
-        assert map(self.filt,
-                self.db.q2.find({'one' : 'two'}, ['three']).all()) \
+        assert list(map(self.filt,
+                self.db.q2.find({'one' : 'two'}, ['three']).all())) \
                 == [{'three' : 'four'}]
 
     def test_deterministic_order_when_static(self):
-        for x in xrange(500):
+        for x in range(500):
             self.db.q3.insert({'x' : x})
 
         snap = self.db.q3.find().all()
 
-        for x in xrange(100):
+        for x in range(100):
             assert snap == self.db.q3.find().all()
 
     def test_skip(self):
-        for x in xrange(500):
+        for x in range(500):
             self.db.q4.insert({'x' : x})
 
         snap = self.db.q4.find().all()
@@ -190,7 +190,7 @@ class TestMongoDB(MongoDbHarness):
         assert snap[250:] == with_skip
 
     def test_limit(self):
-        for x in xrange(500):
+        for x in range(500):
             self.db.q5.insert({'x' : x})
 
         snap = self.db.q5.find().all()
@@ -200,7 +200,7 @@ class TestMongoDB(MongoDbHarness):
         assert snap[:150] == with_skip
 
     def test_skip_limit(self):
-        for x in xrange(500):
+        for x in range(500):
             self.db.q6.insert({'x' : x})
 
         snap = self.db.q6.find().all()
@@ -211,7 +211,7 @@ class TestMongoDB(MongoDbHarness):
 
     # CURSOR PROPERTIES
     def test_cursor_count(self):
-        for x in xrange(500):
+        for x in range(500):
             self.db.c1.insert({'x' : x})
 
         c = self.db.c1.find()
@@ -223,13 +223,12 @@ class TestMongoDB(MongoDbHarness):
         assert len(c.all()) == 150
 
     def test_cursor_sort(self):
-        for x in xrange(500):
+        for x in range(500):
             self.db.c2.insert({'x' : x})
 
         snap = self.db.c2.find().sort('x', 1).all()
 
-        print snap
-        assert map(lambda d: d['x'], snap) == range(500)
+        assert [d['x'] for d in snap] == list(range(500))
 
         snap = self.db.c2.find().sort('x', -1).all()
-        assert map(lambda d: d['x'], snap) == range(499, -1, -1)
+        assert [d['x'] for d in snap] == list(range(499, -1, -1))

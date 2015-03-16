@@ -2,8 +2,9 @@
 """A mongodb client library for Diesel"""
 
 # needed to make diesel work with python 2.5
-from __future__ import with_statement
 
+
+from builtins import object
 import itertools
 import struct
 from collections import deque
@@ -14,7 +15,7 @@ from diesel.core import send, receive
 from diesel.transports.common import protocol, ConnectionClosed
 from diesel.transports.tcp import TCPClient
 
-_ZERO = "\x00\x00\x00\x00"
+_ZERO = b"\x00\x00\x00\x00"
 HEADER_SIZE = 16
 
 class MongoOperationalError(Exception): pass
@@ -60,7 +61,7 @@ class MongoClient(TCPClient):
 
     @property
     def _msg_id(self):
-        return self._msg_id_counter.next()
+        return next(self._msg_id_counter)
 
     def _put_request_get_response(self, op, data):
         self._put_request(op, data)
@@ -74,7 +75,7 @@ class MongoClient(TCPClient):
 
     def _put_request(self, op, data):
         req = struct.pack('<4i', HEADER_SIZE + len(data), self._msg_id, 0, op)
-        send("%s%s" % (req, data))
+        send(req + data)
 
     def _handle_response(self, cursor, resp):
         cid, start, numret, result = resp
@@ -184,7 +185,7 @@ class Ops(object):
                 data.append(BSON.encode(fields))
             else:
                 data.append(BSON.encode(dict.fromkeys(fields, 1)))
-        return "".join(data)
+        return b"".join(data)
 
     @staticmethod
     def get_more(col, limit, id):
@@ -203,7 +204,7 @@ class Ops(object):
             flags |= 1 << 1
         fmt = '<i%dsi' % len(colname)
         part = struct.pack(fmt, 0, colname, flags)
-        return "%s%s%s" % (part, BSON.encode(spec), BSON.encode(doc))
+        return part + BSON.encode(spec) + BSON.encode(doc)
 
     @staticmethod
     def insert(col, doc_or_docs):
@@ -212,21 +213,21 @@ class Ops(object):
             doc_or_docs = [doc_or_docs]
         except AttributeError:
             pass
-        doc_data = "".join(BSON.encode(doc) for doc in doc_or_docs)
+        doc_data = b"".join(BSON.encode(doc) for doc in doc_or_docs)
         colname = _make_c_string(col)
-        return "%s%s%s" % (_ZERO, colname, doc_data)
+        return _ZERO + colname + doc_data
 
     @staticmethod
     def delete(col, spec):
         colname = _make_c_string(col)
-        return "%s%s%s%s" % (_ZERO, colname, _ZERO, BSON.encode(spec))
+        return _ZERO + colname + _ZERO + BSON.encode(spec)
 
 class MongoIter(object):
     def __init__(self, cursor):
         self.cursor = cursor
         self.cache = deque()
 
-    def next(self):
+    def __next__(self):
         try:
             return self.cache.popleft()
         except IndexError:
@@ -235,7 +236,8 @@ class MongoIter(object):
                 raise StopIteration()
             else:
                 self.cache.extend(more)
-                return self.next()
+                return next(self)
+        
 
 class MongoCursor(object):
     def __init__(self, col, client, spec, fields, skip, limit):
@@ -361,7 +363,7 @@ class MongoProxy(object):
 
     def handle_request(self, info, body):
         length, id, to, opcode = info
-        print "saw request with opcode", opcode
+        print("saw request with opcode", opcode)
         return None, info, body
 
     def handle_response(self, response):

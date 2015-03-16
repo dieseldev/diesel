@@ -10,21 +10,21 @@ def send_loop():
     c = RedisClient()
     sleep(1)
 
-    print 'SEND S', time.time()
+    print('SEND S', time.time())
 
-    for x in xrange(500):
+    for x in range(500):
         c.publish("foo", "bar")
 
-    print 'SEND E', time.time()
+    print('SEND E', time.time())
 
 hub = RedisSubHub()
 
 def recv_loop():
-    print 'RECV S', time.time()
+    print('RECV S', time.time())
     with hub.sub('foo') as poll:
-        for x in xrange(500):
+        for x in range(500):
             q, content = poll.fetch()
-    print 'RECV E', time.time()
+    print('RECV E', time.time())
 
 a = Application()
 a.add_loop(Loop(hub)) # start up the sub loop

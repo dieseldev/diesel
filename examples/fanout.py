@@ -13,11 +13,11 @@ def listener(x):
     with f.sub() as q:
         while True:
             v = q.get()
-            print '%s <- %s' % (x, v)
+            print('%s <- %s' % (x, v))
             cd.tick()
 
 def teller():
-    for x in xrange(EVENTS):
+    for x in range(EVENTS):
         sleep(2)
         f.pub(x)
 
@@ -27,4 +27,4 @@ def killer():
 
 from functools import partial
 quickstart(killer, teller,
-        *[partial(listener, x) for x in xrange(LISTENERS)])
+        *[partial(listener, x) for x in range(LISTENERS)])

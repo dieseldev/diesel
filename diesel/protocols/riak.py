@@ -163,7 +163,7 @@ class Bucket(object):
             else:
                 try:
                     res = self.get(key)
-                except Exception, e:
+                except Exception as e:
                     outq.put((key, False, e))
                 else:
                     outq.put((key, True, res))
@@ -175,10 +175,8 @@ class Bucket(object):
         outq = Queue()
         for k in keys:
             inq.put(k)
-
-        for x in xrange(min(len(keys), concurrency_limit)):
+        for x in range(min(len(keys), concurrency_limit)):
             fork(self._subrequest, inq, outq)
-
         failure = False
         okay, err = [], []
         for k in keys:
@@ -359,7 +357,7 @@ class RiakClient(TCPClient):
             key=key,
             content=content,
         )
-        for name, value in params.iteritems():
+        for name, value in params.items():
             setattr(request, name, value)
         self._send(request)
         response = self._receive()
@@ -386,7 +384,7 @@ class RiakClient(TCPClient):
         response = self._receive()
         if response:
             result = _to_dict(response)
-            if result.has_key('keys'):
+            if 'keys' in result:
                 return result['keys']
         return None
 
@@ -428,7 +426,7 @@ class RiakClient(TCPClient):
         """
         request = riak_palm.RpbSetBucketReq(bucket=bucket)
         bucket_props = riak_palm.RpbBucketProps()
-        for name, value in props.iteritems():
+        for name, value in props.items():
             setattr(bucket_props, name, value)
         request.props = bucket_props
         self._send(request)
@@ -501,7 +499,7 @@ class Point(object):
         self.y = y
 
 if __name__ == '__main__':
-    import cPickle
+    import pickle
 
     from diesel import quickstart, quickstop, sleep
 
@@ -558,10 +556,10 @@ if __name__ == '__main__':
         # Custom Bucket.
         class PickleBucket(Bucket): # lol
             def loads(self, raw_value):
-                return cPickle.loads(raw_value)
+                return pickle.loads(raw_value)
 
             def dumps(self, rich_value):
-                return cPickle.dumps(rich_value)
+                return pickle.dumps(rich_value)
 
             def resolve(self, t1, v1, t2, v2):
                 # Returns the value with the smallest different between points.
@@ -609,11 +607,11 @@ if __name__ == '__main__':
         try:
             # Tell Riak to require 10000 nodes to write this before success.
             c.put('testing', 'error!', 'oh noes!', w=10000)
-        except RiakErrorResp, e:
+        except RiakErrorResp as e:
             assert e.errcode == 1, e.errcode
             assert e.errmsg == '{n_val_violation,3}', e.errmsg
             assert repr(e) == "RiakErrorResp: {n_val_violation,3}", repr(e)
-        except Exception, e:
+        except Exception as e:
             assert 0, "UNEXPECTED EXCEPTION: %r" % e
         else:
             assert 0, "DID NOT RAISE"

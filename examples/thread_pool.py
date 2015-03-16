@@ -3,15 +3,15 @@ from diesel.util.pool import ThreadPool
 import random
 
 def handle_it(i):
-    print 'S', i
+    print('S', i)
     sleep(random.random())
-    print 'E', i
+    print('E', i)
 
 def c():
-    for x in xrange(0, 20):
+    for x in range(0, 20):
         yield x
 
-make_it = c().next
+make_it = c()
 
 def stop_it():
     quickstop()

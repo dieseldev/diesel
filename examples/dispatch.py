@@ -13,11 +13,11 @@ def worker(x):
             r[x] += 1
 
 def maker():
-    for x in xrange(500000):
+    for x in range(500000):
         d.dispatch(x)
         if x % 10000 == 0:
             sleep()
             log.info("values: {0}", r)
     quickstop()
 
-quickstart(maker, *(partial(worker, x) for x in xrange(WORKERS)))
+quickstart(maker, *(partial(worker, x) for x in range(WORKERS)))

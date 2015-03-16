@@ -2,14 +2,17 @@
 '''HTTP/1.1 implementation of client and server.
 '''
 
-import cStringIO
+from future.standard_library import install_aliases
+install_aliases()
+
+import io
 import os
-import urllib
+import sys
+import urllib.request, urllib.parse, urllib.error
 import time
 
 from datetime import datetime
-from urlparse import urlparse
-
+from urllib.parse import urlparse
 from flask import Request, Response
 from OpenSSL import SSL
 
@@ -38,7 +41,7 @@ def parse_request_line(line):
     items[0] = items[0].upper()
     if len(items) == 2:
         return tuple(items) + ('0.9',)
-    items[1] = urllib.unquote(items[1])
+    items[1] = urllib.parse.unquote(items[1])
     items[2] = items[2].split('/')[-1].strip()
     return tuple(items)
 
@@ -105,7 +108,7 @@ class HttpServer(object):
                 env.update({
                     'wsgi.version' : (1,0),
                     'wsgi.url_scheme' : 'http', # XXX incomplete
-                    'wsgi.input' : cStringIO.StringIO(''.join(body)),
+                    'wsgi.input' : io.BytesIO(b''.join(body)),
                     'wsgi.errors' : FileLikeErrorLogger(hlog),
                     'wsgi.multithread' : False,
                     'wsgi.multiprocess' : False,
@@ -148,9 +151,10 @@ class HttpServer(object):
             resp.headers.set('Content-Length', str(size))
         else:
             sendfile = None
-
-        send("HTTP/%s %s %s\r\n" % (('%s.%s' % version), resp.status_code, resp.status))
-        send(str(resp.headers))
+        if 'Content-Length' not in resp.headers:
+            resp.headers['Content-Length'] = resp.calculate_content_length()
+        send(('HTTP/%i.%i %i %s\r\n' % (version + (resp.status_code, resp.status))).encode(resp.charset))
+        send(str(resp.headers).encode(resp.charset))
 
         if sendfile:
             send(open(sendfile, 'rb')) # diesel can stream fds
@@ -195,21 +199,27 @@ class HttpClient(TCPClient):
     def request(self, method, url, headers=None, body=None, timeout=None):
         '''Issues a `method` request to `path` on the
         connected server.  Sends along `headers`, and
-        body.
+        `body`.
 
-        Very low level--you must set "host" yourself,
-        for example.  It will set Content-Length,
-        however.
+        :param headers: Request's headers. If not provided, `Host` and
+        `Content-Length` will be automatically provided
         '''
         headers = headers or {}
         url_info = urlparse(url)
-        fake_wsgi = dict(
-        (cgi_name(n), str(v).strip()) for n, v in headers.iteritems())
+        fake_wsgi = dict((cgi_name(n), str(v).strip()) for n, v in headers.items())
+
+        if 'HTTP_HOST' not in fake_wsgi:
+            # HTTP host header omit the port if 80
+            # http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.23
+            if self.port == 80:
+                fake_wsgi['HTTP_HOST'] = self.addr
+            else:
+                fake_wsgi['HTTP_HOST'] = '%s:%i' % (self.addr, self.port)
 
         if body and 'CONTENT_LENGTH' not in fake_wsgi:
             # If the caller hasn't set their own Content-Length but submitted
             # a body, we auto-set the Content-Length header here.
-            fake_wsgi['CONTENT_LENGTH'] = str(len(body))
+            fake_wsgi['CONTENT_LENGTH'] = str(len(body) if body else 0)
 
         fake_wsgi.update({
             'REQUEST_METHOD' : method,
@@ -218,7 +228,7 @@ class HttpClient(TCPClient):
             'QUERY_STRING' : url_info[4],
             'wsgi.version' : (1,0),
             'wsgi.url_scheme' : 'http', # XXX incomplete
-            'wsgi.input' : cStringIO.StringIO(body or ''),
+            'wsgi.input' : io.BytesIO(body or b''),
             'wsgi.errors' : FileLikeErrorLogger(hlog),
             'wsgi.multithread' : False,
             'wsgi.multiprocess' : False,
@@ -228,14 +238,14 @@ class HttpClient(TCPClient):
 
         timeout_handler = TimeoutHandler(timeout or 60)
 
-        url = str(req.path)
+        # Werkzeug desn't encode path but encodes query_string...
+        url = req.path
         if req.query_string:
-            url += '?' + str(req.query_string)
-
-        send('%s %s HTTP/1.1\r\n%s' % (req.method, url, str(req.headers)))
+            url += '?' + req.query_string.decode('latin-1')
+        send(('%s %s HTTP/1.1\r\n%s' % (req.method, url, str(req.headers))).encode(req.charset))
 
         if body:
-            send(body)
+            send(body.encode())
 
         h = HttpParser()
         body = []
@@ -253,7 +263,7 @@ class HttpClient(TCPClient):
             data = val
 
         resp = Response(
-            response=''.join(body),
+            response=b''.join(body),
             status=h.get_status_code(),
             headers=h.get_headers(),
             )

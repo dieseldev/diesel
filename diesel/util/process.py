@@ -90,7 +90,7 @@ class Process(object):
                 except (SystemExit, KeyboardInterrupt):
                     pipe.close()
                     break
-                except Exception, e:
+                except Exception as e:
                     e.original_traceback = traceback.format_exc()
                     pipe.send(e)
 
@@ -189,7 +189,7 @@ class ProcessPool(object):
         ProcessPool to your application.
 
         """
-        for i in xrange(self.concurrency):
+        for i in range(self.concurrency):
             proc = spawn(self.handler)
             self.available_procs.put(proc)
             self.all_procs.append(proc)
@@ -206,28 +206,28 @@ if __name__ == '__main__':
 
     def main():
         def waiting(ident):
-            print ident, "waiting ..."
+            print(ident, "waiting ...")
             t = sleep_pool(4)
-            print ident, "woken up after", t
+            print(ident, "woken up after", t)
 
         diesel.fork(waiting, 'a')
         diesel.fork(waiting, 'b')
         diesel.fork(waiting, 'c')
-        for i in xrange(11):
-            print "busy!"
+        for i in range(11):
+            print("busy!")
             diesel.sleep(1)
         div = spawn(lambda x,y: x/y)
         try:
             div(1,0)
-        except ZeroDivisionError, e:
+        except ZeroDivisionError as e:
             diesel.log.error(e.original_traceback)
-        print '^^ That was an intentional exception.'
+        print('^^ That was an intentional exception.')
         term(div)
         psleep = spawn(sleep_and_return)
         diesel.fork(psleep, 0.5)
         diesel.fork(psleep, 0.5)
         diesel.sleep(1)
-        print '^^ That was an intentional exception.'
+        print('^^ That was an intentional exception.')
         diesel.quickstop()
 
     diesel.quickstart(sleep_pool.pool, main)

@@ -1,3 +1,5 @@
+from builtins import int, object
+
 # vim:ts=4:sw=4:expandtab
 class BufAny(object):
     pass
@@ -17,9 +19,8 @@ class Buffer(object):
     def set_term(self, term):
         '''Set the current sentinel.
 
-        `term` is either an int, for a byte count, or
-        a string, for a sequence of characters that needs
-        to occur in the byte stream.
+        :param term: Either an int, for a bytes count, or bytes, for a
+        sequence of characters that needs to occur in the byte stream.
         '''
         self._atterm = term
 
@@ -46,13 +47,13 @@ class Buffer(object):
             if self.has_data:
                 return self.pop()
             return None
-        if type(self._atterm) is int:
+        if isinstance(self._atterm, int):
             if self._atmark >= self._atterm:
                 ind = self._atterm
         elif self._atterm is None:
             return None
         else:
-            all = ''.join(self._atinbuf)
+            all = b''.join(self._atinbuf)
             res = all.find(self._atterm)
             if res != -1:
                 ind = res + len(self._atterm)
@@ -60,7 +61,7 @@ class Buffer(object):
             return None
         self._atterm = None # this terminator was used
         if all is None:
-            all = ''.join(self._atinbuf)
+            all = b''.join(self._atinbuf)
         use = all[:ind]
         new_all = all[ind:]
         self._atinbuf = [new_all]
@@ -69,7 +70,7 @@ class Buffer(object):
         return use
 
     def pop(self):
-        b = ''.join(self._atinbuf)
+        b = b''.join(self._atinbuf)
         self._atinbuf = []
         self._atmark = 0
         return b

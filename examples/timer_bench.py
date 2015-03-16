@@ -25,15 +25,15 @@ cpustats = []
 
 
 def producer(q):
-    for i in xrange(OPERATIONS):
+    for i in range(OPERATIONS):
         diesel.sleep(0.5)
         q.put(i)
 
 def consumer(q, done):
-    for i in xrange(OPERATIONS):
+    for i in range(OPERATIONS):
         evt, data = diesel.first(waits=[q], sleep=10000)
         if evt == "sleep":
-            print "sleep was triggered!"
+            print("sleep was triggered!")
             break
     done.tick()
 
@@ -57,15 +57,15 @@ def main():
     diesel.fork(track_cpu_stats)
     actor_pairs = int(sys.argv[1])
     done = Countdown(actor_pairs)
-    for i in xrange(actor_pairs):
+    for i in range(actor_pairs):
         pair(done)
     start = time.time()
     done.wait()
-    print "done in %.2f secs" % (time.time() - start)
+    print("done in %.2f secs" % (time.time() - start))
     diesel.sleep(1)
     diesel.quickstop()
 
 if __name__ == '__main__':
     diesel.set_log_level(diesel.loglevels.ERROR)
     diesel.quickstart(main)
-    print cpustats
+    print(cpustats)

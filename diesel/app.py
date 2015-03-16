@@ -74,7 +74,10 @@ class Application(object):
                 except KeyboardInterrupt:
                     log.warning("-- KeyboardInterrupt raised.. exiting main loop --")
                     break
-                except Exception, e:
+                except ApplicationEnd:
+                    log.warning("-- ApplicationEnd raised.. exiting main loop --")
+                    break
+                except Exception as e:
                     log.error("-- Unhandled Exception rose to main loop --")
                     log.error(traceback.format_exc())
 
@@ -93,7 +96,7 @@ class Application(object):
                 config['filename'] = statsfile
             try:
                 cProfile.runctx('_real_main()', globals(), locals(), **config)
-            except TypeError, e:
+            except TypeError as e:
                 if "sort" in e.args[0]:
                     del config['sort']
                     cProfile.runctx('_real_main()', globals(), locals(), **config)
@@ -173,7 +176,7 @@ def quickstart(*args, **kw):
             app.add_service(a)
         elif isinstance(a, Loop):
             app.add_loop(a)
-        elif callable(a):
+        elif isinstance(a, collections.Callable):
             app.add_loop(Loop(a))
     app.run()
 

@@ -1,5 +1,4 @@
-import thread
-
+import _thread
 from diesel.core import fork_from_thread
 from diesel.util.queue import Queue
 
@@ -15,5 +14,5 @@ def consume_stream(stream, q):
 
 def create_line_input_stream(fileobj):
     q = Queue()
-    thread.start_new_thread(consume_stream, (fileobj, q))
+    _thread.start_new_thread(consume_stream, (fileobj, q))
     return q

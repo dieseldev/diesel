@@ -3,7 +3,7 @@
 It's a hack.
 
 """
-import httplib
+import http.client
 
 import diesel
 from diesel.resolver import DNSResolutionError
@@ -109,14 +109,14 @@ class FileLike(object):
     def close(self):
         self._client.close()
 
-class HTTPConnection(httplib.HTTPConnection):
+class HTTPConnection(http.client.HTTPConnection):
     def connect(self):
         try:
             self.sock = SocketLike(self.host, self.port)
         except DNSResolutionError:
             raise requests.ConnectionError
 
-class HTTPSConnection(httplib.HTTPSConnection):
+class HTTPSConnection(http.client.HTTPSConnection):
     def connect(self):
         try:
             kw = {'ssl_ctx': SSL.Context(SSL.SSLv23_METHOD)}

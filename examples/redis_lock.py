@@ -35,8 +35,11 @@ def main():
     client.delete(key)
     client.set(incr_key, 0)
 
-    for _ in xrange(500):
+    print('Starting spawning concurent increments')
+    for i in range(1, 501):
         fork(take_lock)
+        if not i % 100:
+            print('Spawned %i/500 increment tentatives' % i)
         if random.random() > 0.1:
             sleep(random.random() / 10)
     sleep(2)

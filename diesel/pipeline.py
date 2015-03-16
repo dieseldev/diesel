@@ -2,17 +2,47 @@
 '''An outgoing pipeline that can handle
 strings or files.
 '''
+import sys
 try:
-    import cStringIO
+    import io
 except ImportError:
-    raise ImportError, "cStringIO is required"
+    raise ImportError("cStringIO is required")
 
+from builtins import object, bytes, str
 from bisect import bisect_right
+# functools.total_ordering is not available for Python < 2.7
+try:
+    from functools import total_ordering
+except ImportError:
+    def total_ordering(cls):
+        """Class decorator that fills in missing ordering methods"""
+        convert = {
+            '__lt__': [('__gt__', lambda self, other: not (self < other or self == other)),
+                       ('__le__', lambda self, other: self < other or self == other),
+                       ('__ge__', lambda self, other: not self < other)],
+            '__le__': [('__ge__', lambda self, other: not self <= other or self == other),
+                       ('__lt__', lambda self, other: self <= other and not self == other),
+                       ('__gt__', lambda self, other: not self <= other)],
+            '__gt__': [('__lt__', lambda self, other: not (self > other or self == other)),
+                       ('__ge__', lambda self, other: self > other or self == other),
+                       ('__le__', lambda self, other: not self > other)],
+            '__ge__': [('__le__', lambda self, other: (not self >= other) or self == other),
+                       ('__gt__', lambda self, other: self >= other and not self == other),
+                       ('__lt__', lambda self, other: not self >= other)]
+        }
+        roots = set(dir(cls)) & set(convert)
+        if not roots:
+            raise ValueError('must define at least one ordering operation: < > <= >=')
+        root = max(roots)       # prefer __lt__ to __le__ to __gt__ to __ge__
+        for opname, opfunc in convert[root]:
+            if opname not in roots:
+                opfunc.__name__ = opname
+                opfunc.__doc__ = getattr(int, opname).__doc__
+                setattr(cls, opname, opfunc)
+        return cls
 
-_obj_SIO = cStringIO.StringIO
-_type_SIO = cStringIO.OutputType
 def make_SIO(d):
-    t = _obj_SIO()
+    t = io.BytesIO()
     t.write(d)
     t.seek(0)
     return t
@@ -27,9 +57,14 @@ def get_file_length(f):
 class PipelineCloseRequest(Exception): pass
 class PipelineClosed(Exception): pass
 
+@total_ordering
 class PipelineItem(object):
     def __init__(self, d):
-        if type(d) is str:
+        # TODO : error on str
+        if isinstance(d, str):
+            d = d.encode()
+            import pdb; pdb.set_trace()
+        if isinstance(d, bytes):
             self.f = make_SIO(d)
             self.length = len(d)
             self.is_sio = True
@@ -39,7 +74,7 @@ class PipelineItem(object):
             self.length = get_file_length(d)
             self.is_sio = False
         else:
-            raise ValueError("argument to add() must be either a str or a file-like object")
+            raise ValueError("argument to add() must be either bytes or a file-like object")
         self.read = self.f.read
 
     def merge(self, s):
@@ -55,15 +90,15 @@ class PipelineItem(object):
     def done(self):
         return self.f.tell() == self.length
 
-    def __cmp__(self, other):
+    def __lt__(self, other):
         if other is PipelineStandIn:
-            return -1
-        return cmp(self, other) 
+            return True
+        return self < other
 
 class PipelineStandIn(object): pass
 
 class Pipeline(object):
-    '''A pipeline that supports appending strings or
+    '''A pipeline that supports appending bytes or
     files and can read() transparently across object
     boundaries in the outgoing buffer.
     '''
@@ -82,7 +117,7 @@ class Pipeline(object):
 
         dummy = (priority, PipelineStandIn)
         ind = bisect_right(self.line, dummy)
-        if ind > 0 and type(d) is str and self.line[ind - 1][-1].is_sio:
+        if ind > 0 and isinstance(d, bytes) and self.line[ind - 1][-1].is_sio:
             a_pri, adjacent = self.line[ind - 1]
             if adjacent.is_sio and a_pri == priority:
                 adjacent.merge(d)
@@ -108,19 +143,19 @@ class Pipeline(object):
         if not self.current and not self.line:
             if self.want_close:
                 raise PipelineCloseRequest()
-            return ''
+            return b''
 
         if not self.current:
             _, self.current = self.line.pop(0)
             self.current.reset()
 
-        out = ''
+        out = b''
         while len(out) < amt:
             try:
                 data = self.current.read(amt - len(out))
             except ValueError:
-                data = ''
-            if data == '':
+                data = b''
+            if not data:
                 if not self.line:
                     self.current = None
                     break

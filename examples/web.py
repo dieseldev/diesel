@@ -17,6 +17,6 @@ if __name__ == '__main__':
     def t():
         while True:
             diesel.sleep(1)
-            print "also looping.."
+            print("also looping..")
     app.diesel_app.add_loop(diesel.Loop(t))
     app.run(debug=True)

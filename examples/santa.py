@@ -20,12 +20,12 @@ def actor(name, type, group, task, max_group, max_sleep):
             if len(group) < max_group:
                 group.append(name)
                 wait('%s-group-started' % type)
-                print "%s %s" % (name, task)
+                print("%s %s" % (name, task))
                 wait('%s-group-done' % type)
     return actor_event_loop
 
 def work_with_group(name, group, message):
-    print "Ho! Ho! Ho! Let's", message
+    print("Ho! Ho! Ho! Let's", message)
     fire('%s-group-started' % name)
     sleep(random.random() * 3)
     excuse_group(name, group)
@@ -39,7 +39,7 @@ def main():
     app.add_loop(Loop(santa))
 
     elf_do = "meets in study"
-    for i in xrange(10):
+    for i in range(10):
         app.add_loop(Loop(actor("Elf %d" % i, 'elf', elf_group, elf_do, 3, 3)))
 
     deer_do = "delivers toys"

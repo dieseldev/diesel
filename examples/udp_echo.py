@@ -35,8 +35,8 @@ def echo_server(service):
 def echo_client():
     client = EchoClient('localhost', 8013)
     while True:
-        msg = raw_input("> ")
-        print client.say(msg)
+        msg = input("> ")
+        print(client.say(msg))
 
 if len(sys.argv) == 2:
     if 'client' in sys.argv[1]:
@@ -45,4 +45,4 @@ if len(sys.argv) == 2:
     elif 'server' in sys.argv[1]:
         quickstart(UDPService(echo_server, 8013))
         raise SystemExit
-print 'usage: python %s (server|client)' % sys.argv[0]
+print('usage: python %s (server|client)' % sys.argv[0])

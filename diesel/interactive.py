@@ -8,6 +8,7 @@ Supports both the standard Python interactive interpreter and IPython (if
 installed).
 
 """
+from __future__ import print_function
 import code
 import sys
 sys.path.insert(0, '.')
@@ -63,7 +64,7 @@ def python():
 
 def ipython():
     if not IPYTHON_AVAILABLE:
-        print >> sys.stderr, "IPython not found."
+        print("IPython not found.", file=sys.stderr)
         raise SystemExit(1)
     quickstart(interact_ipython)
 

@@ -9,7 +9,7 @@ def putter():
     log = glog.name("putter")
 
     log.info("putting 100000 things on queue")
-    for x in xrange(100000):
+    for x in range(100000):
         q.put(x)
         sleep()
 
@@ -32,4 +32,4 @@ def manage():
     cd.wait()
     quickstop()
 
-quickstart(manage, putter, [getter for x in xrange(4)])
+quickstart(manage, putter, [getter for x in range(4)])
