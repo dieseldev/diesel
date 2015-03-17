@@ -15,13 +15,17 @@ from diesel.core import send, receive
 from diesel.transports.common import protocol, ConnectionClosed
 from diesel.transports.tcp import TCPClient
 
+
 _ZERO = b"\x00\x00\x00\x00"
 HEADER_SIZE = 16
 
+
 class MongoOperationalError(Exception): pass
+
 
 def _full_name(parent, child):
     return "%s.%s" % (parent, child)
+
 
 class TraversesCollections(object):
     def __init__(self, name, client):
@@ -39,6 +43,7 @@ class TraversesCollections(object):
 class Db(TraversesCollections):
     pass
 
+
 class Collection(TraversesCollections):
     def find(self, spec=None, fields=None, skip=0, limit=0):
         return MongoCursor(self.name, self.client, spec, fields, skip, limit)
@@ -51,6 +56,7 @@ class Collection(TraversesCollections):
 
     def delete(self, spec, safe=True):
         return self.client.delete(self.name, spec, safe)
+
 
 class MongoClient(TCPClient):
     collection_class = None
@@ -159,7 +165,11 @@ class MongoClient(TCPClient):
             return []
 
     def __getattr__(self, name):
+        return self[name]
+
+    def __getitem__(self, name):
         return Db(name, self)
+
 
 class Ops(object):
     ASCENDING = 1
@@ -221,6 +231,7 @@ class Ops(object):
     def delete(col, spec):
         colname = _make_c_string(col)
         return _ZERO + colname + _ZERO + BSON.encode(spec)
+
 
 class MongoIter(object):
     def __init__(self, cursor):
@@ -315,6 +326,7 @@ class MongoCursor(object):
         if self.id and not self.finished:
             raise RuntimeError("need to cleanup cursor!")
 
+
 class RawMongoClient(TCPClient):
     "A mongodb client that does the bare minimum to push bits over the wire."
 
@@ -329,6 +341,7 @@ class RawMongoClient(TCPClient):
             length, id, to, opcode = struct.unpack('<4i', header)
             body = receive(length - HEADER_SIZE)
             return header + body
+
 
 class MongoProxy(object):
     ClientClass = RawMongoClient
