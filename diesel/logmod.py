@@ -13,7 +13,6 @@ from functools import partial
 
 diesel_format = formats.line_format
 diesel_format.traceback_prefix = '\n'
-diesel_format.conversion = formats.ConversionTable()
 diesel_format.conversion.add("time", partial(time.strftime, "%Y/%m/%d %H:%M:%S"), "[{1}]".format)
 diesel_format.conversion.add("name", str, "{{{1}}}".format)
 diesel_format.conversion.add("level", str, "{1}".format)
