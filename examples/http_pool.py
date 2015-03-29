@@ -7,13 +7,13 @@ from functools import reduce
 
 def f():
     t1 = time()
-    print(request("http://example.iana.org/missing"), 'is missing?')
+    print(request("http://www.example.org/missing"), 'is missing?')
     t2 = time()
-    print(request("http://example.iana.org/missing"), 'is missing?')
+    print(request("http://www.example.org/missing"), 'is missing?')
     t3 = time()
-    print(request("http://example.iana.org/missing"), 'is missing?')
+    print(request("http://www.example.org/missing"), 'is missing?')
     t4 = time()
-    print(request("http://example.iana.org/"), 'is found?')
+    print(request("http://www.example.org/"), 'is found?')
     t5 = time()
 
     print('First request should (probably) have been longer (tcp handshake) than subsequent 3 requests:')

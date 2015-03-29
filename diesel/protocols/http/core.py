@@ -224,8 +224,8 @@ class HttpClient(TCPClient):
         fake_wsgi.update({
             'REQUEST_METHOD' : method,
             'SCRIPT_NAME' : '',
-            'PATH_INFO' : url_info[2],
-            'QUERY_STRING' : url_info[4],
+            'PATH_INFO' : url_info[2].decode(),
+            'QUERY_STRING' : url_info[4].decode(),
             'wsgi.version' : (1,0),
             'wsgi.url_scheme' : 'http', # XXX incomplete
             'wsgi.input' : io.BytesIO(body or b''),
