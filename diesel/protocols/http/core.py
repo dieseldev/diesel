@@ -205,7 +205,7 @@ class HttpClient(TCPClient):
         `Content-Length` will be automatically provided
         '''
         headers = headers or {}
-        url_info = urlparse(url)
+        url_info = urlparse(url if isinstance(url, str) else url.decode())
         fake_wsgi = dict((cgi_name(n), str(v).strip()) for n, v in headers.items())
 
         if 'HTTP_HOST' not in fake_wsgi:
@@ -220,12 +220,11 @@ class HttpClient(TCPClient):
             # If the caller hasn't set their own Content-Length but submitted
             # a body, we auto-set the Content-Length header here.
             fake_wsgi['CONTENT_LENGTH'] = str(len(body) if body else 0)
-
         fake_wsgi.update({
             'REQUEST_METHOD' : method,
             'SCRIPT_NAME' : '',
-            'PATH_INFO' : url_info[2].decode(),
-            'QUERY_STRING' : url_info[4].decode(),
+            'PATH_INFO' : url_info[2],
+            'QUERY_STRING' : url_info[4],
             'wsgi.version' : (1,0),
             'wsgi.url_scheme' : 'http', # XXX incomplete
             'wsgi.input' : io.BytesIO(body or b''),
