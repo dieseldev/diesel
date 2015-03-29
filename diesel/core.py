@@ -5,6 +5,7 @@ scheduling primitives, green-thread procedures.
 import os
 import itertools
 from greenlet import greenlet
+from past.builtins import basestring
 
 from diesel import buffer
 from diesel import runtime
@@ -92,13 +93,13 @@ def send(data, priority=5):
     """Sends data out over the underlying connection.
 
     :param data: The data that you want to send.
-    :type data: A byte string (str).
+    :type data: bytes or bytes-stream (i.g. file).
     :param priority: The priority
 
     """
-    if not isinstance(data, bytes):
-        raise RuntimeError("Can only send bytes (if string, you should "
-                           "use `encode` prior to call this function)")
+    if isinstance(data, basestring) and not isinstance(data, bytes):
+        raise RuntimeError("Can only send bytes, you should use "
+                           "`encode` prior to call this function")
     return _current_loop.send(data, priority=priority)
 
 
