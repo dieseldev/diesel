@@ -1,6 +1,9 @@
+from __future__ import print_function
+import random
+
 from diesel import Application, Loop, sleep
 from diesel.util.lock import synchronized
-import random
+
 free = 0
 sync = 0
 

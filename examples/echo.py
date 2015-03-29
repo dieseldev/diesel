@@ -1,6 +1,7 @@
 # vim:ts=4:sw=4:expandtab
 '''Simple echo server.
 '''
+from __future__ import print_function
 from diesel import Application, TCPService, until_eol, send
 from diesel.transports.common import ConnectionClosed
 

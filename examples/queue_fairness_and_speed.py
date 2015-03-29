@@ -19,7 +19,7 @@ def worker():
         if val == shutdown:
             break
         num_processed += 1
-    fmt_args = (diesel.core.current_loop, num_processed)
+    fmt_args = (diesel.core._current_loop, num_processed)
     print("%s, worker done (processed %d items)" % fmt_args)
     dones.put('done')
 

@@ -4,6 +4,7 @@
 telnet, type your name, hit enter, then chat.  Invite
 a friend to do the same.
 '''
+from __future__ import print_function
 import sys
 from diesel.transports.common import ConnectionClosed
 from diesel import (

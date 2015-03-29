@@ -1,6 +1,7 @@
 # vim:ts=4:sw=4:expandtab
 '''Simple udp echo server and client.
 '''
+from __future__ import print_function
 import sys
 from builtins import input
 from diesel import (

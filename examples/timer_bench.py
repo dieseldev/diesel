@@ -26,7 +26,7 @@ cpustats = []
 
 def producer(q):
     for i in range(OPERATIONS):
-        diesel.sleep(0.5)
+        diesel.sleep(0.1)
         q.put(i)
 
 def consumer(q, done):
@@ -45,7 +45,7 @@ def pair(done):
 def track_cpu_stats():
     pid = os.getpid()
     def append_stats():
-        rawstats = subprocess.Popen(['ps -p %d -f' % pid], shell=True, stdout=subprocess.PIPE).communicate()[0]
+        rawstats = subprocess.Popen(['ps -p %d -f' % pid], shell=True, stdout=subprocess.PIPE).communicate()[0].decode()
         header, data = rawstats.split('\n', 1)
         procstats = [d for d in data.split(' ') if d]
         cpustats.append(int(procstats[3]))
@@ -56,6 +56,7 @@ def track_cpu_stats():
 def main():
     diesel.fork(track_cpu_stats)
     actor_pairs = int(sys.argv[1])
+    print('Running %i actors, with %i operations each' % (actor_pairs, OPERATIONS))
     done = Countdown(actor_pairs)
     for i in range(actor_pairs):
         pair(done)
@@ -63,9 +64,11 @@ def main():
     done.wait()
     print("done in %.2f secs" % (time.time() - start))
     diesel.sleep(1)
+    print('cupstats:', cpustats)
     diesel.quickstop()
 
 if __name__ == '__main__':
+    if len(sys.argv) != 2:
+        raise SystemExit('usage: %s <actor_pairs>' % sys.argv[0])
     diesel.set_log_level(diesel.loglevels.ERROR)
     diesel.quickstart(main)
-    print(cpustats)
