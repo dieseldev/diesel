@@ -2,6 +2,7 @@
 '''Simple udp echo server and client.
 '''
 import sys
+from builtins import input
 from diesel import (
     UDPService, UDPClient, protocol, send, datagram, quickstart, receive,
 )
@@ -16,7 +17,7 @@ class EchoClient(UDPClient):
     """
     @protocol
     def say(self, msg):
-        send(msg)
+        send(msg.encode())
         return receive(datagram)
 
 def echo_server(service):
@@ -30,13 +31,13 @@ def echo_server(service):
     """
     while True:
         data = receive(datagram)
-        send("you said %s" % data)
+        send(b"you said " + data)
 
 def echo_client():
     client = EchoClient('localhost', 8013)
     while True:
         msg = input("> ")
-        print(client.say(msg))
+        print(client.say(msg).decode())
 
 if len(sys.argv) == 2:
     if 'client' in sys.argv[1]:
