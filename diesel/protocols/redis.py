@@ -43,9 +43,6 @@ class RedisClient(TCPClient):
         """If requested, convert response into unicode"""
         if isinstance(resp, bytes) and self.decode_responses:
             return resp.decode(self.encoding)
-        # TODO : remove me, for sanity check during py3k porting
-        elif not isinstance(resp, (str, bytes)) and resp != None:
-            import pdb; pdb.set_trace()
         else:
             return resp
 
