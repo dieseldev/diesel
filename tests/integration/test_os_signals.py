@@ -38,7 +38,7 @@ def test_multiple_signal_waiters():
     def mwaiter():
         diesel.signal(signal.SIGUSR1)
         c.tick()
-    for i in xrange(N_WAITERS):
+    for i in range(N_WAITERS):
         diesel.fork(mwaiter)
     diesel.sleep()
     os.kill(os.getpid(), signal.SIGUSR1)
@@ -94,7 +94,7 @@ def test_signal_captured_by_Signal_instance():
 
 def test_Signal_instances_trigger_multiple_times():
     usr1 = Signal(signal.SIGUSR1)
-    for i in xrange(5):
+    for i in range(5):
         os.kill(os.getpid(), signal.SIGUSR1)
         evt, _ = diesel.first(sleep=0.1, waits=[usr1])
         assert evt is usr1, evt

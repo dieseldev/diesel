@@ -14,6 +14,7 @@ log = log.name("dhttpd")
 BASE = '.'
 PORT = 8080
 
+print(__file__)
 app = DieselFlask(__file__)
 
 @app.route("/<path:file>", methods=["GET"])

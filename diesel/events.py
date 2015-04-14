@@ -25,7 +25,6 @@ class StringWaiter(str, Waiter):
     def wait_id(self):
         return str(self)
 
-
 class WaitPool(object):
     '''A structure that manages all `wait`ers, makes sure fired events
     get to the right places.
@@ -35,7 +34,7 @@ class WaitPool(object):
         self.loop_refs = defaultdict(set)
 
     def wait(self, who, what):
-        if isinstance(what, basestring):
+        if isinstance(what, str):
             what = StringWaiter(what)
 
         if what.ready_early():
@@ -46,7 +45,7 @@ class WaitPool(object):
         return what.wait_id
 
     def fire(self, what, value):
-        if isinstance(what, basestring):
+        if isinstance(what, str):
             what = StringWaiter(what)
 
         static = False
@@ -58,7 +57,7 @@ class WaitPool(object):
                     value = what.process_fire(value)
                 except StopWaitDispatch:
                     break
-                if type(value) == StaticValue:
+                if isinstance(value, StaticValue):
                     static = True
                     value = value.value
             handler.fire_in(what.wait_id, value)

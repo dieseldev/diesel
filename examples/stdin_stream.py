@@ -1,3 +1,4 @@
+from __future__ import print_function
 import sys
 
 from diesel import quickstart
@@ -7,6 +8,6 @@ def consume():
     q = create_line_input_stream(sys.stdin)
     while True:
         v = q.get()
-        print 'DIESEL GOT', v
+        print('DIESEL GOT', v)
 
 quickstart(consume)

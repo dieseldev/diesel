@@ -1,7 +1,9 @@
 # vim:ts=4:sw=4:expandtab
 '''Simple udp echo server and client.
 '''
+from __future__ import print_function
 import sys
+from builtins import input
 from diesel import (
     UDPService, UDPClient, protocol, send, datagram, quickstart, receive,
 )
@@ -16,7 +18,7 @@ class EchoClient(UDPClient):
     """
     @protocol
     def say(self, msg):
-        send(msg)
+        send(msg.encode())
         return receive(datagram)
 
 def echo_server(service):
@@ -30,13 +32,13 @@ def echo_server(service):
     """
     while True:
         data = receive(datagram)
-        send("you said %s" % data)
+        send(b"you said " + data)
 
 def echo_client():
     client = EchoClient('localhost', 8013)
     while True:
-        msg = raw_input("> ")
-        print client.say(msg)
+        msg = input("> ")
+        print(client.say(msg).decode())
 
 if len(sys.argv) == 2:
     if 'client' in sys.argv[1]:
@@ -45,4 +47,4 @@ if len(sys.argv) == 2:
     elif 'server' in sys.argv[1]:
         quickstart(UDPService(echo_server, 8013))
         raise SystemExit
-print 'usage: python %s (server|client)' % sys.argv[0]
+print('usage: python %s (server|client)' % sys.argv[0])

@@ -15,6 +15,7 @@ LOCAL_HOST = '127.0.0.1'
 echo_service = None
 stream_service = None
 
+
 def setup_module():
     global echo_service, stream_service
     echo_service = UDPService(echo_handler, RANDOM_PORT, LOCAL_HOST)
@@ -23,20 +24,24 @@ def setup_module():
             stream_dispatcher, RANDOM_PORT, LOCAL_HOST, streaming=True)
     runtime.current_app.add_service(stream_service)
 
+
 def test_echo_client_can_talk_to_echo_service():
     client = EchoClient(LOCAL_HOST, echo_service.port)
     assert client.echo('hello') == 'hello'
+
 
 def test_client_can_make_multiple_requests():
     client = EchoClient(LOCAL_HOST, echo_service.port)
     assert client.echo('hello') == 'hello'
     assert client.echo('world') == 'world'
 
+
 def test_client_knows_if_it_is_closed_or_not():
     client = EchoClient(LOCAL_HOST, echo_service.port)
     assert not client.is_closed
     client.close()
     assert client.is_closed
+
 
 def test_service_interleaves_client_requests():
     client1 = EchoClient(LOCAL_HOST, echo_service.port)
@@ -46,10 +51,11 @@ def test_service_interleaves_client_requests():
     assert client1.echo('HELLO') == 'HELLO'
     assert client2.echo('WORLD') == 'WORLD'
 
+
 def test_streaming_to_multiple_clients():
-    a_msgs = ['a:%d' % i for i in xrange(5)]
-    b_msgs = ['b:%d' % i for i in xrange(5)]
-    c_msgs = ['c:%d' % i for i in xrange(5)]
+    a_msgs = [('a:%d' % i).encode() for i in range(5)]
+    b_msgs = [('b:%d' % i).encode() for i in range(5)]
+    c_msgs = [('c:%d' % i).encode() for i in range(5)]
     expected = set()
     expected.update(a_msgs)
     expected.update(b_msgs)
@@ -58,15 +64,16 @@ def test_streaming_to_multiple_clients():
     actual_order = []
     results = Queue()
     def client_loop(actor, queue):
+        # import pdb; pdb.set_trace()
         s = StreamClient(queue, LOCAL_HOST, stream_service.port)
         s.start_stream(actor)
     diesel.fork(client_loop, 'a', results)
     diesel.fork(client_loop, 'b', results)
     diesel.fork(client_loop, 'c', results)
-    for i in xrange(15):
+    for i in range(15):
         msg = results.get(timeout=1.0)
-        actual_order.append(str(msg))
-        expected.remove(str(msg))
+        actual_order.append(bytes(msg))
+        expected.remove(bytes(msg))
     assert actual_order != unexpected_order, unexpected_order
     assert len(expected) == 0
 
@@ -79,6 +86,7 @@ def test_raises_exception_for_bad_service_handler():
     else:
         assert 0, "expected BadUDPHandler"
 
+
 def test_allows_instance_method_as_handler():
     class Foo(object):
         def handle(self, service):
@@ -87,6 +95,7 @@ def test_allows_instance_method_as_handler():
         UDPService(Foo().handle, RANDOM_PORT, LOCAL_HOST)
     except BadUDPHandler:
         assert 0, "instance method with two arguments should be ok"
+
 
 def test_allows_function_with_optional_arg_as_handler():
     def handle(service, foo=None):
@@ -102,22 +111,24 @@ def echo_handler(service):
     while True:
         diesel.send(diesel.receive(datagram))
 
+
 class EchoClient(UDPClient):
     @protocol
     def echo(self, msg):
-        diesel.send(msg)
+        diesel.send(msg.encode())
         result = diesel.receive(datagram)
-        return result.strip()
+        return result.strip().decode()
+
 
 def stream_dispatcher(service):
     def stream_handler(request):
-        for i in xrange(5):
-            diesel.send("%s:%d" % (request, i))
+        for i in range(5):
+            diesel.send(request + b':' + str(i).encode())
             diesel.sleep(random.random())
-
     while True:
         request = diesel.receive(datagram)
         fork_child(stream_handler, request)
+
 
 class StreamClient(UDPClient):
     def __init__(self, queue, *args, **kw):
@@ -126,6 +137,6 @@ class StreamClient(UDPClient):
 
     @protocol
     def start_stream(self, data):
-        diesel.send(data)
-        for i in xrange(5):
+        diesel.send(data.encode())
+        for i in range(5):
             self.queue.put(diesel.receive(datagram))

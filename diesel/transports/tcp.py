@@ -32,7 +32,7 @@ class TCPClient(Client):
 
         try:
             sock.connect(remote_addr)
-        except socket.error, e:
+        except socket.error as e:
             if e.args[0] == errno.EINPROGRESS:
                 _private_connect(
                         self, ip, sock, self.addr, self.port, timeout=timeout)
@@ -63,7 +63,7 @@ class TCPService(Service):
 
         try:
             sock.bind((self.iface, self.port))
-        except socket.error, e:
+        except socket.error as e:
             self.handle_cannot_bind(str(e))
 
         sock.listen(self.LISTEN_QUEUE_SIZE)
@@ -77,7 +77,7 @@ class TCPService(Service):
     def accept_new_connection(self):
         try:
             sock, addr = self.sock.accept()
-        except socket.error, e:
+        except socket.error as e:
             code, s = e
             if code in (errno.EAGAIN, errno.EINTR):
                 return
@@ -142,7 +142,7 @@ class TCPConnection(SocketContext):
             else:
                 try:
                     bsent = self.sock.send(data)
-                except socket.error, e:
+                except socket.error as e:
                     code, s = e
                     if code in (errno.EAGAIN, errno.EINTR):
                         self.pipeline.backup(data)
@@ -177,7 +177,7 @@ class TCPConnection(SocketContext):
             return
         try:
             data = self.sock.recv(BUFSIZE)
-        except socket.error, e:
+        except socket.error as e:
             code, s = e
             if code in (errno.EAGAIN, errno.EINTR):
                 return
@@ -267,7 +267,7 @@ def _private_connect(client, ip, sock, host, port, timeout=None):
         except socket.error:
             try:
                 d = sock.recv(1)
-            except socket.error, e:
+            except socket.error as e:
                 if e.errno == errno.ECONNREFUSED:
                     d = ''
                 else:

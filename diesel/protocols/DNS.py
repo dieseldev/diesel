@@ -1,4 +1,4 @@
-from __future__ import absolute_import
+
 
 import time
 from collections import deque
@@ -23,7 +23,7 @@ _local_nameservers = _resolv_conf.nameservers
 _search_domains = []
 if _resolv_conf.domain:
     _search_domains.append(str(_resolv_conf.domain)[:-1])
-_search_domains.extend(map(lambda n: str(n)[:-1], _resolv_conf.search))
+_search_domains.extend([str(n)[:-1] for n in _resolv_conf.search])
 
 del _resolv_conf
 

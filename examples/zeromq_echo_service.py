@@ -6,7 +6,8 @@ from diesel.transports.zeromq import ZeroMQService, ZeroMQClient
 
 
 NUM_CLIENTS = 100
-cids = range(NUM_CLIENTS)
+cids = list(range(NUM_CLIENTS))
+
 
 class EchoClient(ZeroMQClient):
     def __init__(self, ident, *args, **kw):
@@ -15,10 +16,12 @@ class EchoClient(ZeroMQClient):
 
     @protocol
     def echo(self):
-        for i in xrange(10):
-            diesel.send('msg:%d' % i)
+        for i in range(10):
+            msg = ('msg:%d' % i).encode()
+            diesel.send(msg)
             r = diesel.receive()
-            assert r == 'msg:%d' % i
+            assert r == msg
+
 
 def client_loop(i):
     def wrapper():
@@ -27,6 +30,7 @@ def client_loop(i):
             client.echo()
     return wrapper
 
+
 def handle_messages(service):
     count = 0
     while True:
@@ -34,7 +38,8 @@ def handle_messages(service):
         diesel.send(msg)
         count += 1
         if count % 10 == 0:
-            print "handled", count, "messages"
+            print("handled %i messages" % count)
+
 
 echo_svc = ZeroMQService(zmq.REP, handle_messages, 4321)
 diesel.quickstart(echo_svc, *(client_loop(i) for i in xrange(NUM_CLIENTS)))

@@ -29,8 +29,8 @@ def print_greenlet_stacks():
         stack = ''.join(traceback.format_stack(fr))
         stacks[stack] += 1
         loops[stack] = obj
-    for stack, count in sorted(stacks.iteritems(), key=itemgetter(1)):
+    for stack, count in sorted(iter(stacks.items()), key=itemgetter(1)):
         loop = loops[stack]
         loop_id = address_stripper.sub('', str(loop.loop_callable))
-        print '[%d] === %s ===' % (count, loop_id)
-        print stack
+        print('[%d] === %s ===' % (count, loop_id))
+        print(stack)

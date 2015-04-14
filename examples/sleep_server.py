@@ -6,10 +6,10 @@ from diesel import Application, TCPService, until_eol, sleep, send
 def delay_echo_server(service, addr):
     inp = until_eol()
 
-    for x in xrange(4):
+    for x in range(4):
         sleep(2)
-        send(str(x) + '\r\n')
-    send("you said %s" % inp)
+        send(str(x).encode() + b'\r\n')
+    send(b"you said " + inp)
 
 app = Application()
 app.add_service(TCPService(delay_echo_server, 8013))

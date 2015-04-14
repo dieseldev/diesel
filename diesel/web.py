@@ -1,6 +1,4 @@
-'''Slight wrapper around flask to fit the diesel
-
-mold.
+'''Slight wrapper around flask to fit the diesel mold.
 '''
 from flask import * # we're essentially republishing
 from werkzeug.debug import tbtools
@@ -69,7 +67,7 @@ class DieselFlask(Flask):
         with self.request_context(req):
             try:
                 response = self.full_dispatch_request()
-            except Exception, e:
+            except Exception as e:
                 self.log_exception(e)
                 try:
                     response = self.make_response(self.handle_exception(e))

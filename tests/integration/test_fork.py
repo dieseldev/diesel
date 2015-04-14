@@ -23,12 +23,12 @@ def test_fork_many():
     v = [0]
     COUNT = 10000
     def parent():
-        for x in xrange(COUNT):
+        for x in range(COUNT):
             fork(tottering_child, v)
 
     runtime.current_app.add_loop(Loop(parent))
 
-    for i in xrange(16):
+    for i in range(16):
         if v[0] == COUNT:
             break
         sleep(0.5) # cumulative is long enough in core 2-era

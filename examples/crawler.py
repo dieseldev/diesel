@@ -4,8 +4,13 @@ Clients + Loops
 '''
 
 import sys, time, re, os
-from urlparse import urlparse, urljoin
+try:
+    from urllib.parse import urlparse, urljoin
+except ImportError:
+    from urlparse import urlparse, urljoin
 
+if len(sys.argv) != 3:
+    raise SystemExit('usage: %s url folder' % sys.argv[0])
 url, folder = sys.argv[1:]
 
 schema, host, path, _, _, _ = urlparse(url)
@@ -27,7 +32,7 @@ url_exp = re.compile(r'(src|href)="([^"]+)', re.MULTILINE | re.IGNORECASE)
 heads = {'Host' : host}
 
 def get_links(s):
-    for mo in url_exp.finditer(s):
+    for mo in url_exp.finditer(s.decode('latin-1')):
         lpath = mo.group(2)
         if ':' not in lpath and '..' not in lpath:
             if lpath.startswith('/'):
@@ -51,7 +56,7 @@ def write_file(lpath, body):
     lpath = (lpath if not lpath.endswith('/') else (lpath + 'index.html')).lstrip('/')
     lpath = os.path.join(folder, lpath)
     ensure_dirs(lpath)
-    open(lpath, 'w').write(body)
+    open(lpath, 'wb').write(body)
 
 def follow_loop(lpath):
     log.info(" -> %s" % lpath)
@@ -81,7 +86,6 @@ def stop():
     quickstop()
 
 t = time.time()
-
-pool = ThreadPool(CONCURRENCY, follow_loop, req_loop().next, stop)
+pool = ThreadPool(CONCURRENCY, follow_loop, req_loop(), stop)
 
 quickstart(pool)

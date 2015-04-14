@@ -20,7 +20,7 @@ def test_wait_tokens_dont_accumulate_forever():
     done = []
     wait_ids = []
     expected_length = len(diesel.runtime.current_app.waits.waits)
-    for i in xrange(50):
+    for i in range(50):
         wait_id = uuid.uuid4().hex
         diesel.fork(waiting_green_thread, wait_id, done)
         diesel.sleep()

@@ -160,7 +160,7 @@ class IrcBot(IrcClient):
             assert '\n' not in r
             assert '\0' not in r
             self.send_command('PRIVMSG', chan, r)
-        elif type(r) is unicode:
+        elif type(r) is str:
             self._handle_return(r.encode('utf-8'), chan)
         elif type(r) is tuple:
             chan, r = r
@@ -169,7 +169,7 @@ class IrcBot(IrcClient):
             for i in r:
                 self._handle_return(i, chan)
         else:
-            print 'Hmm, unknown type returned from message handler:', type(r)
+            print('Hmm, unknown type returned from message handler:', type(r))
 
 class SSLIrcBot(IrcBot):
     def __init__(self, *args, **kw):

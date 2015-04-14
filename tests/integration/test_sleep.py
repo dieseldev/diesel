@@ -37,7 +37,7 @@ def test_sleep_zero():
 
     v = [0]
     def i():
-        for i in xrange(10000):
+        for i in range(10000):
             v[0] += 1
             sleep()
 

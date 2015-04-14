@@ -1,5 +1,6 @@
 import time
 import uuid
+from builtins import (bytes, chr, str, int, object)
 
 from contextlib import contextmanager
 
@@ -19,9 +20,45 @@ REDIS_PORT = 6379
 class RedisError(Exception): pass
 
 class RedisClient(TCPClient):
-    def __init__(self, host='localhost', port=REDIS_PORT, password=None, **kw):
-        self.password = password
+    def __init__(self, host='localhost', port=REDIS_PORT, password=None,
+                 encoding='utf-8', encoding_errors='strict',
+                 decode_responses=False, **kw):
+        """
+        :param host: host of the redis server
+        :param port: port of the redis server
+        :param password: password of the redis server
+        :param decode_responses: If true, the incomming socket bytes will be
+        decoded using the `encoding` charset
+        :param encoding: Encoding to use to encode/decode data given the
+        socket level communication must be done with bytes
+        :param encoding_errors: errors handling when encoding unicode
+        """
         super(RedisClient, self).__init__(host, port, **kw)
+        self.password = password
+        self.encoding = encoding
+        self.encoding_errors = encoding_errors
+        self.decode_responses = decode_responses
+
+    def _decode_response(self, resp):
+        """If requested, convert response into unicode"""
+        if isinstance(resp, bytes) and self.decode_responses:
+            return resp.decode(self.encoding)
+        else:
+            return resp
+
+    def _encode(self, value):
+        "Return a bytestring representation of the value"
+        if isinstance(value, bytes):
+            return value
+        elif isinstance(value, int):
+            value = str(value)
+        elif isinstance(value, float):
+            value = repr(value)
+        elif not isinstance(value, str):
+            value = str(value)
+        if isinstance(value, str):
+            value = value.encode(self.encoding, self.encoding_errors)
+        return value
 
     ##################################################
     ### GENERAL OPERATIONS
@@ -207,13 +244,13 @@ class RedisClient(TCPClient):
 
     @protocol
     def mset(self, d):
-        self._send('MSET', list=flatten_arg_pairs(d.iteritems()))
+        self._send('MSET', list=flatten_arg_pairs(iter(d.items())))
         resp = self._get_response()
         return resp
 
     @protocol
     def msetnx(self, d):
-        self._send('MSETNX', list=flatten_arg_pairs(d.iteritems()))
+        self._send('MSETNX', list=flatten_arg_pairs(iter(d.items())))
         resp = self._get_response()
         return resp
 
@@ -456,7 +493,7 @@ class RedisClient(TCPClient):
 
     def __pair_with_scores(self, resp):
         return [(resp[x], float(resp[x+1]))
-                for x in xrange(0, len(resp), 2)]
+                for x in range(0, len(resp), 2)]
 
     @protocol
     def zadd(self, key, score, member):
@@ -576,7 +613,7 @@ class RedisClient(TCPClient):
     def hmset(self, key, d):
         if not d:
             return True
-        args = [key] + flatten_arg_pairs(d.iteritems())
+        args = [key] + flatten_arg_pairs(iter(d.items()))
 
         self._send('HMSET', list=args)
         resp = self._get_response()
@@ -589,7 +626,7 @@ class RedisClient(TCPClient):
         args = [key] + l
         self._send('HMGET', list=args)
         resp = self._get_response()
-        return dict(zip(l, resp))
+        return dict(list(zip(l, resp)))
 
     @protocol
     def hincrby(self, key, field, amt):
@@ -631,7 +668,7 @@ class RedisClient(TCPClient):
     def hgetall(self, key):
         self._send('HGETALL', key)
         resp = self._get_response()
-        return dict(resp[x:x+2] for x in xrange(0, len(resp), 2))
+        return dict(resp[x:x+2] for x in range(0, len(resp), 2))
 
     @protocol
     def hsetnx(self, key, field, value):
@@ -716,15 +753,15 @@ class RedisClient(TCPClient):
 
         -- OR -- None, if wake_sig was fired
 
-        NOTE: The message will always be a string.  Handle this as you see fit.
+        NOTE: The message will always be of bytes type.  Handle this as you see fit.
         NOTE: subscribe/unsubscribe acks are ignored here
         '''
         while True:
             r = self._get_response(wake_sig)
             if r:
-                if r[0] == 'message':
+                if r[0] == b'message':
                     return [r[1]] + r[1:]
-                elif r[0] == 'pmessage':
+                elif r[0] == b'pmessage':
                     return r[1:]
             else:
                 return None
@@ -746,20 +783,20 @@ class RedisClient(TCPClient):
         self._send(cmd, list=rest)
 
         line_one = until_eol()
-        if line_one[0] in ('+', '-', ':'):
+        c = chr(bytes(line_one)[0])
+        if c in ('+', '-', ':'):
             return line_one
-
-        if line_one[0] == '$':
+        if c == '$':
             amt = int(line_one[1:])
             if amt == -1:
                 return line_one
             return line_one + receive(amt) + until_eol()
-        if line_one[0] == '*':
+        if c == '*':
             nargs = int(line_one[1:])
             if nargs == -1:
                 return line_one
             out = line_one
-            for x in xrange(nargs):
+            for x in range(nargs):
                 head = until_eol()
                 out += head
                 out += receive(int(head[1:])) + until_eol()
@@ -767,11 +804,11 @@ class RedisClient(TCPClient):
 
     def _send(self, cmd, *args, **kwargs):
         if 'list' in kwargs:
-            args = kwargs['list']
-        all = (cmd,) + tuple(str(s) for s in args)
-        send('*%s\r\n' % len(all))
+            args = tuple(kwargs['list'])
+        all = tuple(map(self._encode, (cmd,) + args))
+        send(('*%s\r\n' % len(all)).encode())
         for i in all:
-            send(('$%s\r\n' % len(i)) + i + '\r\n')
+            send(('$%s\r\n' % len(i)).encode() + i + b'\r\n')
 
     def _get_response(self, wake_sig=None):
         if wake_sig:
@@ -782,9 +819,9 @@ class RedisClient(TCPClient):
         else:
             fl = until_eol().strip()
 
-        c = fl[0]
+        c = chr(bytes(fl)[0])
         if c == '+':
-            return fl[1:]
+            return self._decode_response(fl[1:])
         elif c == '$':
             l = int(fl[1:])
             if l == -1:
@@ -792,26 +829,27 @@ class RedisClient(TCPClient):
             else:
                 resp = receive(l)
                 until_eol() # noop
-            return resp
+            return self._decode_response(resp)
         elif c == '*':
             count = int(fl[1:])
             resp = []
             if count == -1:
                 return None
-            for x in xrange(count):
+            for x in range(count):
                 hl = until_eol()
-                assert hl[0] in ['$', ':', '+']
-                if hl[0] == '$':
+                c_hl = chr(bytes(hl)[0])
+                assert c_hl in ['$', ':', '+'], c_hl
+                if c_hl == '$':
                     l = int(hl[1:])
                     if l == -1:
                         resp.append(None)
                     else:
-                        resp.append(receive(l))
+                        resp.append(self._decode_response(receive(l)))
                         until_eol() # noop
-                elif hl[0] == ':':
+                elif c_hl == ':':
                     resp.append(int(hl[1:]))
-                elif hl[0] == '+':
-                    resp.append(hl[1:].strip())
+                elif c_hl == '+':
+                    resp.append(self._decode_response(hl[1:].strip()))
             return resp
         elif c == ':':
             return int(fl[1:])
@@ -881,9 +919,10 @@ class RedisLock(object):
     def __init__(self, client, key, timeout=30):
         assert timeout >= 2, 'Timeout must be greater than 2 to guarantee the transaction'
         self.client = client
-        self.key = key
+        assert isinstance(key, (str, bytes))
+        self.key = key if isinstance(key, bytes) else key.encode()
         self.timeout = timeout
-        self.me = str(uuid.uuid4())
+        self.me = uuid.uuid4().bytes
 
     def __enter__(self):
         trans = self.client.transaction(watch=[self.key])
@@ -915,7 +954,22 @@ class RedisLock(object):
 #########################################
 ## Hub, an abstraction of sub behavior, etc
 class RedisSubHub(object):
-    def __init__(self, host='127.0.0.1', port=REDIS_PORT, password=None):
+    def __init__(self, host='127.0.0.1', port=REDIS_PORT, password=None,
+                 encoding='utf-8', encoding_errors='strict',
+                 decode_responses=False):
+        """
+        :param host: host of the redis server
+        :param port: port of the redis server
+        :param password: password of the redis server
+        :param decode_responses: If true, the incomming socket bytes will be
+        decoded using the `encoding` charset
+        :param encoding: Encoding to use to encode/decode data given the
+        socket level communication must be done with bytes
+        :param encoding_errors: errors handling when encoding unicode
+        """
+        self.encoding = encoding
+        self.encoding_errors = encoding_errors
+        self.decode_responses = decode_responses
         self.host = host
         self.port = port
         self.password= password
@@ -924,14 +978,31 @@ class RedisSubHub(object):
         self.sub_rms = []
         self.subs = {}
 
+    def _encode(self, value):
+        "Return a bytestring representation of the value"
+        if isinstance(value, bytes):
+            return value
+        elif isinstance(value, int):
+            value = str(value)
+        elif isinstance(value, float):
+            value = repr(value)
+        elif not isinstance(value, str):
+            value = str(value)
+        if isinstance(value, str):
+            value = value.encode(self.encoding, self.encoding_errors)
+        return value
+
     def make_client(self):
-        client = RedisClient(self.host, self.port, self.password)
+        client = RedisClient(self.host, self.port, self.password,
+                             encoding=self.encoding,
+                             encoding_errors=self.encoding_errors,
+                             decode_responses=self.decode_responses)
         if self.password != None:
             client.auth()
         return  client
 
     def __isglob(self, glob):
-        return '*' in glob or '?' in glob or ('[' in glob and ']' and glob)
+        return b'*' in glob or b'?' in glob or (b'[' in glob and b']' and glob)
 
     def __call__(self):
         with self.make_client() as conn:
@@ -990,6 +1061,7 @@ class RedisSubHub(object):
     def subq(self, classes):
         if type(classes) not in (set, list, tuple):
             classes = [classes]
+        classes = [self._encode(classe) for classe in classes]
 
         q = Queue()
 
@@ -1009,6 +1081,7 @@ class RedisSubHub(object):
     def sub(self, classes):
         if type(classes) not in (set, list, tuple):
             classes = [classes]
+        classes = [self._encode(classe) for classe in classes]
 
         hb = self
         q = Queue()

@@ -19,9 +19,9 @@ def make_and_wait():
         q, v = first(waits=both)
         assert v is None
         if q == q1:
-            print 'q1'
+            print('q1')
         elif q == q2:
-            print 'q2'
+            print('q2')
         else:
             assert 0
 

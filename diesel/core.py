@@ -5,11 +5,13 @@ scheduling primitives, green-thread procedures.
 import os
 import itertools
 from greenlet import greenlet
+from past.builtins import basestring
 
 from diesel import buffer
 from diesel import runtime
 from diesel.logmod import log
 from diesel.events import EarlyValue
+import collections
 
 
 class LoopKeepAlive(Exception):
@@ -17,17 +19,27 @@ class LoopKeepAlive(Exception):
     allows the app to re-schedule keep_alive loops.
     '''
 
+
 class ParentDiedException(Exception):
     '''Raised when the parent (assigned via fork_child) has died.
     '''
+
 
 class TerminateLoop(Exception):
     '''Raised to terminate the current loop, closing the socket if there
     is one associated with the loop.
     '''
 
-CRLF = '\r\n'
+
+CRLF = b'\r\n'
 BUFSIZ = 2 ** 14
+TOK_RECEIVE_ANY = 'receive_any'
+TOK_RECEIVE = 'receive'
+TOK_UNTIL = 'until'
+TOK_UNTIL_EOL = 'until_eol'
+TOK_DATAGRAM = 'datagram'
+TOK_SLEEP = 'sleep'
+
 
 def until(sentinel):
     """Returns data from the underlying connection, terminated by sentinel.
@@ -37,11 +49,12 @@ def until(sentinel):
     off the socket beyond the sentinel is buffered.
 
     :param sentinel: The sentinel to wait for before returning data.
-    :type sentinel: A byte string (str).
-    :return: A byte string (str).
+    :type sentinel: bytes
+    :return: bytes
 
     """
     return _current_loop.input_op(sentinel)
+
 
 def until_eol():
     """Returns data from the underlying connection, terminated by \\r\\n.
@@ -50,7 +63,7 @@ def until_eol():
     a carriage return and a line feed (CRLF). Data that has been read off the
     socket beyond the CRLF is buffered.
 
-    :return: A byte string (str).
+    :return: bytes
 
     """
     return until(CRLF)
@@ -75,49 +88,64 @@ def receive(spec=None):
     """
     return _current_loop.input_op(spec)
 
+
 def send(data, priority=5):
     """Sends data out over the underlying connection.
 
     :param data: The data that you want to send.
-    :type data: A byte string (str).
+    :type data: bytes or bytes-stream (i.g. file).
     :param priority: The priority
 
     """
+    if isinstance(data, basestring) and not isinstance(data, bytes):
+        raise RuntimeError("Can only send bytes, you should use "
+                           "`encode` prior to call this function")
     return _current_loop.send(data, priority=priority)
+
 
 def wait(*args, **kw):
     return _current_loop.wait(*args, **kw)
 
+
 def fire(*args, **kw):
     return _current_loop.fire(*args, **kw)
+
 
 def sleep(*args, **kw):
     return _current_loop.sleep(*args, **kw)
 
+
 def thread(*args, **kw):
     return _current_loop.thread(*args, **kw)
+
 
 def first(*args, **kw):
     return _current_loop.first(*args, **kw)
 
+
 def label(*args, **kw):
     return _current_loop.label(*args, **kw)
+
 
 def fork(*args, **kw):
     return _current_loop.fork(False, *args, **kw)
 
+
 def fork_child(*args, **kw):
     return _current_loop.fork(True, *args, **kw)
+
 
 def fork_from_thread(f, *args, **kw):
     l = Loop(f, *args, **kw)
     runtime.current_app.hub.schedule_loop_from_other_thread(l, ContinueNothing)
+
 
 def signal(sig, callback=None):
     if not callback:
         return _current_loop.signal(sig)
     else:
         return _current_loop._signal(sig, callback)
+
 
 class datagram(object):
     """Used to create a singleton instance of the same name.
@@ -126,16 +154,21 @@ class datagram(object):
 
     """
     pass
+
+
 datagram = datagram()
 _datagram = datagram
-
 _current_loop = None
+
 
 ContinueNothing = object()
 
+
 def identity(cb): return cb
 
+
 ids = itertools.count(1)
+
 
 class Loop(object):
     def __init__(self, loop_callable, *args, **kw):
@@ -146,7 +179,7 @@ class Loop(object):
         self.keep_alive = False
         self.hub = runtime.current_app.hub
         self.app = runtime.current_app
-        self.id = ids.next()
+        self.id = next(ids)
         self.children = set()
         self.parent = None
         self.deaths = 0
@@ -181,7 +214,8 @@ class Loop(object):
             raise
         except ParentDiedException:
             parent_died = True
-        except:
+        except Exception as e:
+            print(e)
             log.trace().error("-- Unhandled Exception in local loop <%s> --" % self.loop_label)
         finally:
             if self.connection_stack:
@@ -268,25 +302,25 @@ class Loop(object):
                 return mark
             return deco
 
-        f_sent = filter(None, (receive_any, receive, until, until_eol, datagram))
-        assert len(f_sent) <= 1,(
-        "only 1 of (receive_any, receive, until, until_eol, datagram) may be provided")
+        f_sent = [_f for _f in (receive_any, receive, until, until_eol, datagram) if _f]
+        assert len(f_sent) <= 1, ("only 1 of (receive_any, receive, until,"
+                                  " until_eol, datagram) may be provided")
         sentinel = None
         if receive_any:
             sentinel = buffer.BufAny
-            tok = 'receive_any'
+            tok = TOK_RECEIVE_ANY
         elif receive:
             sentinel = receive
-            tok = 'receive'
+            tok = TOK_RECEIVE
         elif until:
             sentinel = until
-            tok = 'until'
+            tok = TOK_UNTIL
         elif until_eol:
-            sentinel = "\r\n"
-            tok = 'until_eol'
+            sentinel = CRLF
+            tok = TOK_UNTIL_EOL
         elif datagram:
             sentinel = _datagram
-            tok = 'datagram'
+            tok = TOK_DATAGRAM
         if sentinel:
             early_val = self._input_op(sentinel, marked_cb(tok))
             if early_val:
@@ -294,7 +328,7 @@ class Loop(object):
             # othewise.. process others and dispatch
 
         if sleep is not None:
-            self._sleep(sleep, marked_cb('sleep'))
+            self._sleep(sleep, marked_cb(TOK_SLEEP))
 
         if waits:
             for w in waits:
@@ -327,7 +361,7 @@ class Loop(object):
 
     def wait(self, event):
         v = self._wait(event)
-        if type(v) is EarlyValue:
+        if isinstance(v, EarlyValue):
             self.reschedule_with_this_value(v.val)
         return self.dispatch()
 
@@ -338,7 +372,7 @@ class Loop(object):
                 rcb(d)
             self.hub.schedule(call_in)
         v = self.app.waits.wait(self, event)
-        if type(v) is EarlyValue:
+        if isinstance(v, EarlyValue):
             return v
         self.fire_handlers[v] = cb
 
@@ -414,7 +448,7 @@ class Loop(object):
         conn = self.check_connection()
         cb = cb_maker(self.wake)
         res = conn.check_incoming(sentinel, cb)
-        if callable(res):
+        if isinstance(res, collections.Callable):
             cb = res
         elif res:
             return res
@@ -446,4 +480,3 @@ class Loop(object):
 
     def _signal(self, sig, cb):
         self.hub.add_signal_handler(sig, cb)
-

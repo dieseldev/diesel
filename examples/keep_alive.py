@@ -1,7 +1,7 @@
 from diesel import Application, Loop
 
 def restart():
-    print "I should restart"
+    print("I should restart")
     a = b
 
 a = Application()

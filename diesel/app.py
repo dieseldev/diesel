@@ -5,7 +5,7 @@ import os
 import gc
 import cProfile
 import traceback
-
+import collections
 from greenlet import greenlet
 
 from diesel import runtime
@@ -74,7 +74,7 @@ class Application(object):
                 except KeyboardInterrupt:
                     log.warning("-- KeyboardInterrupt raised.. exiting main loop --")
                     break
-                except Exception, e:
+                except Exception as e:
                     log.error("-- Unhandled Exception rose to main loop --")
                     log.error(traceback.format_exc())
 
@@ -93,12 +93,11 @@ class Application(object):
                 config['filename'] = statsfile
             try:
                 cProfile.runctx('_real_main()', globals(), locals(), **config)
-            except TypeError, e:
+            except TypeError as e:
                 if "sort" in e.args[0]:
                     del config['sort']
                     cProfile.runctx('_real_main()', globals(), locals(), **config)
                 else: raise e
-
         self.runhub = greenlet(_main if not profile else _profiled_main)
         self.runhub.switch()
 
@@ -173,7 +172,7 @@ def quickstart(*args, **kw):
             app.add_service(a)
         elif isinstance(a, Loop):
             app.add_loop(a)
-        elif callable(a):
+        elif isinstance(a, collections.Callable):
             app.add_loop(Loop(a))
     app.run()
 

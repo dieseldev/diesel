@@ -10,7 +10,7 @@ def ssl_async_handshake(sock, hub, next):
             hub.enable_write(sock)
         except SSL.WantX509LookupError:
             pass
-        except Exception, e:
+        except Exception as e:
             hub.unregister(sock)
             next(e)
         else:

@@ -51,9 +51,9 @@ class EchoClient(TCPClient):
 
     @protocol
     def echo(self, msg):
-        diesel.send(msg + '\r\n')
+        diesel.send((msg + '\r\n').encode())
         result = diesel.until_eol()
-        return result.strip()
+        return result.strip().decode()
 
     def on_connect(self):
         self.on_connect_called = True
